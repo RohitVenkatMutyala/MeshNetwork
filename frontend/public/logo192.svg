@@ -1,0 +1,73 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bodyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4dd0d0"/>
+      <stop offset="100%" stop-color="#20b2aa"/>
+    </linearGradient>
+    
+    <radialGradient id="headGradient" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#6de5e5"/>
+      <stop offset="100%" stop-color="#20b2aa"/>
+    </radialGradient>
+    
+    <!-- Glitch/Random effect filter -->
+    <filter id="randomGlitch" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence baseFrequency="0.9" numOctaves="4" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2"/>
+    </filter>
+  </defs>
+  
+  <!-- Random geometric background elements -->
+  <g opacity="0.1">
+    <rect x="10" y="15" width="8" height="12" fill="#20b2aa" transform="rotate(23 14 21)"/>
+    <circle cx="80" cy="25" r="6" fill="#20b2aa"/>
+    <polygon points="15,80 25,85 20,95" fill="#20b2aa"/>
+    <rect x="75" y="70" width="10" height="6" fill="#20b2aa" transform="rotate(-15 80 73)"/>
+  </g>
+  
+  <!-- Main figure - simplified person icon -->
+  <g transform="translate(50,50)">
+    <!-- Head -->
+    <circle cx="0" cy="-25" r="12" fill="url(#headGradient)" stroke="#0d7377" stroke-width="1"/>
+    
+    <!-- Body -->
+    <rect x="-8" y="-15" width="16" height="25" fill="url(#bodyGradient)" stroke="#0d7377" stroke-width="1" rx="2"/>
+    
+    <!-- Arms - positioned randomly/asymmetrically -->
+    <rect x="-20" y="-10" width="12" height="4" fill="url(#bodyGradient)" rx="2" transform="rotate(-20 -14 -8)"/>
+    <rect x="8" y="-8" width="12" height="4" fill="url(#bodyGradient)" rx="2" transform="rotate(35 14 -6)"/>
+    
+    <!-- Legs - different lengths for randomness -->
+    <rect x="-6" y="10" width="5" height="18" fill="url(#bodyGradient)" rx="2"/>
+    <rect x="1" y="10" width="5" height="22" fill="url(#bodyGradient)" rx="2"/>
+    
+    <!-- Random elements floating around the figure -->
+    <g opacity="0.7">
+      <!-- Question marks and symbols -->
+      <text x="-30" y="-20" font-family="Arial" font-size="8" fill="#20b2aa" transform="rotate(-15 -30 -20)">?</text>
+      <text x="25" y="-15" font-family="Arial" font-size="6" fill="#20b2aa" transform="rotate(25 25 -15)">!</text>
+      <text x="-25" y="5" font-family="Arial" font-size="7" fill="#20b2aa" transform="rotate(45 -25 5)">~</text>
+      <text x="20" y="15" font-family="Arial" font-size="8" fill="#20b2aa" transform="rotate(-30 20 15)">*</text>
+      
+      <!-- Random dots/particles -->
+      <circle cx="-28" cy="10" r="1.5" fill="#20b2aa"/>
+      <circle cx="30" cy="-5" r="1" fill="#20b2aa"/>
+      <circle cx="-15" cy="25" r="1.2" fill="#20b2aa"/>
+      <circle cx="18" cy="-25" r="0.8" fill="#20b2aa"/>
+    </g>
+    
+    <!-- Face elements -->
+    <circle cx="-4" cy="-28" r="1.5" fill="#0d7377"/> <!-- Left eye -->
+    <circle cx="4" cy="-28" r="1.5" fill="#0d7377"/>  <!-- Right eye -->
+    <path d="M-3,-22 Q0,-20 3,-22" stroke="#0d7377" stroke-width="1" fill="none"/> <!-- Smile -->
+  </g>
+  
+  <!-- Random geometric border elements -->
+  <g opacity="0.3" stroke="#20b2aa" stroke-width="1" fill="none">
+    <path d="M5,5 L15,5 L15,15"/>
+    <path d="M85,5 L95,5 L95,15"/>
+    <path d="M5,85 L5,95 L15,95"/>
+    <path d="M85,95 L95,95 L95,85"/>
+  </g>
+</svg>
