@@ -9,7 +9,7 @@ import RegisterForm from './components/RegisterForm';
 import { ThemeProvider } from './context/ThemeContext'; 
 import Call from './components/call.js';
 import CreateCall from './components/CreateCall'; // <-- 1. IMPORT CreateCall
-
+import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 function App() {
   return (
    <ThemeProvider>
