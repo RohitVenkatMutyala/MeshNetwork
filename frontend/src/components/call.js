@@ -233,7 +233,7 @@ function Call() {
         if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
         }
-    }, [stream]); // Runs when 'stream' changes (from null to a stream, or from a stream to null)
+    }, [stream, callState]); // Runs when 'stream' changes (from null to a stream, or from a stream to null)
 
 
     // --- Handler Functions ---
