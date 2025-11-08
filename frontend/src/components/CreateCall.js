@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import emailjs from '@emailjs/browser';
 import RecentCalls from './RecentCalls';
-
+import Navbar from './navbar';
 
 function CreateCall() {
     const navigate = useNavigate();
@@ -207,7 +207,7 @@ function CreateCall() {
 
     return (
         <>
-           
+            <Navbar />
             <div className="container mt-5">
                 <style jsx>{`
                     .calls-page-card { 
