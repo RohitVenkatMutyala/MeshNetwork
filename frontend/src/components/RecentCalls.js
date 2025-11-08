@@ -1,19 +1,22 @@
+// src/components/RecentCalls.js
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, setDoc, serverTimestamp, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import emailjs from '@emailjs/browser';
 
 function RecentCalls({ searchTerm }) {
     const { user } = useAuth();
-    const [allCalls, setAllCalls] = useState([]);
-    const [filteredCalls, setFilteredCalls] = useState([]);
+    const [allCalls, setAllCalls] = useState([]); // Stores all calls from Firebase
+    const [filteredCalls, setFilteredCalls] = useState([]); // Stores calls to display
     const [loading, setLoading] = useState(true);
     const [isCalling, setIsCalling] = useState(null);
     const navigate = useNavigate();
 
+    // Function to send email when re-calling
     const sendInvitationEmails = async (callId, callDescription, invitedEmail) => {
         if (!invitedEmail) return;
         const emailjsPublicKey = '3WEPhBvkjCwXVYBJ-';
@@ -35,55 +38,12 @@ function RecentCalls({ searchTerm }) {
         }
     };
 
-    // --- NEW: Copied Call Limiting Function ---
-    const checkCallLimit = async () => {
-        // 1. Check 30-second cooldown
-        const lastCallTime = localStorage.getItem('lastCallTime');
-        if (lastCallTime && Date.now() - parseInt(lastCallTime) < 30000) { // 30 seconds
-            toast.warn("Please wait 30 seconds between starting new calls.");
-            return false;
-        }
-
-        // 2. Check 10-calls-per-day limit
-        const now = new Date();
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const startOfDayTimestamp = Timestamp.fromDate(startOfDay);
-
-        const callsQuery = query(
-            collection(db, 'calls'),
-            where('ownerId', '==', user._id),
-            where('createdAt', '>=', startOfDayTimestamp)
-        );
-
-        try {
-            const querySnapshot = await getDocs(callsQuery);
-            if (querySnapshot.size >= 10) {
-                toast.error("You have reached your limit of 10 calls per day.");
-                return false;
-            }
-        } catch (error) {
-            console.error("Error checking call limit: ", error);
-            toast.error("Could not verify call limit. Please try again.");
-            return false;
-        }
-        return true; // All checks passed
-    };
-
     // "Speed dial" function
     const handleReCall = async (callId, recipientName, recipientEmail, description) => {
         if (!user) {
             toast.error("You must be logged in to make a call.");
             return;
         }
-
-        // --- NEW: Run checks before creating call ---
-        const canCall = await checkCallLimit();
-        if (!canCall) {
-            setIsCalling(null);
-            return;
-        }
-        // --- END NEW ---
-
         setIsCalling(callId);
         const newCallId = Math.random().toString(36).substring(2, 9);
         const callDocRef = doc(db, 'calls', newCallId);
@@ -105,11 +65,6 @@ function RecentCalls({ searchTerm }) {
             });
             await sendInvitationEmails(newCallId, description, recipientEmail);
             toast.success(`Calling ${recipientName}...`);
-            
-            // --- NEW: Set cooldown timer and clear rejoin card ---
-            localStorage.setItem('lastCallTime', Date.now().toString());
-            localStorage.removeItem('lastActiveCall');
-
             navigate(`/call/${newCallId}`);
         } catch (error) {
             console.error("Failed to create call:", error);
@@ -118,7 +73,7 @@ function RecentCalls({ searchTerm }) {
         }
     };
 
-    // Effect 1: Fetch and de-duplicate calls
+    // Effect 1: Fetch all calls from Firebase
     useEffect(() => {
         if (!user) {
             setLoading(false);
@@ -128,25 +83,35 @@ function RecentCalls({ searchTerm }) {
             collection(db, 'calls'),
             where('allowedEmails', 'array-contains', user.email),
             orderBy('createdAt', 'desc'),
-            limit(20) 
+            limit(20) // Get more calls to make search useful
         );
         const unsubscribe = onSnapshot(callsQuery, (snapshot) => {
             const callsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+            // =================================================================
+            // === NEW DE-DUPLICATION LOGIC ===
+            // =================================================================
+            // This creates a list with only the most recent call for each unique person.
             const uniqueCalls = [];
             const seenEmails = new Set();
             
             for (const call of callsData) {
+                // Determine the *other* person's email
                 const isOwner = call.ownerId === user._id;
                 const otherPersonEmail = isOwner ? call.recipientEmail : call.ownerEmail;
 
+                // If we haven't seen this email yet, and it's valid, add it.
                 if (otherPersonEmail && !seenEmails.has(otherPersonEmail)) {
                     seenEmails.add(otherPersonEmail);
                     uniqueCalls.push(call);
                 }
+                // If we have seen this email, it's an older call with the same person,
+                // so we skip it.
             }
-            setAllCalls(uniqueCalls);
-            setFilteredCalls(uniqueCalls);
+            // =================================================================
+
+            setAllCalls(uniqueCalls); // Store the unique list
+            setFilteredCalls(uniqueCalls); // Set the initial filtered list
             setLoading(false);
         }, (error) => {
             console.error("Error fetching recent calls:", error);
@@ -158,9 +123,10 @@ function RecentCalls({ searchTerm }) {
     // Effect 2: Filter calls when searchTerm changes
     useEffect(() => {
         if (!searchTerm) {
-            setFilteredCalls(allCalls);
+            setFilteredCalls(allCalls); // If search is empty, show all calls
             return;
         }
+
         const lowerCaseSearch = searchTerm.toLowerCase();
         const filtered = allCalls.filter(call => {
             const isOwner = call.ownerId === user._id;
@@ -173,7 +139,7 @@ function RecentCalls({ searchTerm }) {
             );
         });
         setFilteredCalls(filtered);
-    }, [searchTerm, allCalls, user]);
+    }, [searchTerm, allCalls, user]); // Re-run this filter when search or data changes
 
 
     const formatTimestamp = (timestamp) => {
@@ -297,7 +263,7 @@ function RecentCalls({ searchTerm }) {
                         const displayName = isCurrentUserOwner ? call.recipientName : call.ownerName;
                         const displayEmail = isCurrentUserOwner ? call.recipientEmail : call.ownerEmail;
                         
-                        if (!displayName) return null;
+                        if (!displayName) return null; // Don't render calls with missing data
 
                         return (
                             <div key={call.id} className="call-item">
