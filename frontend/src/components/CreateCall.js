@@ -1,8 +1,6 @@
-// src/components/CreateCall.js
-
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { doc, setDoc, serverTimestamp, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
@@ -19,8 +17,24 @@ function CreateCall() {
     const [recipientName, setRecipientName] = useState('');
     const [recipientEmail, setRecipientEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    
     const [searchTerm, setSearchTerm] = useState('');
+
+    // --- NEW: State for the "Rejoin" card ---
+    const [lastActiveCall, setLastActiveCall] = useState(null);
+
+    // --- NEW: Check for a "Rejoin" call on mount ---
+    useEffect(() => {
+        try {
+            const callData = localStorage.getItem('lastActiveCall');
+            if (callData) {
+                setLastActiveCall(JSON.parse(callData));
+            }
+        } catch (error) {
+            console.error("Failed to parse last active call", error);
+            localStorage.removeItem('lastActiveCall');
+        }
+    }, []);
+
 
     const sendInvitationEmails = async (callId, callDescription, invitedEmails) => {
         if (!invitedEmails || invitedEmails.length === 0) return;
@@ -47,11 +61,55 @@ function CreateCall() {
         }
     };
 
+    // --- NEW: Call Limiting Function ---
+    const checkCallLimit = async () => {
+        // 1. Check 30-second cooldown
+        const lastCallTime = localStorage.getItem('lastCallTime');
+        if (lastCallTime && Date.now() - parseInt(lastCallTime) < 30000) { // 30 seconds
+            toast.warn("Please wait 30 seconds between starting new calls.");
+            return false;
+        }
+
+        // 2. Check 10-calls-per-day limit
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfDayTimestamp = Timestamp.fromDate(startOfDay);
+
+        const callsQuery = query(
+            collection(db, 'calls'),
+            where('ownerId', '==', user._id),
+            where('createdAt', '>=', startOfDayTimestamp)
+        );
+
+        try {
+            const querySnapshot = await getDocs(callsQuery);
+            if (querySnapshot.size >= 10) {
+                toast.error("You have reached your limit of 10 calls per day.");
+                return false;
+            }
+        } catch (error) {
+            console.error("Error checking call limit: ", error);
+            toast.error("Could not verify call limit. Please try again.");
+            return false;
+        }
+
+        return true; // All checks passed
+    };
+
     const handleCreateCall = async () => {
         if (!user) {
             toast.error("You must be logged in.");
             return;
         }
+
+        // --- NEW: Run checks before creating call ---
+        const canCall = await checkCallLimit();
+        if (!canCall) {
+            setIsLoading(false);
+            return;
+        }
+        // --- END NEW ---
+
         if (!description) {
             toast.warn("A description is required.");
             return;
@@ -95,6 +153,10 @@ function CreateCall() {
 
             await sendInvitationEmails(newCallId, description, invitedEmails);
             toast.success("Call created and invitation sent!");
+            
+            // --- NEW: Set cooldown timer and clear rejoin card ---
+            localStorage.setItem('lastCallTime', Date.now().toString());
+            localStorage.removeItem('lastActiveCall');
             
             navigate(`/call/${newCallId}`); 
 
@@ -159,18 +221,16 @@ function CreateCall() {
                         </div>
                     </div>
                 );
-            default: // --- NEW: Main screen with Search and Add ---
+            default: // Main screen with Search and Add
                 return (
                     <div className="card-body p-0 p-md-2">
                         <div className="p-3 p-md-4">
-                            {/* --- UPDATED UI --- */}
                             <div className="d-flex gap-2 align-items-center">
-                                {/* Small search bar */}
                                 <div className="input-group input-group-sm flex-grow-1">
                                     <span className="input-group-text" id="search-icon"><i className="bi bi-search"></i></span>
                                     <input
                                         type="search"
-                                        className="form-control" // form-control-sm is automatic in input-group-sm
+                                        className="form-control"
                                         placeholder="Search recent calls..."
                                         aria-label="Search recent calls"
                                         aria-describedby="search-icon"
@@ -178,19 +238,16 @@ function CreateCall() {
                                         onChange={(e) => setSearchTerm(e.target.value)}
                                     />
                                 </div>
-                                {/* Small icon button */}
                                 <button 
                                     className="btn btn-primary btn-sm"
                                     onClick={() => setStep(1)}
                                     title="Add New Call"
-                                    style={{lineHeight: 1}} // Fix for icon alignment
+                                    style={{lineHeight: 1}}
                                 > 
                                     <i className="bi bi-person-plus-fill fs-6"></i>
                                 </button>
                             </div>
-                            {/* --- END UPDATED UI --- */}
                         </div>
-                        {/* The RecentCalls component is now part of the default view */}
                         <RecentCalls searchTerm={searchTerm} />
                     </div>
                 );
@@ -226,7 +283,6 @@ function CreateCall() {
                         font-size: 2rem; 
                         margin-bottom: 1.5rem; 
                     }
-                    /* This is for the form steps, not the icon button */
                     .create-btn { 
                         background: linear-gradient(135deg, #f12711, #f5af19); 
                         border: none; 
@@ -241,10 +297,44 @@ function CreateCall() {
                         box-shadow: 0 8px 25px rgba(241, 39, 17, 0.4); 
                         color: white; 
                     }
+                    /* --- NEW: Rejoin Card Styles --- */
+                    .rejoin-card {
+                        background-color: var(--bs-tertiary-bg);
+                        border-top: 1px solid var(--bs-border-color);
+                        padding: 1rem 1.5rem;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .rejoin-btn {
+                        background-color: var(--bs-success);
+                        border-color: var(--bs-success);
+                    }
                 `}</style>
                 <div className="card calls-page-card shadow-lg border-0 position-relative">
                     {renderStep()}
                 </div>
+
+                {/* --- NEW: Rejoin Call Card --- */}
+                {lastActiveCall && step === 0 && (
+                    <div className="card calls-page-card shadow-lg border-0 position-relative mt-4">
+                        <div className="rejoin-card">
+                            <div>
+                                <h5 className="mb-0">Still in a call?</h5>
+                                <small className="text-muted">{lastActiveCall.description}</small>
+                            </div>
+                            <Link 
+                                to={`/call/${lastActiveCall.id}`} 
+                                className="btn rejoin-btn text-white fw-bold"
+                                onClick={() => localStorage.removeItem('lastActiveCall')} // Clear on rejoin
+                            >
+                                <i className="bi bi-box-arrow-in-right me-2"></i>
+                                Rejoin
+                            </Link>
+                        </div>
+                    </div>
+                )}
+
             </div>
         </>
     );

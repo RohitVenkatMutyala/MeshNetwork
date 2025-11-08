@@ -10,10 +10,12 @@ import {
 } from 'firebase/firestore';
 import { toast } from 'react-toastify';
 import Peer from 'simple-peer';
+
+import Navbar from './navbar';
 import SharingComponent from './SharingComponent';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import Navbar from './navbar';
+
 function Call() {
     const { user } = useAuth();
     const { callId } = useParams();
@@ -43,6 +45,9 @@ function Call() {
     const audioContainerRef = useRef(null);
     const remoteVideoRef = useRef(null);
     const chatMessagesEndRef = useRef(null);
+    
+    // --- NEW: Ref for self-view video ---
+    const localVideoRef = useRef(null);
 
     // Auto-scroll chat
     useEffect(() => {
@@ -72,6 +77,8 @@ function Call() {
         const unsubscribeCall = onSnapshot(callDocRef, (docSnap) => {
             if (!docSnap.exists()) {
                 setCallState('denied');
+                // --- NEW: Clear localStorage if call is deleted ---
+                localStorage.removeItem('lastActiveCall');
                 return;
             }
 
@@ -84,6 +91,7 @@ function Call() {
 
             if (!hasAccess) {
                 setCallState('denied');
+                localStorage.removeItem('lastActiveCall'); // Clear if no access
                 return;
             }
 
@@ -103,9 +111,18 @@ function Call() {
             if (callState === 'loading') {
                 setCallState('joining');
             }
+            
+            // --- NEW: Set localStorage when call is active ---
+            if (callState === 'active') {
+                localStorage.setItem('lastActiveCall', JSON.stringify({
+                    id: callId,
+                    description: data.description || 'Active Call'
+                }));
+            }
         }, (error) => {
             console.error("Error in onSnapshot listener:", error);
             setCallState('denied');
+            localStorage.removeItem('lastActiveCall');
         });
 
         const messagesQuery = query(collection(db, 'calls', callId, 'messages'), orderBy('timestamp'));
@@ -123,12 +140,11 @@ function Call() {
             unsubscribeCall();
             unsubscribeMessages();
         };
-    }, [callId, user, callState === 'loading']); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [callId, user, callState]); // Added callState to dependencies
 
     // useEffect for WebRTC connections
     useEffect(() => {
         if (!stream || callState !== 'active' || !user) return;
-
         const signalingColRef = collection(db, 'calls', callId, 'signaling');
 
         const createPeer = (recipientId, senderId, stream) => {
@@ -198,6 +214,21 @@ function Call() {
         return () => unsubscribeSignaling();
     }, [stream, activeUsers, callState, callId, user]);
     
+    // --- NEW: Robust Local Video (Self-View) UseEffect ---
+    useEffect(() => {
+        const videoElem = localVideoRef.current;
+        if (stream && videoElem) {
+            videoElem.srcObject = stream;
+            videoElem.muted = true;
+            const playPromise = videoElem.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.error("Error attempting to autoplay local video:", error);
+                });
+            }
+        }
+    }, [stream]);
+
     // Mute Status UseEffect
     useEffect(() => {
         if (!stream || !user || !stream.getAudioTracks().length) { return; }
@@ -205,14 +236,14 @@ function Call() {
         stream.getAudioTracks()[0].enabled = !isMuted;
     }, [muteStatus, stream, user]);
 
-    // --- NEW: Video Toggle UseEffect ---
+    // Video Toggle UseEffect
     useEffect(() => {
         if (!stream) return;
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
             videoTrack.enabled = isVideoOn;
         }
-    }, [isVideoOn, stream]); // Re-runs when video state or stream changes
+    }, [isVideoOn, stream]);
 
     // --- Handler Functions ---
 
@@ -220,9 +251,9 @@ function Call() {
         try {
             const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             setStream(userStream);
-            setIsVideoOn(true); // Video starts ON
+            setIsVideoOn(true);
             await updateDoc(doc(db, 'calls', callId), { 
-                [`muteStatus.${user._id}`]: false // Start unmuted
+                [`muteStatus.${user._id}`]: false
             });
             setCallState('active'); 
         } catch (err) {
@@ -237,39 +268,38 @@ function Call() {
     
     // Hangup: Navigate to dashboard
     const handleHangUp = () => {
+        // --- NEW: Clear the rejoin item on hangup ---
+        localStorage.removeItem('lastActiveCall');
+        
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
         setStream(null);
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
-        navigate('/new-call'); // Go to new call
+        navigate('/dashboard'); // Go to dashboard
     };
 
-    // --- NEW: Video Toggle Function ---
+    // Video Toggle Function
     const handleToggleVideo = () => {
         if (!stream) return;
         const newVideoState = !isVideoOn;
         setIsVideoOn(newVideoState);
-        // This will trigger the `useEffect` above
     };
 
-    // --- UPDATED: Mute Toggle Function ---
+    // Mute Toggle Function
     const handleToggleMute = async (targetUserId) => {
         const isSelf = targetUserId === user._id;
 
         if (isSelf) {
-            // User can ALWAYS mute/unmute themselves
             const currentMuteState = muteStatus[targetUserId] ?? false;
             const newMuteState = !currentMuteState;
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${targetUserId}`]: newMuteState 
             });
         } else {
-            // User is trying to mute/unmute someone else
             const isTrueOwner = user && user._id === callOwnerId;
             if (isTrueOwner) {
-                // Host can only MUTE others
                 await updateDoc(doc(db, 'calls', callId), { 
                     [`muteStatus.${targetUserId}`]: true 
                 });
@@ -279,7 +309,6 @@ function Call() {
             }
         }
     };
-
 
     const formatTimestamp = (timestamp) => !timestamp ? '' : timestamp.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
@@ -308,6 +337,7 @@ function Call() {
     if (callState === 'denied') {
         return (
             <>
+                <Navbar />
                 <div className="container mt-5">
                     <div className="alert alert-danger"><b>Access Denied.</b> This call may not exist or you may not have permission to join.</div>
                 </div>
@@ -319,7 +349,7 @@ function Call() {
         const callerName = callData?.ownerName || 'Unknown Caller';
         return (
             <>
-             <Navbar />
+                <Navbar />
                 {/* --- Pulsing Animation --- */}
                 <style jsx>{`
                     .pulse-button {
@@ -380,6 +410,7 @@ function Call() {
     // RENDER: Active Call UI
     return (
         <>
+            <Navbar />
             
             <div className="chat-page-container">
                 <style jsx>{`
@@ -430,6 +461,21 @@ function Call() {
                         object-fit: cover;
                     }
                     
+                    /* --- NEW: Self-view video --- */
+                    .local-video {
+                        position: absolute;
+                        top: 1rem;
+                        right: 1rem;
+                        width: 100px;
+                        height: auto;
+                        aspect-ratio: 4 / 3;
+                        object-fit: cover;
+                        border: 2px solid var(--border-color);
+                        border-radius: 8px;
+                        background-color: #111;
+                        z-index: 10;
+                    }
+
                     .call-controls {
                         position: absolute;
                         bottom: 2rem;
@@ -511,6 +557,13 @@ function Call() {
                             border: 1px solid var(--border-color);
                         }
                         
+                        .local-video {
+                            top: auto;
+                            bottom: 1rem;
+                            width: 25%;
+                            max-width: 200px;
+                        }
+
                         .call-controls .btn {
                             width: 50px;
                             height: 50px;
@@ -539,7 +592,7 @@ function Call() {
                         flex-grow: 1;
                     }
                     .chat-messages-container {
-                        flex-grow: 1; /* Make message list fill the body */
+                        flex-grow: 1; 
                         overflow-y: auto; /* CRITICAL: Add scrollbar */
                         min-height: 0;
                         display: flex;
@@ -603,6 +656,15 @@ function Call() {
                                 autoPlay 
                                 playsInline 
                                 controls={false}
+                            />
+                            
+                            {/* --- NEW: Self-view video re-added --- */}
+                            <video 
+                                ref={localVideoRef} 
+                                className="local-video" 
+                                autoPlay
+                                playsInline
+                                muted
                             />
                             
                             {/* --- Call Controls (Bottom Center) --- */}
@@ -682,7 +744,7 @@ function Call() {
                                         </div>
                                         {stream && (
                                             <button
-                                                className={`btn btn-sm ${muteStatus[p.id] ?? true ? 'text-danger' : 'text-success'}`}
+                                                className={`btn btn-sm ${muteStatus[p.id] ? 'text-danger' : 'text-success'}`}
                                                 onClick={() => handleToggleMute(p.id)}
                                                 // User can only mute others (if owner), or self
                                                 disabled={user?._id !== callOwnerId && p.id !== user?._id}
@@ -717,7 +779,7 @@ function Call() {
                                     <div ref={chatMessagesEndRef} />
                                 </div>
                                 <form onSubmit={handleSendMessage} className="chat-form">
-                                    <div className="d-flex align-items:center">
+                                    <div className="d-flex align-items-center">
                                         <input
                                             type="text"
                                             className="form-control chat-input"
