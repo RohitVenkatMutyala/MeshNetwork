@@ -33,7 +33,7 @@ function Call() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
-    const [areControlsVisible, setAreControlsVisible] = useState(true); // --- NEW: Toggle controls ---
+    const [areControlsVisible, setAreControlsVisible] = useState(true);
 
     // --- Voice/Video Chat State ---
     const [stream, setStream] = useState(null);
@@ -42,11 +42,11 @@ function Call() {
     const peersRef = useRef({});
     const audioContainerRef = useRef(null);
     const remoteVideoRef = useRef(null);
-    const localVideoRef = useRef(null); // --- NEW: Self-view (PiP) ---
+    const localVideoRef = useRef(null); // --- This ref is now used for PiP video AND dragging ---
     const chatMessagesEndRef = useRef(null);
     
-    // --- NEW: Draggable PiP State ---
-    const pipRef = useRef(null);
+    // --- Draggable PiP State ---
+    // const pipRef = useRef(null); // --- REMOVED ---
     const [isPipDragging, setIsPipDragging] = useState(false);
     const pipOffsetRef = useRef({ x: 0, y: 0 });
 
@@ -228,7 +228,7 @@ function Call() {
             const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             setStream(userStream);
             
-            // --- NEW: Set self-view video ---
+            // --- CORRECTED: Set self-view video ---
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = userStream;
             }
@@ -295,39 +295,39 @@ function Call() {
         setNewMessage('');
     };
 
-    // --- NEW: PiP Drag Handlers ---
+    // --- CORRECTED: PiP Drag Handlers (use localVideoRef) ---
     const handlePipMouseDown = (e) => {
-        if (!pipRef.current) return;
+        if (!localVideoRef.current) return; // --- FIXED ---
         setIsPipDragging(true);
         pipOffsetRef.current = {
-            x: e.clientX - pipRef.current.getBoundingClientRect().left,
-            y: e.clientY - pipRef.current.getBoundingClientRect().top,
+            x: e.clientX - localVideoRef.current.getBoundingClientRect().left, // --- FIXED ---
+            y: e.clientY - localVideoRef.current.getBoundingClientRect().top, // --- FIXED ---
         };
-        pipRef.current.style.cursor = 'grabbing';
+        localVideoRef.current.style.cursor = 'grabbing'; // --- FIXED ---
     };
 
     const handlePipMouseUp = () => {
         setIsPipDragging(false);
-        if (pipRef.current) {
-            pipRef.current.style.cursor = 'move';
+        if (localVideoRef.current) { // --- FIXED ---
+            localVideoRef.current.style.cursor = 'move'; // --- FIXED ---
         }
     };
 
     const handlePipMouseMove = (e) => {
-        if (!isPipDragging || !pipRef.current || !pipRef.current.parentElement) return;
+        if (!isPipDragging || !localVideoRef.current || !localVideoRef.current.parentElement) return; // --- FIXED ---
         
-        const parentRect = pipRef.current.parentElement.getBoundingClientRect();
+        const parentRect = localVideoRef.current.parentElement.getBoundingClientRect(); // --- FIXED ---
         let newX = e.clientX - parentRect.left - pipOffsetRef.current.x;
         let newY = e.clientY - parentRect.top - pipOffsetRef.current.y;
 
         // Constrain to parent
-        newX = Math.max(0, Math.min(newX, parentRect.width - pipRef.current.offsetWidth));
-        newY = Math.max(0, Math.min(newY, parentRect.height - pipRef.current.offsetHeight));
+        newX = Math.max(0, Math.min(newX, parentRect.width - localVideoRef.current.offsetWidth)); // --- FIXED ---
+        newY = Math.max(0, Math.min(newY, parentRect.height - localVideoRef.current.offsetHeight)); // --- FIXED ---
 
-        pipRef.current.style.left = `${newX}px`;
-        pipRef.current.style.top = `${newY}px`;
-        pipRef.current.style.bottom = 'auto';
-        pipRef.current.style.right = 'auto';
+        localVideoRef.current.style.left = `${newX}px`; // --- FIXED ---
+        localVideoRef.current.style.top = `${newY}px`; // --- FIXED ---
+        localVideoRef.current.style.bottom = 'auto'; // --- FIXED ---
+        localVideoRef.current.style.right = 'auto'; // --- FIXED ---
     };
 
 
@@ -356,7 +356,6 @@ function Call() {
         );
     }
     
-    // --- NEW: Updated 'joining' screen with new animation ---
     if (callState === 'joining') {
         const callerName = callData?.ownerName || 'Unknown Caller';
         return (
@@ -527,7 +526,7 @@ function Call() {
                         height: calc(100vh - 56px); /* Full height minus navbar */
                         background-color: #000;
                         overflow: hidden;
-                        cursor: pointer; /* --- NEW: Cursor to show it's clickable --- */
+                        cursor: pointer; 
                     }
                     .remote-video {
                         width: 100%;
@@ -535,7 +534,7 @@ function Call() {
                         object-fit: cover;
                     }
                     
-                    /* --- NEW: Draggable Self-View (PiP) --- */
+                    /* --- Draggable Self-View (PiP) --- */
                     .local-video-pip {
                         position: absolute;
                         bottom: 1rem;
@@ -565,9 +564,9 @@ function Call() {
                         display: flex;
                         gap: 0.5rem;
                         z-index: 20;
-                        transition: opacity 0.3s ease; /* --- NEW --- */
+                        transition: opacity 0.3s ease; 
                     }
-                    .call-controls.hidden { /* --- NEW --- */
+                    .call-controls.hidden { 
                         opacity: 0;
                         pointer-events: none;
                     }
@@ -659,7 +658,6 @@ function Call() {
 
                     /* --- 6. CHAT STYLES (Used by both) --- */
                     
-                    /* --- NEW: Fixed Height Chat Card --- */
                     .chat-card {
                         flex-grow: 1;
                         display: flex;
@@ -667,19 +665,19 @@ function Call() {
                         min-height: 0; /* Flexbox trick */
                     }
                     .chat-card .card-body {
-                        padding: 0; /* Remove padding */
-                        overflow: hidden; /* CRITICAL */
+                        padding: 0; 
+                        overflow: hidden; 
                         display: flex;
                         flex-direction: column;
                         flex-grow: 1;
                     }
                     .chat-messages-container {
-                        flex-grow: 1; /* Make message list fill the body */
-                        overflow-y: auto; /* CRITICAL: Add scrollbar */
+                        flex-grow: 1; 
+                        overflow-y: auto; 
                         min-height: 0;
                         display: flex;
                         flex-direction: column;
-                        padding: 1rem; /* Add padding back here */
+                        padding: 1rem; 
                     }
                     .chat-form {
                         flex-shrink: 0;
@@ -736,10 +734,10 @@ function Call() {
                     <div className="col-12 col-lg-8 d-flex flex-column">
                         <div 
                             className="video-panel-container shadow-sm"
-                            onClick={() => setAreControlsVisible(!areControlsVisible)} // --- NEW: Toggle controls ---
-                            onMouseMove={handlePipMouseMove} // --- NEW: For PiP Drag ---
-                            onMouseUp={handlePipMouseUp} // --- NEW: For PiP Drag ---
-                            onMouseLeave={handlePipMouseUp} // --- NEW: For PiP Drag ---
+                            onClick={() => setAreControlsVisible(!areControlsVisible)} 
+                            onMouseMove={handlePipMouseMove} 
+                            onMouseUp={handlePipMouseUp} 
+                            onMouseLeave={handlePipMouseUp} 
                         >
                             <video 
                                 ref={remoteVideoRef} 
@@ -749,10 +747,10 @@ function Call() {
                                 controls={false}
                             />
                             
-                            {/* --- NEW: Self-View (PiP) --- */}
+                            {/* --- Self-View (PiP) --- */}
                             {stream && (
                                 <video
-                                    ref={pipRef}
+                                    ref={localVideoRef} // --- CORRECTED ref ---
                                     className="local-video-pip"
                                     autoPlay
                                     playsInline
@@ -766,16 +764,16 @@ function Call() {
                             <div className={`call-controls ${!areControlsVisible ? 'hidden' : ''}`}>
                                 
                                 <button
-                                    className={`btn rounded-circle ${isVideoOn ? 'btn-light' : 'btn-danger'}`} // --- NEW COLOR ---
-                                    onClick={(e) => { e.stopPropagation(); handleToggleVideo(); }} // Stop propagation
+                                    className={`btn rounded-circle ${isVideoOn ? 'btn-light' : 'btn-danger'}`} 
+                                    onClick={(e) => { e.stopPropagation(); handleToggleVideo(); }} 
                                     title={isVideoOn ? "Turn off camera" : "Turn on camera"}
                                 >
                                     <i className={`bi ${isVideoOn ? 'bi-camera-video-fill' : 'bi-camera-video-off-fill'}`}></i>
                                 </button>
                                 
                                 <button
-                                    className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-danger' : 'btn-light'}`} // --- NEW COLOR ---
-                                    onClick={(e) => { e.stopPropagation(); handleToggleMute(user._id); }} // Stop propagation
+                                    className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-danger' : 'btn-light'}`} 
+                                    onClick={(e) => { e.stopPropagation(); handleToggleMute(user._id); }} 
                                     title={muteStatus[user._id] ? "Unmute" : "Mute"}
                                 >
                                     <i className={`bi ${muteStatus[user._id] ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
@@ -783,8 +781,8 @@ function Call() {
                                 
                                 {/* Chat (MOBILE ONLY) */}
                                 <button
-                                    className="btn btn-primary rounded-circle d-lg-none" // --- NEW COLOR ---
-                                    onClick={(e) => { e.stopPropagation(); setIsChatOpen(true); }} // Stop propagation
+                                    className="btn btn-primary rounded-circle d-lg-none" 
+                                    onClick={(e) => { e.stopPropagation(); setIsChatOpen(true); }} 
                                     title="Show Chat"
                                 >
                                     <i className="bi bi-chat-dots-fill"></i>
@@ -792,8 +790,8 @@ function Call() {
                                 
                                 {/* Participants (MOBILE ONLY) */}
                                 <button
-                                    className="btn btn-primary rounded-circle d-lg-none" // --- NEW COLOR ---
-                                    onClick={(e) => { e.stopPropagation(); setIsParticipantsOpen(true); }} // Stop propagation
+                                    className="btn btn-primary rounded-circle d-lg-none" 
+                                    onClick={(e) => { e.stopPropagation(); setIsParticipantsOpen(true); }} 
                                     title="Show Participants"
                                 >
                                     <i className="bi bi-people-fill"></i>
@@ -801,8 +799,8 @@ function Call() {
 
                                 {/* Share (MOBILE ONLY) */}
                                 <button
-                                    className="btn btn-primary rounded-circle d-lg-none" // --- NEW COLOR ---
-                                    onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} // Stop propagation
+                                    className="btn btn-primary rounded-circle d-lg-none" 
+                                    onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} 
                                     title="Share Link"
                                 >
                                     <i className="bi bi-share-fill"></i>
@@ -811,7 +809,7 @@ function Call() {
                                 {/* Hangup Button */}
                                 <button 
                                     className="btn btn-danger rounded-circle"
-                                    onClick={(e) => { e.stopPropagation(); handleHangUp(); }} // Stop propagation
+                                    onClick={(e) => { e.stopPropagation(); handleHangUp(); }} 
                                     title="Hang Up"
                                 >
                                     <i className="bi bi-telephone-fill" style={{ transform: 'rotate(135deg)' }}></i>
@@ -854,7 +852,7 @@ function Call() {
                         {/* Share Card (Desktop) */}
                         <div><SharingComponent sessionId={callId} /></div>
 
-                        {/* Chat Card (Desktop) --- NEW FIXED LAYOUT --- */}
+                        {/* Chat Card (Desktop) */}
                         <div className="card shadow-sm flex-grow-1 chat-card">
                             <div className="card-header">Live Chat</div>
                             <div className="card-body">
@@ -936,7 +934,7 @@ function Call() {
                     </div>
                 )}
 
-                {/* Chat Panel (Mobile) --- NEW FIXED LAYOUT --- */}
+                {/* Chat Panel (Mobile) */}
                 {isChatOpen && (
                     <div className="mobile-panel mobile-chat-panel d-lg-none">
                         <div className="mobile-panel-header">
