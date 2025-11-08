@@ -178,7 +178,7 @@ function Navbar() {
                         className={`logo-image ${theme === 'dark' ? 'logo-dark-theme' : ''}`}
                     /> */}
                     <Link to={user ? "/new-call" : "/new-call"} className="navbar-brand-custom py-2">
-                        NETWORK.RANDOMAN
+                        NETWORK
                     </Link>
 
                     <button

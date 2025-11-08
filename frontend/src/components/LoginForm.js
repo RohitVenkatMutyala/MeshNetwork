@@ -111,7 +111,7 @@ function LoginForm() {
                   <div className="col-lg-6 d-none d-lg-flex align-items-center auth-welcome-col">
                     <div className="text-start">
                       <h1 className="display-5 fw-bold mb-3">
-                        Welcome to MeshNetwork
+                        Welcome to Network
                       </h1>
                       <p className="text-muted mb-4">
                         Secure, 1-on-1 video calls powered by a
