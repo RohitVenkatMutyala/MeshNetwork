@@ -42,11 +42,10 @@ function Call() {
     const peersRef = useRef({});
     const audioContainerRef = useRef(null);
     const remoteVideoRef = useRef(null);
-    const localVideoRef = useRef(null); // --- This ref is now used for PiP video AND dragging ---
+    const localVideoRef = useRef(null); // Ref for PiP video
     const chatMessagesEndRef = useRef(null);
     
     // --- Draggable PiP State ---
-    // const pipRef = useRef(null); // --- REMOVED ---
     const [isPipDragging, setIsPipDragging] = useState(false);
     const pipOffsetRef = useRef({ x: 0, y: 0 });
 
@@ -221,17 +220,27 @@ function Call() {
         }
     }, [isVideoOn, stream]);
 
+
+    // --- *** NEW/FIXED *** ---
+    // This effect now correctly attaches the stream to the mini-player
+    // *after* it has been rendered.
+    useEffect(() => {
+        if (localVideoRef.current && stream) {
+            localVideoRef.current.srcObject = stream;
+        }
+    }, [stream]); // We only need to run this when the stream is ready
+
+
     // --- Handler Functions ---
 
+    // --- *** MODIFIED *** ---
     const handleAcceptCall = async () => {
         try {
             const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            setStream(userStream);
+            setStream(userStream); // This will trigger the new useEffect above
             
-            // --- CORRECTED: Set self-view video ---
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = userStream;
-            }
+            // --- REMOVED this line from here ---
+            // if (localVideoRef.current) { ... }
 
             setIsVideoOn(true);
             await updateDoc(doc(db, 'calls', callId), { 
@@ -295,39 +304,39 @@ function Call() {
         setNewMessage('');
     };
 
-    // --- CORRECTED: PiP Drag Handlers (use localVideoRef) ---
+    // --- PiP Drag Handlers (using localVideoRef) ---
     const handlePipMouseDown = (e) => {
-        if (!localVideoRef.current) return; // --- FIXED ---
+        if (!localVideoRef.current) return;
         setIsPipDragging(true);
         pipOffsetRef.current = {
-            x: e.clientX - localVideoRef.current.getBoundingClientRect().left, // --- FIXED ---
-            y: e.clientY - localVideoRef.current.getBoundingClientRect().top, // --- FIXED ---
+            x: e.clientX - localVideoRef.current.getBoundingClientRect().left,
+            y: e.clientY - localVideoRef.current.getBoundingClientRect().top,
         };
-        localVideoRef.current.style.cursor = 'grabbing'; // --- FIXED ---
+        localVideoRef.current.style.cursor = 'grabbing';
     };
 
     const handlePipMouseUp = () => {
         setIsPipDragging(false);
-        if (localVideoRef.current) { // --- FIXED ---
-            localVideoRef.current.style.cursor = 'move'; // --- FIXED ---
+        if (localVideoRef.current) {
+            localVideoRef.current.style.cursor = 'move';
         }
     };
 
     const handlePipMouseMove = (e) => {
-        if (!isPipDragging || !localVideoRef.current || !localVideoRef.current.parentElement) return; // --- FIXED ---
+        if (!isPipDragging || !localVideoRef.current || !localVideoRef.current.parentElement) return; 
         
-        const parentRect = localVideoRef.current.parentElement.getBoundingClientRect(); // --- FIXED ---
+        const parentRect = localVideoRef.current.parentElement.getBoundingClientRect();
         let newX = e.clientX - parentRect.left - pipOffsetRef.current.x;
         let newY = e.clientY - parentRect.top - pipOffsetRef.current.y;
 
         // Constrain to parent
-        newX = Math.max(0, Math.min(newX, parentRect.width - localVideoRef.current.offsetWidth)); // --- FIXED ---
-        newY = Math.max(0, Math.min(newY, parentRect.height - localVideoRef.current.offsetHeight)); // --- FIXED ---
+        newX = Math.max(0, Math.min(newX, parentRect.width - localVideoRef.current.offsetWidth));
+        newY = Math.max(0, Math.min(newY, parentRect.height - localVideoRef.current.offsetHeight));
 
-        localVideoRef.current.style.left = `${newX}px`; // --- FIXED ---
-        localVideoRef.current.style.top = `${newY}px`; // --- FIXED ---
-        localVideoRef.current.style.bottom = 'auto'; // --- FIXED ---
-        localVideoRef.current.style.right = 'auto'; // --- FIXED ---
+        localVideoRef.current.style.left = `${newX}px`;
+        localVideoRef.current.style.top = `${newY}px`;
+        localVideoRef.current.style.bottom = 'auto';
+        localVideoRef.current.style.right = 'auto';
     };
 
 
@@ -750,13 +759,13 @@ function Call() {
                             {/* --- Self-View (PiP) --- */}
                             {stream && (
                                 <video
-                                    ref={localVideoRef} // --- CORRECTED ref ---
+                                    ref={localVideoRef} // Correct ref
                                     className="local-video-pip"
                                     autoPlay
                                     playsInline
                                     muted
                                     onMouseDown={handlePipMouseDown}
-                                    onClick={(e) => e.stopPropagation()} // Prevent click-through to hide controls
+                                    onClick={(e) => e.stopPropagation()} 
                                 />
                             )}
                             
