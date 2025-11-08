@@ -1,5 +1,3 @@
-// src/components/Call.js
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -14,6 +12,7 @@ import SharingComponent from './SharingComponent';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import Navbar from './navbar';
+
 function Call() {
     const { user } = useAuth();
     const { callId } = useParams();
@@ -34,15 +33,23 @@ function Call() {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
+    const [areControlsVisible, setAreControlsVisible] = useState(true); // --- NEW: Toggle controls ---
 
     // --- Voice/Video Chat State ---
     const [stream, setStream] = useState(null);
     const [muteStatus, setMuteStatus] = useState({});
-    const [isVideoOn, setIsVideoOn] = useState(true); // <-- NEW: Video toggle state
+    const [isVideoOn, setIsVideoOn] = useState(true);
     const peersRef = useRef({});
     const audioContainerRef = useRef(null);
     const remoteVideoRef = useRef(null);
+    const localVideoRef = useRef(null); // --- NEW: Self-view (PiP) ---
     const chatMessagesEndRef = useRef(null);
+    
+    // --- NEW: Draggable PiP State ---
+    const pipRef = useRef(null);
+    const [isPipDragging, setIsPipDragging] = useState(false);
+    const pipOffsetRef = useRef({ x: 0, y: 0 });
+
 
     // Auto-scroll chat
     useEffect(() => {
@@ -205,14 +212,14 @@ function Call() {
         stream.getAudioTracks()[0].enabled = !isMuted;
     }, [muteStatus, stream, user]);
 
-    // --- NEW: Video Toggle UseEffect ---
+    // Video Toggle UseEffect
     useEffect(() => {
         if (!stream) return;
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
             videoTrack.enabled = isVideoOn;
         }
-    }, [isVideoOn, stream]); // Re-runs when video state or stream changes
+    }, [isVideoOn, stream]);
 
     // --- Handler Functions ---
 
@@ -220,9 +227,15 @@ function Call() {
         try {
             const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             setStream(userStream);
-            setIsVideoOn(true); // Video starts ON
+            
+            // --- NEW: Set self-view video ---
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = userStream;
+            }
+
+            setIsVideoOn(true);
             await updateDoc(doc(db, 'calls', callId), { 
-                [`muteStatus.${user._id}`]: false // Start unmuted
+                [`muteStatus.${user._id}`]: false
             });
             setCallState('active'); 
         } catch (err) {
@@ -235,7 +248,6 @@ function Call() {
         navigate(-1); 
     };
     
-    // Hangup: Navigate to dashboard
     const handleHangUp = () => {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
@@ -243,33 +255,27 @@ function Call() {
         setStream(null);
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
-        navigate('/new-call'); // Go to new call
+        navigate('/new-call');
     };
 
-    // --- NEW: Video Toggle Function ---
     const handleToggleVideo = () => {
         if (!stream) return;
         const newVideoState = !isVideoOn;
         setIsVideoOn(newVideoState);
-        // This will trigger the `useEffect` above
     };
 
-    // --- UPDATED: Mute Toggle Function ---
     const handleToggleMute = async (targetUserId) => {
         const isSelf = targetUserId === user._id;
 
         if (isSelf) {
-            // User can ALWAYS mute/unmute themselves
             const currentMuteState = muteStatus[targetUserId] ?? false;
             const newMuteState = !currentMuteState;
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${targetUserId}`]: newMuteState 
             });
         } else {
-            // User is trying to mute/unmute someone else
             const isTrueOwner = user && user._id === callOwnerId;
             if (isTrueOwner) {
-                // Host can only MUTE others
                 await updateDoc(doc(db, 'calls', callId), { 
                     [`muteStatus.${targetUserId}`]: true 
                 });
@@ -280,7 +286,6 @@ function Call() {
         }
     };
 
-
     const formatTimestamp = (timestamp) => !timestamp ? '' : timestamp.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
     const handleSendMessage = async (e) => {
@@ -289,6 +294,42 @@ function Call() {
         await addDoc(collection(db, 'calls', callId, 'messages'), { text: newMessage, senderName: `${user.firstname} ${user.lastname}`, senderId: user._id, timestamp: serverTimestamp() });
         setNewMessage('');
     };
+
+    // --- NEW: PiP Drag Handlers ---
+    const handlePipMouseDown = (e) => {
+        if (!pipRef.current) return;
+        setIsPipDragging(true);
+        pipOffsetRef.current = {
+            x: e.clientX - pipRef.current.getBoundingClientRect().left,
+            y: e.clientY - pipRef.current.getBoundingClientRect().top,
+        };
+        pipRef.current.style.cursor = 'grabbing';
+    };
+
+    const handlePipMouseUp = () => {
+        setIsPipDragging(false);
+        if (pipRef.current) {
+            pipRef.current.style.cursor = 'move';
+        }
+    };
+
+    const handlePipMouseMove = (e) => {
+        if (!isPipDragging || !pipRef.current || !pipRef.current.parentElement) return;
+        
+        const parentRect = pipRef.current.parentElement.getBoundingClientRect();
+        let newX = e.clientX - parentRect.left - pipOffsetRef.current.x;
+        let newY = e.clientY - parentRect.top - pipOffsetRef.current.y;
+
+        // Constrain to parent
+        newX = Math.max(0, Math.min(newX, parentRect.width - pipRef.current.offsetWidth));
+        newY = Math.max(0, Math.min(newY, parentRect.height - pipRef.current.offsetHeight));
+
+        pipRef.current.style.left = `${newX}px`;
+        pipRef.current.style.top = `${newY}px`;
+        pipRef.current.style.bottom = 'auto';
+        pipRef.current.style.right = 'auto';
+    };
+
 
     // --- Render Functions ---
 
@@ -315,67 +356,130 @@ function Call() {
         );
     }
     
+    // --- NEW: Updated 'joining' screen with new animation ---
     if (callState === 'joining') {
         const callerName = callData?.ownerName || 'Unknown Caller';
         return (
             <>
-             <Navbar />
-                {/* --- Pulsing Animation --- */}
+                <Navbar />
                 <style jsx>{`
-                    .pulse-button {
-                        animation: pulse 1.5s infinite;
-                        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+                    .joining-screen {
+                        background-color: #2b2b2b;
+                        color: white;
                     }
-                    .pulse-button.decline {
+                    .caller-info {
+                        text-align: center;
+                    }
+                    .caller-name {
+                        font-size: 2.5rem;
+                        font-weight: 500;
+                        margin-bottom: 0.25rem;
+                    }
+                    .caller-id {
+                        font-size: 1.5rem;
+                        color: #aaa;
+                    }
+                    .call-actions {
+                        display: flex;
+                        justify-content: space-around;
+                        width: 100%;
+                        max-width: 300px;
+                        margin-top: 5rem;
+                    }
+                    .action-button {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        text-decoration: none;
+                        color: white;
+                        font-weight: 500;
+                    }
+                    .button-circle {
+                        width: 70px;
+                        height: 70px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 1.8rem;
+                        margin-bottom: 0.5rem;
+                        position: relative;
+                        background-color: rgba(255, 255, 255, 0.1);
+                    }
+                    .button-circle.accept {
+                        background-color: #28a745;
+                    }
+                    .button-circle.decline {
+                        background-color: #dc3545;
+                    }
+                    
+                    /* New Ripple Animation */
+                    .button-circle::before, .button-circle::after {
+                        content: '';
+                        position: absolute;
+                        border-radius: 50%;
+                        z-index: -1;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        animation: ripple 2s infinite ease-out;
+                    }
+                    .button-circle.accept::before, .button-circle.accept::after {
+                        background-color: #28a745;
+                    }
+                    .button-circle.decline::before, .button-circle.decline::after {
+                        background-color: #dc3545;
+                    }
+                    .button-circle::after {
                         animation-delay: 0.5s;
                     }
-                    @keyframes pulse {
+
+                    @keyframes ripple {
                         0% {
-                            transform: scale(0.95);
-                            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
-                        }
-                        70% {
                             transform: scale(1);
-                            box-shadow: 0 0 0 15px rgba(255, 255, 255, 0);
+                            opacity: 0.6;
                         }
                         100% {
-                            transform: scale(0.95);
-                            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+                            transform: scale(1.7);
+                            opacity: 0;
                         }
                     }
                 `}</style>
-                <div className="d-flex flex-column justify-content-between align-items-center vh-100" style={{ backgroundColor: '#2b2b2b', color: 'white', padding: '10vh 0' }}>
-                    <div className="text-center">
-                        <h1 className="display-4">{callerName}</h1>
-                        <h3 className="text-muted">{callData?.description || 'Incoming Call...'}</h3>
+                <div className="d-flex flex-column justify-content-around align-items-center vh-100 joining-screen">
+                    
+                    <div className="caller-info">
+                        <h1 className="caller-name">{callerName}</h1>
+                        <h3 className="caller-id">{callData?.description || 'Incoming Call...'}</h3>
                     </div>
 
-                    <div className="d-flex justify-content-around w-100" style={{ maxWidth: '400px' }}>
-                        <div className="text-center">
+                    <div className="call-actions">
+                        <div className="action-button">
                             <button 
-                                className="btn btn-danger btn-lg rounded-circle pulse-button decline" 
-                                style={{ width: '70px', height: '70px', fontSize: '1.8rem' }}
+                                className="button-circle decline"
                                 onClick={handleDeclineCall}
+                                aria-label="Decline"
                             >
                                 <i className="bi bi-telephone-fill" style={{ transform: 'rotate(135deg)' }}></i>
                             </button>
-                            <div className="mt-2">Decline</div>
+                            <span>Decline</span>
                         </div>
-                        <div className="text-center">
+                        <div className="action-button">
                             <button 
-                                className="btn btn-success btn-lg rounded-circle pulse-button" 
-                                style={{ width: '70px', height: '70px', fontSize: '1.8rem' }}
+                                className="button-circle accept"
                                 onClick={handleAcceptCall}
+                                aria-label="Accept"
                             >
                                 <i className="bi bi-telephone-fill"></i>
                             </button>
-                            <div className="mt-2">Accept</div>
+                            <span>Accept</span>
                         </div>
                     </div>
                 </div>
             </>
         );
     }
+
 
     // RENDER: Active Call UI
     return (
@@ -385,44 +489,45 @@ function Call() {
                 <style jsx>{`
                     /* --- 1. General Page & Layout Styles --- */
                     :root {
-                      --dark-bg-primary: #12121c;
-                      --dark-bg-secondary: #1e1e2f;
-                      --border-color: #3a3a5a;
-                      --text-primary: #e0e0e0;
-                      --text-secondary: #a9a9b3;
-                      --accent-blue: #4a69bd;
+                        --dark-bg-primary: #12121c;
+                        --dark-bg-secondary: #1e1e2f;
+                        --border-color: #3a3a5a;
+                        --text-primary: #e0e0e0;
+                        --text-secondary: #a9a9b3;
+                        --accent-blue: #4a69bd;
                     }
                     .chat-page-container {
-                      background-color: var(--dark-bg-primary);
-                      color: var(--text-primary);
-                      min-height: calc(100vh - 56px); /* 56px is navbar height */
-                      padding: 0;
+                        background-color: var(--dark-bg-primary);
+                        color: var(--text-primary);
+                        min-height: calc(100vh - 56px); /* 56px is navbar height */
+                        padding: 0;
                     }
                     
                     /* --- 2. Card Component Overrides (for desktop/panels) --- */
                     .card {
-                      background-color: var(--dark-bg-secondary);
-                      border: 1px solid var(--border-color);
+                        background-color: var(--dark-bg-secondary);
+                        border: 1px solid var(--border-color);
                     }
                     .card-header, .card-footer {
-                      background-color: rgba(0, 0, 0, 0.2);
-                      border-bottom: 1px solid var(--border-color);
-                      font-weight: 600;
-                      color: var(--text-primary);
+                        background-color: rgba(0, 0, 0, 0.2);
+                        border-bottom: 1px solid var(--border-color);
+                        font-weight: 600;
+                        color: var(--text-primary);
                     }
                     .list-group-item {
-                      background-color: transparent;
-                      border-bottom: 1px solid var(--border-color);
-                      color: var(--text-primary);
+                        background-color: transparent;
+                        border-bottom: 1px solid var(--border-color);
+                        color: var(--text-primary);
                     }
 
-                    /* --- 3. VIDEO PANEL (MOBILE) --- */
+                    /* --- 3. VIDEO PANEL --- */
                     .video-panel-container {
                         position: relative;
                         width: 100%;
                         height: calc(100vh - 56px); /* Full height minus navbar */
                         background-color: #000;
                         overflow: hidden;
+                        cursor: pointer; /* --- NEW: Cursor to show it's clickable --- */
                     }
                     .remote-video {
                         width: 100%;
@@ -430,6 +535,25 @@ function Call() {
                         object-fit: cover;
                     }
                     
+                    /* --- NEW: Draggable Self-View (PiP) --- */
+                    .local-video-pip {
+                        position: absolute;
+                        bottom: 1rem;
+                        right: 1rem;
+                        width: 150px;
+                        height: 150px;
+                        border-radius: 50%;
+                        object-fit: cover;
+                        border: 2px solid var(--border-color);
+                        z-index: 10;
+                        cursor: move;
+                        transition: box-shadow 0.2s ease;
+                    }
+                    .local-video-pip:active {
+                        box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.3);
+                        cursor: grabbing;
+                    }
+
                     .call-controls {
                         position: absolute;
                         bottom: 2rem;
@@ -441,6 +565,11 @@ function Call() {
                         display: flex;
                         gap: 0.5rem;
                         z-index: 20;
+                        transition: opacity 0.3s ease; /* --- NEW --- */
+                    }
+                    .call-controls.hidden { /* --- NEW --- */
+                        opacity: 0;
+                        pointer-events: none;
                     }
                     .call-controls .btn {
                         width: 45px;
@@ -472,25 +601,30 @@ function Call() {
                         padding: 1rem;
                         border-bottom: 1px solid var(--border-color);
                         background-color: var(--dark-bg-secondary);
+                        flex-shrink: 0;
                     }
                     .mobile-panel-header h5 { margin: 0; }
                     .mobile-panel-body {
                         flex-grow: 1;
                         overflow-y: auto;
                         padding: 1rem;
+                        min-height: 0;
                     }
+                    
+                    /* --- FIXED MOBILE CHAT LAYOUT --- */
                     .mobile-chat-panel { padding: 0; }
                     .mobile-chat-body {
                         display: flex;
                         flex-direction: column;
-                        height: calc(100vh - 56px - 61px); /* Full - nav - header */
+                        flex-grow: 1;
                         padding: 0;
-                        overflow: hidden;
+                        overflow: hidden; /* CRITICAL */
                     }
                     .mobile-messages-container {
                         flex-grow: 1;
                         overflow-y: auto; /* SCROLLBAR */
                         padding: 1rem;
+                        min-height: 0;
                     }
                     .mobile-chat-form {
                         padding: 1rem;
@@ -506,7 +640,7 @@ function Call() {
                             padding: 1.5rem 0;
                         }
                         .video-panel-container {
-                            height: 80vh; /* <-- INCREASED HEIGHT */
+                            height: 80vh;
                             border-radius: 8px;
                             border: 1px solid var(--border-color);
                         }
@@ -525,6 +659,7 @@ function Call() {
 
                     /* --- 6. CHAT STYLES (Used by both) --- */
                     
+                    /* --- NEW: Fixed Height Chat Card --- */
                     .chat-card {
                         flex-grow: 1;
                         display: flex;
@@ -532,7 +667,7 @@ function Call() {
                         min-height: 0; /* Flexbox trick */
                     }
                     .chat-card .card-body {
-                        padding: 0.5rem 1rem;
+                        padding: 0; /* Remove padding */
                         overflow: hidden; /* CRITICAL */
                         display: flex;
                         flex-direction: column;
@@ -544,13 +679,16 @@ function Call() {
                         min-height: 0;
                         display: flex;
                         flex-direction: column;
-                        padding: 0.5rem 0.5rem 0.5rem 0;
+                        padding: 1rem; /* Add padding back here */
                     }
                     .chat-form {
                         flex-shrink: 0;
-                        margin-top: 0.75rem;
+                        padding: 1rem;
+                        border-top: 1px solid var(--border-color);
+                        background-color: rgba(0,0,0,0.1);
                     }
 
+                    /* --- Custom Scrollbar --- */
                     .chat-messages-container::-webkit-scrollbar {
                         width: 8px;
                     }
@@ -566,7 +704,7 @@ function Call() {
                         background-color: #777;
                     }
 
-
+                    /* --- Message Bubbles --- */
                     .chat-message { margin-bottom: 1rem; display: flex; flex-direction: column; }
                     .message-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.3rem; }
                     .message-sender { font-weight: 600; font-size: 0.85rem; color: var(--text-primary); }
@@ -578,25 +716,31 @@ function Call() {
                     .other-message { align-items: flex-start; }
                     .other-message .message-bubble { background-color: #313147; color: var(--text-primary); border-top-left-radius: 4px; }
                     .form-control {
-                      background-color: var(--dark-bg-primary) !important;
-                      border: 1px solid var(--border-color) !important;
-                      color: var(--text-primary) !important;
+                        background-color: var(--dark-bg-primary) !important;
+                        border: 1px solid var(--border-color) !important;
+                        color: var(--text-primary) !important;
                     }
                     .form-control::placeholder { color: var(--text-secondary) !important; }
                     .chat-input { border-radius: 20px; padding: 0.5rem 1rem; }
                     .send-button {
-                      background: var(--accent-blue); border: none; color: white;
-                      border-radius: 50%; width: 40px; height: 40px;
-                      display: flex; align-items: center; justify-content: center;
-                      margin-left: 0.5rem; transition: background-color 0.2s ease;
+                        background: var(--accent-blue); border: none; color: white;
+                        border-radius: 50%; width: 40px; height: 40px;
+                        display: flex; align-items: center; justify-content: center;
+                        margin-left: 0.5rem; transition: background-color 0.2s ease;
                     }
                 `}</style>
 
                 <div className="row g-3 h-100">
 
-                    {/* --- Video Column (Fullscreen Mobile, col-lg-8 Desktop) --- */}
+                    {/* --- Video Column --- */}
                     <div className="col-12 col-lg-8 d-flex flex-column">
-                        <div className="video-panel-container shadow-sm">
+                        <div 
+                            className="video-panel-container shadow-sm"
+                            onClick={() => setAreControlsVisible(!areControlsVisible)} // --- NEW: Toggle controls ---
+                            onMouseMove={handlePipMouseMove} // --- NEW: For PiP Drag ---
+                            onMouseUp={handlePipMouseUp} // --- NEW: For PiP Drag ---
+                            onMouseLeave={handlePipMouseUp} // --- NEW: For PiP Drag ---
+                        >
                             <video 
                                 ref={remoteVideoRef} 
                                 className="remote-video" 
@@ -605,22 +749,33 @@ function Call() {
                                 controls={false}
                             />
                             
-                            {/* --- Call Controls (Bottom Center) --- */}
-                            <div className="call-controls">
+                            {/* --- NEW: Self-View (PiP) --- */}
+                            {stream && (
+                                <video
+                                    ref={pipRef}
+                                    className="local-video-pip"
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    onMouseDown={handlePipMouseDown}
+                                    onClick={(e) => e.stopPropagation()} // Prevent click-through to hide controls
+                                />
+                            )}
+                            
+                            {/* --- Call Controls --- */}
+                            <div className={`call-controls ${!areControlsVisible ? 'hidden' : ''}`}>
                                 
-                                {/* --- NEW: Video Toggle Button --- */}
                                 <button
-                                    className={`btn rounded-circle ${isVideoOn ? 'btn-light' : 'btn-secondary'}`}
-                                    onClick={handleToggleVideo}
+                                    className={`btn rounded-circle ${isVideoOn ? 'btn-light' : 'btn-danger'}`} // --- NEW COLOR ---
+                                    onClick={(e) => { e.stopPropagation(); handleToggleVideo(); }} // Stop propagation
                                     title={isVideoOn ? "Turn off camera" : "Turn on camera"}
                                 >
                                     <i className={`bi ${isVideoOn ? 'bi-camera-video-fill' : 'bi-camera-video-off-fill'}`}></i>
                                 </button>
                                 
-                                {/* Mute Button (Logic updated) */}
                                 <button
-                                    className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-secondary' : 'btn-light'}`}
-                                    onClick={() => handleToggleMute(user._id)}
+                                    className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-danger' : 'btn-light'}`} // --- NEW COLOR ---
+                                    onClick={(e) => { e.stopPropagation(); handleToggleMute(user._id); }} // Stop propagation
                                     title={muteStatus[user._id] ? "Unmute" : "Mute"}
                                 >
                                     <i className={`bi ${muteStatus[user._id] ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
@@ -628,8 +783,8 @@ function Call() {
                                 
                                 {/* Chat (MOBILE ONLY) */}
                                 <button
-                                    className="btn btn-primary rounded-circle d-lg-none"
-                                    onClick={() => setIsChatOpen(true)}
+                                    className="btn btn-primary rounded-circle d-lg-none" // --- NEW COLOR ---
+                                    onClick={(e) => { e.stopPropagation(); setIsChatOpen(true); }} // Stop propagation
                                     title="Show Chat"
                                 >
                                     <i className="bi bi-chat-dots-fill"></i>
@@ -637,8 +792,8 @@ function Call() {
                                 
                                 {/* Participants (MOBILE ONLY) */}
                                 <button
-                                    className="btn btn-primary rounded-circle d-lg-none"
-                                    onClick={() => setIsParticipantsOpen(true)}
+                                    className="btn btn-primary rounded-circle d-lg-none" // --- NEW COLOR ---
+                                    onClick={(e) => { e.stopPropagation(); setIsParticipantsOpen(true); }} // Stop propagation
                                     title="Show Participants"
                                 >
                                     <i className="bi bi-people-fill"></i>
@@ -646,8 +801,8 @@ function Call() {
 
                                 {/* Share (MOBILE ONLY) */}
                                 <button
-                                    className="btn btn-primary rounded-circle d-lg-none"
-                                    onClick={() => setIsShareOpen(true)}
+                                    className="btn btn-primary rounded-circle d-lg-none" // --- NEW COLOR ---
+                                    onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} // Stop propagation
                                     title="Share Link"
                                 >
                                     <i className="bi bi-share-fill"></i>
@@ -656,7 +811,7 @@ function Call() {
                                 {/* Hangup Button */}
                                 <button 
                                     className="btn btn-danger rounded-circle"
-                                    onClick={handleHangUp}
+                                    onClick={(e) => { e.stopPropagation(); handleHangUp(); }} // Stop propagation
                                     title="Hang Up"
                                 >
                                     <i className="bi bi-telephone-fill" style={{ transform: 'rotate(135deg)' }}></i>
@@ -666,14 +821,14 @@ function Call() {
                     </div>
 
                     {/* --- Desktop-Only Sidebar (d-none d-lg-flex) --- */}
-                    <div className="col-lg-4 d-none d-lg-flex flex-column h-100">
+                    <div className="col-lg-4 d-none d-lg-flex flex-column h-100" style={{maxHeight: '80vh', gap: '1.5rem'}}>
                         {/* Participants Card (Desktop) */}
-                        <div className="card shadow-sm mb-3">
+                        <div className="card shadow-sm">
                             <div className="card-header d-flex justify-content-between">
                                 <span>Participants ({activeUsers.length})</span>
                                 <i className="bi bi-broadcast text-success"></i>
                             </div>
-                            <ul className="list-group list-group-flush">
+                            <ul className="list-group list-group-flush" style={{maxHeight: '150px', overflowY: 'auto'}}>
                                 {activeUsers.map(p => (
                                     <li key={p.id} className="list-group-item d-flex justify-content-between align-items-center">
                                         <div>
@@ -684,7 +839,6 @@ function Call() {
                                             <button
                                                 className={`btn btn-sm ${muteStatus[p.id] ?? true ? 'text-danger' : 'text-success'}`}
                                                 onClick={() => handleToggleMute(p.id)}
-                                                // User can only mute others (if owner), or self
                                                 disabled={user?._id !== callOwnerId && p.id !== user?._id}
                                                 style={{ fontSize: '1.2rem' }}
                                             >
@@ -698,9 +852,9 @@ function Call() {
                         </div>
 
                         {/* Share Card (Desktop) */}
-                        <div className="mb-3"><SharingComponent sessionId={callId} /></div>
+                        <div><SharingComponent sessionId={callId} /></div>
 
-                        {/* Chat Card (Desktop) */}
+                        {/* Chat Card (Desktop) --- NEW FIXED LAYOUT --- */}
                         <div className="card shadow-sm flex-grow-1 chat-card">
                             <div className="card-header">Live Chat</div>
                             <div className="card-body">
@@ -782,7 +936,7 @@ function Call() {
                     </div>
                 )}
 
-                {/* Chat Panel (Mobile) */}
+                {/* Chat Panel (Mobile) --- NEW FIXED LAYOUT --- */}
                 {isChatOpen && (
                     <div className="mobile-panel mobile-chat-panel d-lg-none">
                         <div className="mobile-panel-header">
