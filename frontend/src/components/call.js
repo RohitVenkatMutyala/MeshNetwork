@@ -238,15 +238,20 @@ function Call() {
 
     // --- Handler Functions ---
 
-    const handleAcceptCall = async () => {
+ const handleAcceptCall = async () => {
         try {
             const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            setStream(userStream); // This will trigger the useLayoutEffect above
-            setIsVideoOn(true);
+            
+            // First, perform the async database operation
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${user._id}`]: false
             });
-            setCallState('active'); 
+
+            // NOW, set all state updates together.
+            // React will batch these into a single render.
+            setStream(userStream); 
+            setIsVideoOn(true);
+            setCallState('active'); // This makes the <video> element appear
         } catch (err) {
             toast.error("Could not access camera/microphone. Please check permissions.");
             console.error(err);
