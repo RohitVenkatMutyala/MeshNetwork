@@ -10,8 +10,6 @@ import {
 } from 'firebase/firestore';
 import { toast } from 'react-toastify';
 import Peer from 'simple-peer';
-
-
 import SharingComponent from './SharingComponent';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -32,8 +30,7 @@ function Call() {
     const [activeUsers, setActiveUsers] = useState([]);
     const [callOwnerId, setCallOwnerId] = useState(null);
     
-    // --- UI State (NEW) ---
-    // These control the mobile overlay panels
+    // --- UI State ---
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
@@ -41,9 +38,9 @@ function Call() {
     // --- Voice/Video Chat State ---
     const [stream, setStream] = useState(null);
     const [muteStatus, setMuteStatus] = useState({});
+    const [isVideoOn, setIsVideoOn] = useState(true); // <-- NEW: Video toggle state
     const peersRef = useRef({});
     const audioContainerRef = useRef(null);
-    // localVideoRef (for self-view) has been removed
     const remoteVideoRef = useRef(null);
     const chatMessagesEndRef = useRef(null);
 
@@ -201,19 +198,21 @@ function Call() {
         return () => unsubscribeSignaling();
     }, [stream, activeUsers, callState, callId, user]);
     
-    // Self-view useEffect has been removed
-
     // Mute Status UseEffect
     useEffect(() => {
-        if (!stream || !user || stream.getAudioTracks().length === 0) { return; }
-        const isMuted = muteStatus[user._id] ?? true;
-        const audioTrack = stream.getAudioTracks()[0];
-        audioTrack.enabled = !isMuted;
-        Object.values(peersRef.current).forEach(peer => {
-            const sender = peer._pc.getSenders().find(s => s.track?.kind === 'audio');
-            if (sender) { sender.replaceTrack(audioTrack); }
-        });
+        if (!stream || !user || !stream.getAudioTracks().length) { return; }
+        const isMuted = muteStatus[user._id] ?? false;
+        stream.getAudioTracks()[0].enabled = !isMuted;
     }, [muteStatus, stream, user]);
+
+    // --- NEW: Video Toggle UseEffect ---
+    useEffect(() => {
+        if (!stream) return;
+        const videoTrack = stream.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = isVideoOn;
+        }
+    }, [isVideoOn, stream]); // Re-runs when video state or stream changes
 
     // --- Handler Functions ---
 
@@ -221,7 +220,10 @@ function Call() {
         try {
             const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             setStream(userStream);
-            await updateDoc(doc(db, 'calls', callId), { [`muteStatus.${user._id}`]: false });
+            setIsVideoOn(true); // Video starts ON
+            await updateDoc(doc(db, 'calls', callId), { 
+                [`muteStatus.${user._id}`]: false // Start unmuted
+            });
             setCallState('active'); 
         } catch (err) {
             toast.error("Could not access camera/microphone. Please check permissions.");
@@ -241,31 +243,43 @@ function Call() {
         setStream(null);
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
-        navigate('/new-call'); // Go to dashboard
+        navigate('/new-call'); // Go to new call
     };
 
+    // --- NEW: Video Toggle Function ---
+    const handleToggleVideo = () => {
+        if (!stream) return;
+        const newVideoState = !isVideoOn;
+        setIsVideoOn(newVideoState);
+        // This will trigger the `useEffect` above
+    };
+
+    // --- UPDATED: Mute Toggle Function ---
     const handleToggleMute = async (targetUserId) => {
-        const isTrueOwner = user && user._id === callOwnerId;
         const isSelf = targetUserId === user._id;
 
-        if (isTrueOwner) {
-            const currentMuteState = muteStatus[targetUserId] ?? true;
-            const newMuteState = !currentMuteState;
-            await updateDoc(doc(db, 'calls', callId), { [`muteStatus.${targetUserId}`]: newMuteState });
-            return;
-        }
-
         if (isSelf) {
-            const isCurrentlyMuted = muteStatus[targetUserId] ?? true;
-            if (isCurrentlyMuted) {
-                toast.error("Only the call host can unmute you.");
-                return;
-            }
-            await updateDoc(doc(db, 'calls', callId), { [`muteStatus.${targetUserId}`]: true });
+            // User can ALWAYS mute/unmute themselves
+            const currentMuteState = muteStatus[targetUserId] ?? false;
+            const newMuteState = !currentMuteState;
+            await updateDoc(doc(db, 'calls', callId), { 
+                [`muteStatus.${targetUserId}`]: newMuteState 
+            });
         } else {
-            toast.error("You do not have permission to mute other participants.");
+            // User is trying to mute/unmute someone else
+            const isTrueOwner = user && user._id === callOwnerId;
+            if (isTrueOwner) {
+                // Host can only MUTE others
+                await updateDoc(doc(db, 'calls', callId), { 
+                    [`muteStatus.${targetUserId}`]: true 
+                });
+                toast.success("Muted participant");
+            } else {
+                toast.error("You can only mute yourself.");
+            }
         }
     };
+
 
     const formatTimestamp = (timestamp) => !timestamp ? '' : timestamp.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
@@ -294,7 +308,7 @@ function Call() {
     if (callState === 'denied') {
         return (
             <>
-               
+                <Navbar />
                 <div className="container mt-5">
                     <div className="alert alert-danger"><b>Access Denied.</b> This call may not exist or you may not have permission to join.</div>
                 </div>
@@ -367,7 +381,6 @@ function Call() {
     return (
         <>
             
-            
             <div className="chat-page-container">
                 <style jsx>{`
                     /* --- 1. General Page & Layout Styles --- */
@@ -417,8 +430,6 @@ function Call() {
                         object-fit: cover;
                     }
                     
-                    /* LOCAL VIDEO (SELF-VIEW) IS REMOVED */
-
                     .call-controls {
                         position: absolute;
                         bottom: 2rem;
@@ -500,8 +511,6 @@ function Call() {
                             border: 1px solid var(--border-color);
                         }
                         
-                        /* LOCAL VIDEO (SELF-VIEW) IS REMOVED FOR DESKTOP */
-
                         .call-controls .btn {
                             width: 50px;
                             height: 50px;
@@ -516,7 +525,6 @@ function Call() {
 
                     /* --- 6. CHAT STYLES (Used by both) --- */
                     
-                    /* --- FIX 1: DESKTOP CHAT SCROLLING --- */
                     .chat-card {
                         flex-grow: 1;
                         display: flex;
@@ -533,18 +541,16 @@ function Call() {
                     .chat-messages-container {
                         flex-grow: 1; /* Make message list fill the body */
                         overflow-y: auto; /* CRITICAL: Add scrollbar */
-                        min-height: 0; /* Flexbox trick */
+                        min-height: 0;
                         display: flex;
                         flex-direction: column;
-                        padding: 0.5rem 0.5rem 0.5rem 0; /* Add padding for scrollbar */
+                        padding: 0.5rem 0.5rem 0.5rem 0;
                     }
                     .chat-form {
                         flex-shrink: 0;
                         margin-top: 0.75rem;
                     }
-                    /* --- END FIX 1 --- */
 
-                    /* --- CUSTOM SCROLLBAR (as requested) --- */
                     .chat-messages-container::-webkit-scrollbar {
                         width: 8px;
                     }
@@ -559,7 +565,6 @@ function Call() {
                     .chat-messages-container::-webkit-scrollbar-thumb:hover {
                         background-color: #777;
                     }
-                    /* --- END CUSTOM SCROLLBAR --- */
 
 
                     .chat-message { margin-bottom: 1rem; display: flex; flex-direction: column; }
@@ -600,11 +605,19 @@ function Call() {
                                 controls={false}
                             />
                             
-                            {/* --- LOCAL VIDEO (SELF-VIEW) TAG IS REMOVED --- */}
-                            
                             {/* --- Call Controls (Bottom Center) --- */}
                             <div className="call-controls">
-                                {/* Mute Button */}
+                                
+                                {/* --- NEW: Video Toggle Button --- */}
+                                <button
+                                    className={`btn rounded-circle ${isVideoOn ? 'btn-light' : 'btn-secondary'}`}
+                                    onClick={handleToggleVideo}
+                                    title={isVideoOn ? "Turn off camera" : "Turn on camera"}
+                                >
+                                    <i className={`bi ${isVideoOn ? 'bi-camera-video-fill' : 'bi-camera-video-off-fill'}`}></i>
+                                </button>
+                                
+                                {/* Mute Button (Logic updated) */}
                                 <button
                                     className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-secondary' : 'btn-light'}`}
                                     onClick={() => handleToggleMute(user._id)}
@@ -671,7 +684,8 @@ function Call() {
                                             <button
                                                 className={`btn btn-sm ${muteStatus[p.id] ?? true ? 'text-danger' : 'text-success'}`}
                                                 onClick={() => handleToggleMute(p.id)}
-                                                disabled={user?._id !== callOwnerId && (p.id !== user?._id || (muteStatus[p.id] ?? true))}
+                                                // User can only mute others (if owner), or self
+                                                disabled={user?._id !== callOwnerId && p.id !== user?._id}
                                                 style={{ fontSize: '1.2rem' }}
                                             >
                                                 <i className={`bi ${muteStatus[p.id] ?? true ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
@@ -742,7 +756,7 @@ function Call() {
                                             <button
                                                 className={`btn btn-sm ${muteStatus[p.id] ?? true ? 'text-danger' : 'text-success'}`}
                                                 onClick={() => handleToggleMute(p.id)}
-                                                disabled={user?._id !== callOwnerId && (p.id !== user?._id || (muteStatus[p.id] ?? true))}
+                                                disabled={user?._id !== callOwnerId && p.id !== user?._id}
                                                 style={{ fontSize: '1.2rem' }}
                                             >
                                                 <i className={`bi ${muteStatus[p.id] ?? true ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
@@ -789,7 +803,7 @@ function Call() {
                                 <div ref={chatMessagesEndRef} />
                             </div>
                             <form onSubmit={handleSendMessage} className="mobile-chat-form">
-                                <div className="d-flex align-items:center">
+                                <div className="d-flex align-items-center">
                                     <input
                                         type="text"
                                         className="form-control chat-input"
