@@ -3,10 +3,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+// Import runTransaction for safe counter updates
+import { 
+    collection, query, where, orderBy, limit, onSnapshot, 
+    doc, setDoc, serverTimestamp, runTransaction 
+} from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import emailjs from '@emailjs/browser';
+
+// Helper function to get today's date as YYYY-MM-DD
+const getTodayString = () => {
+    return new Date().toISOString().split('T')[0];
+};
 
 function RecentCalls({ searchTerm }) {
     const { user } = useAuth();
@@ -14,6 +23,8 @@ function RecentCalls({ searchTerm }) {
     const [filteredCalls, setFilteredCalls] = useState([]); // Stores calls to display
     const [loading, setLoading] = useState(true);
     const [isCalling, setIsCalling] = useState(null);
+    const [dailyCallCount, setDailyCallCount] = useState(0); // State for the call count
+    const dailyCallLimit = 32; // Define the limit
     const navigate = useNavigate();
 
     // Function to send email when re-calling
@@ -38,38 +49,77 @@ function RecentCalls({ searchTerm }) {
         }
     };
 
-    // "Speed dial" function
+    // "Speed dial" function with limit logic
     const handleReCall = async (callId, recipientName, recipientEmail, description) => {
         if (!user) {
             toast.error("You must be logged in to make a call.");
             return;
         }
         setIsCalling(callId);
+
+        const today = getTodayString();
+        // Define a reference to the user's specific limit document
+        const limitDocRef = doc(db, 'userCallLimits', user._id);
         const newCallId = Math.random().toString(36).substring(2, 9);
         const callDocRef = doc(db, 'calls', newCallId);
 
         try {
-            await setDoc(callDocRef, {
-                description,
-                createdAt: serverTimestamp(),
-                ownerId: user._id,
-                ownerName: `${user.firstname} ${user.lastname}`,
-                ownerEmail: user.email,
-                recipientName: recipientName,
-                recipientEmail: recipientEmail,
-                access: 'private',
-                defaultRole: 'editor',
-                allowedEmails: [user.email, recipientEmail],
-                permissions: { [user._id]: 'editor' },
-                muteStatus: { [user._id]: false },
+            // Use a transaction to safely read and update the count
+            await runTransaction(db, async (transaction) => {
+                const limitDoc = await transaction.get(limitDocRef);
+                
+                let currentCount = 0;
+                
+                if (limitDoc.exists()) {
+                    const data = limitDoc.data();
+                    // Check if the stored count is from today
+                    if (data.lastCallDate === today) {
+                        currentCount = data.count;
+                    }
+                    // If data.lastCallDate is not today, currentCount remains 0 (it resets)
+                }
+
+                // Check the limit
+                if (currentCount >= dailyCallLimit) {
+                    // This error will be caught by the outer catch block
+                    throw new Error(`You have reached your daily limit of ${dailyCallLimit} calls.`);
+                }
+
+                const newCount = currentCount + 1;
+
+                // 1. Create the new call document
+                transaction.set(callDocRef, {
+                    description,
+                    createdAt: serverTimestamp(),
+                    ownerId: user._id,
+                    ownerName: `${user.firstname} ${user.lastname}`,
+                    ownerEmail: user.email,
+                    recipientName: recipientName,
+                    recipientEmail: recipientEmail,
+                    access: 'private',
+                    defaultRole: 'editor',
+                    allowedEmails: [user.email, recipientEmail],
+                    permissions: { [user._id]: 'editor' },
+                    muteStatus: { [user._id]: false },
+                });
+
+                // 2. Update the limit document with the new count and today's date
+                transaction.set(limitDocRef, { 
+                    count: newCount, 
+                    lastCallDate: today 
+                });
             });
+
+            // --- If transaction is successful ---
             await sendInvitationEmails(newCallId, description, recipientEmail);
             toast.success(`Calling ${recipientName}...`);
             navigate(`/call/${newCallId}`);
+
         } catch (error) {
+            // This will catch the "limit reached" error too
             console.error("Failed to create call:", error);
-            toast.error("Could not create the call.");
-            setIsCalling(null);
+            toast.error(error.message || "Could not create the call.");
+            setIsCalling(null); // Reset spinner on failure
         }
     };
 
@@ -89,9 +139,8 @@ function RecentCalls({ searchTerm }) {
             const callsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
             // =================================================================
-            // === NEW DE-DUPLICATION LOGIC ===
+            // === DE-DUPLICATION LOGIC ===
             // =================================================================
-            // This creates a list with only the most recent call for each unique person.
             const uniqueCalls = [];
             const seenEmails = new Set();
             
@@ -105,8 +154,6 @@ function RecentCalls({ searchTerm }) {
                     seenEmails.add(otherPersonEmail);
                     uniqueCalls.push(call);
                 }
-                // If we have seen this email, it's an older call with the same person,
-                // so we skip it.
             }
             // =================================================================
 
@@ -120,7 +167,37 @@ function RecentCalls({ searchTerm }) {
         return () => unsubscribe();
     }, [user]);
 
-    // Effect 2: Filter calls when searchTerm changes
+    // Effect 2: Fetch and listen to the daily call count
+    useEffect(() => {
+        if (!user) {
+            setDailyCallCount(0);
+            return;
+        }
+
+        const today = getTodayString();
+        const limitDocRef = doc(db, 'userCallLimits', user._id);
+
+        // Listen for real-time updates to the count
+        const unsubscribe = onSnapshot(limitDocRef, (doc) => {
+            if (doc.exists()) {
+                const data = doc.data();
+                // Only set the count if the date matches today
+                if (data.lastCallDate === today) {
+                    setDailyCallCount(data.count);
+                } else {
+                    // It's a new day, so the count is 0
+                    setDailyCallCount(0);
+                }
+            } else {
+                // No document exists, so the count is 0
+                setDailyCallCount(0);
+            }
+        });
+
+        return () => unsubscribe();
+    }, [user]); // Re-run if the user logs in or out
+
+    // Effect 3: Filter calls when searchTerm changes
     useEffect(() => {
         if (!searchTerm) {
             setFilteredCalls(allCalls); // If search is empty, show all calls
@@ -135,7 +212,8 @@ function RecentCalls({ searchTerm }) {
 
             return (
                 displayName?.toLowerCase().includes(lowerCaseSearch) ||
-                displayEmail?.toLowerCase().includes(lowerCaseSearch)
+                displayEmail?.toLowerCase().includes(lowerCaseSearch) ||
+                call.id.toLowerCase().includes(lowerCaseSearch) // Also allow search by call ID
             );
         });
         setFilteredCalls(filtered);
@@ -172,7 +250,8 @@ function RecentCalls({ searchTerm }) {
         <>
             <style jsx>{`
                 .recent-calls-list {
-                    border-radius: 0.5rem;
+                    /* Modified: Removed top border radius */
+                    border-radius: 0 0 0.5rem 0.5rem;
                     overflow: hidden;
                     max-height: 60vh;
                     overflow-y: auto;
@@ -223,6 +302,23 @@ function RecentCalls({ searchTerm }) {
                 .call-action {
                     margin-left: 1rem;
                     flex-shrink: 0;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem; /* Adds space between link and icon */
+                }
+                .call-rejoin-link {
+                    font-family: "Courier New", Courier, monospace;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    color: var(--bs-primary);
+                    text-decoration: none;
+                    padding: 0.5rem;
+                    border-radius: 0.3rem;
+                    transition: background-color 0.2s ease, color 0.2s ease;
+                }
+                .call-rejoin-link:hover {
+                    background-color: var(--bs-secondary-bg);
+                    text-decoration: underline;
                 }
                 .call-button {
                     background: none;
@@ -237,6 +333,7 @@ function RecentCalls({ searchTerm }) {
                     align-items: center;
                     justify-content: center;
                     transition: background-color 0.2s ease;
+                    flex-shrink: 0; 
                 }
                 .call-button:hover {
                     background-color: var(--bs-secondary-bg);
@@ -250,8 +347,27 @@ function RecentCalls({ searchTerm }) {
                     text-align: center;
                     color: var(--bs-secondary-color);
                 }
+                /* Style for the call counter */
+                .call-count-display {
+                    padding: 0.75rem 1.25rem;
+                    background-color: var(--bs-tertiary-bg);
+                    border-bottom: 1px solid var(--bs-border-color);
+                    text-align: center;
+                    font-size: 0.9rem;
+                    color: var(--bs-secondary-color);
+                    border-radius: 0.5rem 0.5rem 0 0;
+                }
+                .call-count-display strong {
+                    color: var(--bs-body-color);
+                    font-weight: 600;
+                }
             `}</style>
             
+            {/* Added the call count display at the top */}
+            <div className="call-count-display">
+                Today's Calls: <strong>{dailyCallCount} / {dailyCallLimit}</strong>
+            </div>
+
             <div className="recent-calls-list">
                 {filteredCalls.length === 0 ? (
                     <div className="empty-state">
@@ -280,12 +396,28 @@ function RecentCalls({ searchTerm }) {
                                         {displayEmail} • {formatTimestamp(call.createdAt)}
                                     </div>
                                 </div>
+
                                 <div className="call-action">
+                                    {/* 1. The new re-join link */}
+                                    <a
+                                        href={`/call/${call.id}`}
+                                        className="call-rejoin-link"
+                                        title={`Re-join session ${call.id}`}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            navigate(`/call/${call.id}`);
+                                        }}
+                                    >
+                                        {call.id}
+                                    </a>
+
+                                    {/* 2. The original "new call" button */}
                                     <button 
                                         className="call-button" 
-                                        title={`Call ${displayName}`}
+                                        title={`Call ${displayName} (New Session)`}
                                         onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
-                                        disabled={isCalling === call.id}
+                                        // Also disable if count is at limit
+                                        disabled={isCalling === call.id || dailyCallCount >= dailyCallLimit}
                                     >
                                         {isCalling === call.id ? (
                                             <div className="spinner-border spinner-border-sm" role="status">
