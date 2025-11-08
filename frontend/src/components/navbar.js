@@ -6,7 +6,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { db } from '../firebaseConfig';
 import { doc, onSnapshot } from 'firebase/firestore';
-import logo from '../logo.svg'; // <-- UPDATED PATH
+import logo from '../../public/logo.svg'; // <-- UPDATED PATH
 
 function Navbar() {
     const { user, logout } = useAuth();
@@ -172,13 +172,13 @@ function Navbar() {
 
             <nav className={`navbar navbar-expand-lg sticky-top shadow-sm navbar-custom theme-${theme}`}>
                 <div className="container-fluid px-4">
-                    <img
+                   {/* <img
                         src={logo} 
-                        alt="MeshNetwork Logo"
+                        alt="NETWORK.RANDOMAN Logo"
                         className={`logo-image ${theme === 'dark' ? 'logo-dark-theme' : ''}`}
-                    />
-                    <Link to={user ? "/dashboard" : "/"} className="navbar-brand-custom py-2">
-                        MeshNetwork
+                    /> */}
+                    <Link to={user ? "/new-call" : "/new-call"} className="navbar-brand-custom py-2">
+                        NETWORK.RANDOMAN
                     </Link>
 
                     <button
@@ -194,11 +194,7 @@ function Navbar() {
                             {user ? (
                                 <>
                                     {/* --- UPDATED LINKS --- */}
-                                    <li className="nav-item">
-                                        <Link className={`nav-link nav-link-custom ${isActive('/dashboard') ? 'active' : ''}`} to="/dashboard">
-                                            <i className="bi bi-grid-fill"></i><span>Dashboard</span>
-                                        </Link>
-                                    </li>
+                                   
                                     <li className="nav-item">
                                         <Link className={`nav-link nav-link-custom ${isActive('/new-call') ? 'active' : ''}`} to="/new-call">
                                             <i className="bi bi-telephone-fill"></i><span>Calls</span>
