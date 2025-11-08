@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext'; // <-- 1. IMPORT THEME
 import { Eye, EyeOff } from 'lucide-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap-icons/font/bootstrap-icons.css'; // Ensure you have this import
+import 'bootstrap-icons/font/bootstrap-icons.css';
 import Navbar from './navbar';
 function LoginForm() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -13,6 +14,7 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const { setUser, user } = useAuth();
+  const { theme } = useTheme(); // <-- 2. GET THEME
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,7 +28,7 @@ function LoginForm() {
       });
 
       setUser(res.data.user);
-      navigate('/new-call'); // Navigate to the main app page
+      navigate('/new-call');
     } catch (err) {
       setError('Login failed. Please check your credentials.');
       setLoading(false);
@@ -35,12 +37,13 @@ function LoginForm() {
 
   if (user) {
     navigate("/new-call");
-    return null; // Return null to prevent rendering during redirect
+    return null;
   }
 
   return (
     <>
       <Navbar />
+      {/* 3. UPDATED STYLES TO USE CSS VARIABLES */}
       <style>{`
         body, html {
           height: 100%;
@@ -50,26 +53,27 @@ function LoginForm() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background-color: #f8f9fa; /* Clean light background */
+          background-color: var(--bs-light-bg-subtle, #f8f9fa);
         }
         .auth-card {
-          border: none;
+          border: 1px solid var(--bs-border-color-translucent);
           border-radius: 1rem;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
           overflow: hidden;
+          background-color: var(--bs-body-bg);
         }
         .auth-welcome-col {
           padding: 3rem;
-          background-color: #ffffff;
+          background-color: var(--bs-body-bg);
         }
         .auth-form-col {
           padding: 3rem;
-          background-color: #fdfdfd;
-          border-left: 1px solid #dee2e6;
+          background-color: var(--bs-tertiary-bg);
+          border-left: 1px solid var(--bs-border-color-translucent);
         }
         .feature-card {
-          background-color: #f8f9fa;
-          border: 1px solid #e9ecef;
+          background-color: var(--bs-light-bg-subtle);
+          border: 1px solid var(--bs-border-color-translucent);
           border-radius: 0.75rem;
           transition: all 0.3s ease;
         }
@@ -79,21 +83,25 @@ function LoginForm() {
         }
         .feature-icon {
           font-size: 1.5rem;
-          color: #0d6efd; /* Professional blue */
+          color: var(--bs-primary);
         }
         .btn-primary {
-          background-color: #0d6efd;
+          background-color: var(--bs-primary);
           border: none;
           transition: all 0.3s ease;
         }
         .btn-primary:hover {
-          background-color: #0b5ed7;
+          background-color: var(--bs-primary-dark);
           transform: translateY(-2px);
-          box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3);
+          box-shadow: 0 4px 10px rgba(var(--bs-primary-rgb), 0.3);
+        }
+        .auth-form-col h2, .auth-welcome-col h1 {
+          color: var(--bs-body-color);
         }
       `}</style>
 
-      <div className="auth-container">
+      {/* 4. ADD data-bs-theme ATTRIBUTE */}
+      <div className="auth-container" data-bs-theme={theme}>
         <div className="container">
           <div className="row justify-content-center">
             <div className="col-lg-10 col-xl-9">
@@ -102,7 +110,7 @@ function LoginForm() {
                   {/* Left Column - Welcome Section */}
                   <div className="col-lg-6 d-none d-lg-flex align-items-center auth-welcome-col">
                     <div className="text-start">
-                      <h1 className="display-5 fw-bold mb-3 text-dark">
+                      <h1 className="display-5 fw-bold mb-3">
                         Welcome to MeshNetwork
                       </h1>
                       <p className="text-muted mb-4">
@@ -146,7 +154,7 @@ function LoginForm() {
                       <form onSubmit={handleSubmit}>
                         <div className="text-center mb-4">
                           <i className="bi bi-person-circle text-primary" style={{ fontSize: '3rem' }}></i>
-                          <h2 className="fw-bold text-dark mt-2">
+                          <h2 className="fw-bold mt-2">
                             Sign In
                           </h2>
                           <p className="text-muted">Access your MeshNetwork account.</p>
