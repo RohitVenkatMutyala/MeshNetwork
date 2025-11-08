@@ -13,7 +13,7 @@ import Peer from 'simple-peer';
 import SharingComponent from './SharingComponent';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-
+import Navbar from './navbar';
 function Call() {
     const { user } = useAuth();
     const { callId } = useParams();
@@ -319,6 +319,7 @@ function Call() {
         const callerName = callData?.ownerName || 'Unknown Caller';
         return (
             <>
+             <Navbar />
                 {/* --- Pulsing Animation --- */}
                 <style jsx>{`
                     .pulse-button {

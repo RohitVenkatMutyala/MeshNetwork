@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff } from 'lucide-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css'; // Ensure you have this import
-
+import Navbar from './navbar';
 function LoginForm() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
@@ -40,6 +40,7 @@ function LoginForm() {
 
   return (
     <>
+      <Navbar />
       <style>{`
         body, html {
           height: 100%;

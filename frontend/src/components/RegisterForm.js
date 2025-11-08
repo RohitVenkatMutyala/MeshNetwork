@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff } from 'lucide-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css'; // Ensure you have this import
-
+import Navbar from './navbar';
 function RegisterForm() {
   const API_URL = process.env.REACT_APP_SERVER_API;
   const [form, setForm] = useState({
@@ -54,6 +54,7 @@ function RegisterForm() {
 
   return (
     <>
+     <Navbar />
       <style>{`
         body, html {
           height: 100%;
