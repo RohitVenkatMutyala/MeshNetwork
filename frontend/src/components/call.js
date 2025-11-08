@@ -1,4 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { 
+    useState, 
+    useEffect, 
+    useRef, 
+    useLayoutEffect // --- NEW: Import useLayoutEffect ---
+} from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
@@ -221,10 +226,10 @@ function Call() {
     }, [isVideoOn, stream]);
 
 
-    // --- *** NEW/FIXED *** ---
-    // This effect now correctly attaches the stream (or null) to the
-    // mini-player whenever the stream changes.
-    useEffect(() => {
+    // --- *** CORRECTED *** ---
+    // Switched to useLayoutEffect. This runs *before* the browser paints,
+    // guaranteeing the localVideoRef.current element is ready.
+    useLayoutEffect(() => {
         if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
         }
@@ -236,7 +241,7 @@ function Call() {
     const handleAcceptCall = async () => {
         try {
             const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            setStream(userStream); // This will trigger the new useEffect above
+            setStream(userStream); // This will trigger the useLayoutEffect above
             setIsVideoOn(true);
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${user._id}`]: false
@@ -256,7 +261,7 @@ function Call() {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
-        setStream(null); // This will trigger the useEffect to clear the PiP video
+        setStream(null); // This will trigger the useLayoutEffect to clear the PiP video
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
         navigate('/new-call');
@@ -550,12 +555,16 @@ function Call() {
                         border: 2px solid var(--border-color);
                         z-index: 10;
                         cursor: move;
-                        transition: box-shadow 0.2s ease;
-                        /* --- NEW: Hide if no stream --- */
+                        transition: box-shadow 0.2s ease, opacity 0.3s ease;
                         background: #222; /* Placeholder color */
                     }
-                    .local-video-pip:not([srcObject]) {
-                        display: none; /* Hide if no stream is attached */
+                    /* --- MODIFIED: Hide if no stream --- */
+                    .local-video-pip:not([style*="left"]) { /* A bit of a hack: if no 'left' style, it's not dragged */
+                         bottom: 1rem;
+                         right: 1rem;
+                    }
+                    .local-video-pip[style*="opacity: 0"] {
+                         display: none;
                     }
                     .local-video-pip:active {
                         box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.3);
@@ -756,12 +765,11 @@ function Call() {
                                 controls={false}
                             />
                             
-                            {/* --- *** MODIFIED *** --- */}
-                            {/* This <video> element is now ALWAYS rendered */}
-                            {/* The useEffect will attach/detach the stream to it */}
+                            {/* --- Self-View (PiP) --- */}
                             <video
                                 ref={localVideoRef} 
                                 className="local-video-pip"
+                                style={{ opacity: stream ? 1 : 0 }} // Hide if no stream
                                 autoPlay
                                 playsInline
                                 muted
@@ -884,7 +892,7 @@ function Call() {
                                             className="form-control chat-input"
                                             placeholder="Type a message..."
                                             value={newMessage}
-                                            onChange={(e) => setNewMessage(e.target.value)}
+                                            onChange={(e) => setNewMessage(e.g.target.value)}
                                         />
                                         <button className="send-button flex-shrink-0" type="submit" disabled={!newMessage.trim()}>
                                             <i className="bi bi-send-fill"></i>
