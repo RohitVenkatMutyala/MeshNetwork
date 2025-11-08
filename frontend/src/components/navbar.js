@@ -220,7 +220,7 @@ function Navbar() {
                                                     </div>
                                                 </li>
                                                 <li><hr className="dropdown-divider" /></li>
-                                                <li><Link className="dropdown-item d-flex align-items-center gap-2" to="/dashboard"><i className="bi bi-house-fill"></i><span>Dashboard</span></Link></li>
+                                        
                                                 <li><hr className="dropdown-divider" /></li>
                                                 <li>
                                                     <button className="dropdown-item d-flex align-items-center gap-2" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
