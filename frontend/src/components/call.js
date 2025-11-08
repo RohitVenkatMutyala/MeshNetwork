@@ -308,7 +308,6 @@ function Call() {
     if (callState === 'denied') {
         return (
             <>
-                <Navbar />
                 <div className="container mt-5">
                     <div className="alert alert-danger"><b>Access Denied.</b> This call may not exist or you may not have permission to join.</div>
                 </div>
