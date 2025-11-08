@@ -222,26 +222,21 @@ function Call() {
 
 
     // --- *** NEW/FIXED *** ---
-    // This effect now correctly attaches the stream to the mini-player
-    // *after* it has been rendered.
+    // This effect now correctly attaches the stream (or null) to the
+    // mini-player whenever the stream changes.
     useEffect(() => {
-        if (localVideoRef.current && stream) {
+        if (localVideoRef.current) {
             localVideoRef.current.srcObject = stream;
         }
-    }, [stream]); // We only need to run this when the stream is ready
+    }, [stream]); // Runs when 'stream' changes (from null to a stream, or from a stream to null)
 
 
     // --- Handler Functions ---
 
-    // --- *** MODIFIED *** ---
     const handleAcceptCall = async () => {
         try {
             const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             setStream(userStream); // This will trigger the new useEffect above
-            
-            // --- REMOVED this line from here ---
-            // if (localVideoRef.current) { ... }
-
             setIsVideoOn(true);
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${user._id}`]: false
@@ -261,7 +256,7 @@ function Call() {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
-        setStream(null);
+        setStream(null); // This will trigger the useEffect to clear the PiP video
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
         navigate('/new-call');
@@ -556,6 +551,11 @@ function Call() {
                         z-index: 10;
                         cursor: move;
                         transition: box-shadow 0.2s ease;
+                        /* --- NEW: Hide if no stream --- */
+                        background: #222; /* Placeholder color */
+                    }
+                    .local-video-pip:not([srcObject]) {
+                        display: none; /* Hide if no stream is attached */
                     }
                     .local-video-pip:active {
                         box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.3);
@@ -756,18 +756,18 @@ function Call() {
                                 controls={false}
                             />
                             
-                            {/* --- Self-View (PiP) --- */}
-                            {stream && (
-                                <video
-                                    ref={localVideoRef} // Correct ref
-                                    className="local-video-pip"
-                                    autoPlay
-                                    playsInline
-                                    muted
-                                    onMouseDown={handlePipMouseDown}
-                                    onClick={(e) => e.stopPropagation()} 
-                                />
-                            )}
+                            {/* --- *** MODIFIED *** --- */}
+                            {/* This <video> element is now ALWAYS rendered */}
+                            {/* The useEffect will attach/detach the stream to it */}
+                            <video
+                                ref={localVideoRef} 
+                                className="local-video-pip"
+                                autoPlay
+                                playsInline
+                                muted
+                                onMouseDown={handlePipMouseDown}
+                                onClick={(e) => e.stopPropagation()} 
+                            />
                             
                             {/* --- Call Controls --- */}
                             <div className={`call-controls ${!areControlsVisible ? 'hidden' : ''}`}>
