@@ -6,7 +6,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { db } from '../firebaseConfig';
 import { doc, onSnapshot } from 'firebase/firestore';
-import logo from '../../public/logo.svg'; // <-- UPDATED PATH
+import logo from '../logo.svg'; // <-- UPDATED PATH
 
 function Navbar() {
     const { user, logout } = useAuth();
