@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
-// --- NEW ---: Import deleteDoc
 import { 
     collection, query, where, orderBy, limit, onSnapshot, 
     doc, setDoc, serverTimestamp, runTransaction, deleteDoc 
@@ -21,7 +20,7 @@ function RecentCalls({ searchTerm }) {
     const [filteredCalls, setFilteredCalls] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCalling, setIsCalling] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(null); // --- NEW ---: State for delete spinner
+    const [isDeleting, setIsDeleting] = useState(null); 
     const [dailyCallCount, setDailyCallCount] = useState(0);
     const dailyCallLimit = 32;
     const navigate = useNavigate();
@@ -263,7 +262,7 @@ function RecentCalls({ searchTerm }) {
                     height: 48px;
                 }
                 /* Target the add button */
-                .btn-primary.ms-2 {
+                .btn-primary.btn-sm { /* --- MODIFIED: Target .btn-sm --- */
                     background-color: #4A69BD; /* Professional blue */
                     border-color: #4A69BD;
                     border-radius: 12px !important;
@@ -271,7 +270,7 @@ function RecentCalls({ searchTerm }) {
                     width: 48px;
                     font-size: 1.25rem;
                 }
-                .btn-primary.ms-2:hover {
+                .btn-primary.btn-sm:hover {
                     background-color: #3e5aa8;
                     border-color: #3e5aa8;
                 }
@@ -279,26 +278,14 @@ function RecentCalls({ searchTerm }) {
             
             {/* --- MODIFIED: Component-specific styles --- */}
             <style jsx>{`
-                /* --- NEW: Main container style --- */
-                .recent-calls-container {
-                    max-width: 800px;
-                    margin: 1.5rem auto;
-                    background-color: var(--bs-body-bg);
-                    border-radius: 16px;
-                    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
-                    /* --- MODIFIED: Use theme-specific shadow --- */
-                    [data-bs-theme="dark"] & {
-                         box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-                         border: 1px solid var(--bs-border-color);
-                    }
-                    overflow: hidden;
-                }
+                /* --- REMOVED .recent-calls-container --- */
             
                 .recent-calls-list {
-                    /* --- MODIFIED: Removed borders/overflow --- */
                     max-height: 60vh;
                     overflow-y: auto;
-                    padding: 0.5rem; /* Add padding for list items */
+                    /* --- MODIFIED: Add radius to match parent card --- */
+                    border-radius: 0 0 0.5rem 0.5rem; 
+                    overflow: hidden;
                 }
                 .call-item {
                     display: flex;
@@ -306,12 +293,9 @@ function RecentCalls({ searchTerm }) {
                     padding: 1rem 1.25rem;
                     border-bottom: 1px solid var(--bs-border-color);
                     transition: background-color 0.2s ease;
-                    border-radius: 12px; /* --- NEW: Rounded list items --- */
-                    margin-bottom: 0.5rem; /* --- NEW: Space between items --- */
                 }
                 .call-item:last-child {
                     border-bottom: none;
-                    margin-bottom: 0;
                 }
                 .call-item:hover {
                     background-color: var(--bs-tertiary-bg);
@@ -413,20 +397,19 @@ function RecentCalls({ searchTerm }) {
                     color: var(--bs-secondary-color);
                 }
                 
-                /* --- MODIFIED: "Today's Calls" UI --- */
+                /* --- MODIFIED: "Today's Calls" UI (now a header) --- */
                 .call-count-display {
-                    padding: 0.6rem 1rem;
+                    padding: 0.75rem 1.25rem;
                     background-color: var(--bs-tertiary-bg);
-                    border-radius: 10px;
+                    border-bottom: 1px solid var(--bs-border-color);
+                    text-align: center;
                     font-size: 0.9rem;
                     color: var(--bs-secondary-color);
-                    font-weight: 500;
-                    margin: 1.5rem 1.5rem 1rem 1.5rem; /* Position inside container */
-                    text-align: left;
+                    /* This will be the top of the card now */
                 }
                 .call-count-display strong {
                     color: var(--bs-body-color);
-                    font-weight: 700;
+                    font-weight: 600;
                 }
 
                 /* --- MODIFIED: Delete button color --- */
@@ -463,107 +446,98 @@ function RecentCalls({ searchTerm }) {
                     .call-item {
                         padding: 1rem 0.75rem;
                     }
-                    .recent-calls-container {
-                        margin: 0.5rem;
-                        border-radius: 12px;
-                    }
-                    .call-count-display {
-                        margin: 1rem 0.75rem 0.5rem 0.75rem;
-                    }
                 }
             `}</style>
             
-            {/* --- MODIFIED: Wrapped in container, moved call count --- */}
-            <div className="recent-calls-container">
-                <div className="call-count-display">
-                    Today's Calls: <strong>{dailyCallCount} / {dailyCallLimit}</strong>
-                </div>
+            {/* --- MODIFIED: Removed container wrapper --- */}
+            <div className="call-count-display">
+                Today's Calls: <strong>{dailyCallCount} / {dailyCallLimit}</strong>
+            </div>
 
-                <div className="recent-calls-list">
-                    {filteredCalls.length === 0 ? (
-                        <div className="empty-state">
-                            {searchTerm ? "No calls match your search." : "You have no recent calls."}
-                        </div>
-                    ) : (
-                        filteredCalls.map(call => {
-                            const isCurrentUserOwner = call.ownerId === user._id;
-                            const displayName = isCurrentUserOwner ? call.recipientName : call.ownerName;
-                            const displayEmail = isCurrentUserOwner ? call.recipientEmail : call.ownerEmail;
-                            
-                            if (!displayName) return null;
+            <div className="recent-calls-list">
+                {filteredCalls.length === 0 ? (
+                    <div className="empty-state">
+                        {searchTerm ? "No calls match your search." : "You have no recent calls."}
+                    </div>
+                ) : (
+                    filteredCalls.map(call => {
+                        const isCurrentUserOwner = call.ownerId === user._id;
+                        const displayName = isCurrentUserOwner ? call.recipientName : call.ownerName;
+                        const displayEmail = isCurrentUserOwner ? call.recipientEmail : call.ownerEmail;
+                        
+                        if (!displayName) return null;
 
-                            return (
-                                <div key={call.id} className="call-item">
-                                    <div 
-                                        className="call-avatar" 
-                                        style={{ backgroundColor: getAvatarColor(displayName) }}
-                                    >
-                                        {displayName.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div className="call-info">
-                                        <div className="call-name">{displayName}</div>
-                                        {/* --- MODIFIED: JSX for responsive time --- */}
-                                        <div className="call-details">
-                                            <span className="call-email">
-                                                <i className="bi bi-envelope-fill me-2"></i>
-                                                {displayEmail}
-                                            </span>
-                                            <span className="call-time-separator d-none d-sm-inline"> • </span>
-                                            <span className="call-time">{formatTimestamp(call.createdAt)}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="call-action">
-                                        {/* 1. The re-join link */}
-                                        <a
-                                            href={`/call/${call.id}`}
-                                            className="call-rejoin-link"
-                                            title={`Re-join session ${call.id}`}
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                navigate(`/call/${call.id}`);
-                                            }}
-                                        >
-                                            {call.id}
-                                        </a>
-
-                                        {/* 2. The "new call" button */}
-                                        <button 
-                                            className="call-button" 
-                                            title={`Call ${displayName} (New Session)`}
-                                            onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
-                                            disabled={isCalling === call.id || dailyCallCount >= dailyCallLimit || isDeleting === call.id}
-                                        >
-                                            {isCalling === call.id ? (
-                                                <div className="spinner-border spinner-border-sm" role="status">
-                                                    <span className="visually-hidden">Calling...</span>
-                                                </div>
-                                            ) : (
-                                                <i className="bi bi-telephone-fill"></i>
-                                            )}
-                                        </button>
-
-                                        {/* --- NEW ---: 3. The "delete" button */}
-                                        <button 
-                                            className="call-button call-delete-button" 
-                                            title={`Delete ${displayName}`}
-                                            onClick={() => handleDelete(call.id, displayName)}
-                                            disabled={isDeleting === call.id || isCalling === call.id}
-                                        >
-                                            {isDeleting === call.id ? (
-                                                <div className="spinner-border spinner-border-sm" role="status">
-                                                    <span className="visually-hidden">Deleting...</span>
-                                                </div>
-                                            ) : (
-                                                <i className="bi bi-trash-fill"></i>
-                                            )}
-                                        </button>
+                        return (
+                            <div key={call.id} className="call-item">
+                                <div 
+                                    className="call-avatar" 
+                                    style={{ backgroundColor: getAvatarColor(displayName) }}
+                                >
+                                    {displayName.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="call-info">
+                                    <div className="call-name">{displayName}</div>
+                                    {/* --- MODIFIED: JSX for responsive time --- */}
+                                    <div className="call-details">
+                                        <span className="call-email">
+                                            <i className="bi bi-envelope-fill me-2"></i>
+                                            {displayEmail}
+                                        </span>
+                                        <span className="call-time-separator d-none d-sm-inline"> • </span>
+                                        <span className="call-time">{formatTimestamp(call.createdAt)}</span>
                                     </div>
                                 </div>
-                            );
-                        })
-                    )}
-                </div>
+
+                                <div className="call-action">
+                                    {/* 1. The re-join link */}
+                                    <a
+                                        href={`/call/${call.id}`}
+                                        className="call-rejoin-link"
+                                        title={`Re-join session ${call.id}`}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            navigate(`/call/${call.id}`);
+                                        }}
+                                    >
+                                        {call.id}
+                                    </a>
+
+                                    {/* 2. The "new call" button */}
+                                    <button 
+                                        className="call-button" 
+                                        title={`Call ${displayName} (New Session)`}
+                                        onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
+                                        disabled={isCalling === call.id || dailyCallCount >= dailyCallLimit || isDeleting === call.id}
+                                    >
+                                        {isCalling === call.id ? (
+                                            <div className="spinner-border spinner-border-sm" role="status">
+                                                <span className="visually-hidden">Calling...</span>
+                                            </div>
+                                        ) : (
+                                            <i className="bi bi-telephone-fill"></i>
+                                        )}
+                                    </button>
+
+                                    {/* --- NEW ---: 3. The "delete" button */}
+                                    <button 
+                                        className="call-button call-delete-button" 
+                                        title={`Delete ${displayName}`}
+                                        onClick={() => handleDelete(call.id, displayName)}
+                                        disabled={isDeleting === call.id || isCalling === call.id}
+                                    >
+                                        {isDeleting === call.id ? (
+                                            <div className="spinner-border spinner-border-sm" role="status">
+                                                <span className="visually-hidden">Deleting...</span>
+                                            </div>
+                                        ) : (
+                                            <i className="bi bi-trash-fill"></i>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })
+                )}
             </div>
         </>
     );
