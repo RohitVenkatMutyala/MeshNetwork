@@ -237,9 +237,7 @@ function Navbar() {
                                 </>
                             ) : (
                                 <li className="nav-item">
-                                    <Link className="btn btn-primary rounded-pill px-4" to="/login">
-                                        <i className="bi bi-person-fill me-2"></i>Login
-                                    </Link>
+                                   
                                 </li>
                             )}
                         </ul>
