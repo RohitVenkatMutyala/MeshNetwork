@@ -413,10 +413,12 @@ function Call() {
         }
     };
 
+    // --- MODIFIED: Routing Fix ---
     const handleDeclineCall = () => {
-        navigate(-1); 
+        navigate('/new-call', { replace: true }); 
     };
     
+    // --- MODIFIED: Routing Fix ---
     const handleHangUp = () => {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
@@ -424,7 +426,7 @@ function Call() {
         setStream(null); 
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
-        navigate('/new-call');
+        navigate('/new-call', { replace: true });
     };
 
     const handleToggleVideo = () => {
@@ -769,19 +771,22 @@ function Call() {
                         color: var(--text-primary);
                     }
 
-                    /* --- 3. VIDEO PANEL --- */
+                    /* --- 3. VIDEO PANEL (MODIFIED) --- */
                     .video-panel-container {
                         position: relative;
                         width: 100%;
                         height: 100dvh; /* --- MODIFIED: Full height --- */
-                        background-color: #000;
+                        background-color: var(--dark-bg-primary); /* --- MODIFIED: Match page bg --- */
                         overflow: hidden;
                         cursor: pointer; 
+                        padding: 1.5rem; /* --- NEW: Added padding for boundary --- */
                     }
                     .remote-video {
                         width: 100%;
                         height: 100%;
                         object-fit: cover;
+                        border-radius: 12px; /* --- NEW: Rounded corners --- */
+                        background-color: #000; /* --- NEW: Black background for video --- */
                     }
                     
                     /* --- Draggable Self-View (PiP) --- */
@@ -799,9 +804,10 @@ function Call() {
                         background: #333; /* Background for placeholder */
                         overflow: hidden; /* --- NEW: To keep icon inside --- */
                     }
+                    /* --- MODIFIED: Adjust PiP position for new padding --- */
                     .local-video-pip:not([style*="left"]) { 
-                         bottom: 1rem;
-                         right: 1rem;
+                         bottom: 2.5rem; /* 1rem + 1.5rem padding */
+                         right: 2.5rem; /* 1rem + 1.5rem padding */
                     }
                     .local-video-pip[style*="opacity: 0"] {
                          display: none;
