@@ -233,8 +233,18 @@ function Call() {
             setActiveUsers(currentUsers);
             setMuteStatus(data.muteStatus || {});
 
+            // --- MODIFIED: Refresh Fix ---
             if (callState === 'loading') {
-                setCallState('joining');
+                const alreadyJoined = sessionStorage.getItem(`call_joined_${callId}`) === 'true';
+                
+                if (alreadyJoined) {
+                    // User was already in this call, so skip 'joining' and go straight to 'active'
+                    // We will get the media in a separate useEffect
+                    setCallState('active');
+                } else {
+                    // User is new to this call, show them the joining screen
+                    setCallState('joining');
+                }
             }
         }, (error) => {
             console.error("Error in onSnapshot listener:", error);
@@ -256,7 +266,7 @@ function Call() {
             unsubscribeCall();
             unsubscribeMessages();
         };
-    }, [callId, user, callState === 'loading']); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [callId, user]); // --- MODIFIED: Removed callState from dependency array ---
 
     // useEffect for WebRTC connections
     useEffect(() => {
@@ -357,6 +367,27 @@ function Call() {
     }, [stream, callState]); // <-- Re-run when callState changes to 'active'
 
 
+    // --- NEW useEffect to handle refresh ---
+    // This runs when callState becomes 'active' but the stream is still null
+    useEffect(() => {
+        if (callState === 'active' && !stream) {
+            const getMediaOnRefresh = async () => {
+                try {
+                    const userStream = await getQualityStream(videoQuality, true);
+                    setStream(userStream); 
+                    setIsVideoOn(true);
+                    // No need to setCallState('active'), it already is
+                } catch (err) {
+                    toast.error("Could not re-access camera/microphone.");
+                    console.error(err);
+                    setCallState('denied'); // Can't join
+                }
+            };
+            getMediaOnRefresh();
+        }
+    }, [callState, stream, videoQuality]); // Added dependencies
+
+
     // --- Handler Functions ---
 
     // --- MODIFIED: getQualityStream simplified (no facingMode) ---
@@ -407,6 +438,10 @@ function Call() {
             setStream(userStream); 
             setIsVideoOn(true); // Video is on by default
             setCallState('active'); 
+            
+            // --- NEW: Set session storage flag ---
+            sessionStorage.setItem(`call_joined_${callId}`, 'true');
+
         } catch (err) {
             toast.error("Could not access camera/microphone.");
             console.error(err);
@@ -415,6 +450,7 @@ function Call() {
 
     // --- MODIFIED: Routing Fix ---
     const handleDeclineCall = () => {
+        sessionStorage.removeItem(`call_joined_${callId}`);
         // Replace the current history item ("/call/:callId") with "/new-call"
         navigate('/new-call', { replace: true }); 
     };
@@ -427,6 +463,8 @@ function Call() {
         setStream(null); 
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
+        
+        sessionStorage.removeItem(`call_joined_${callId}`);
         // Replace the current history item ("/call/:callId") with "/new-call"
         navigate('/new-call', { replace: true });
     };
@@ -1095,10 +1133,12 @@ function Call() {
                                 setAreControlsVisible(!areControlsVisible);
                                 setIsQualityMenuOpen(false); // Close menu when clicking bg
                             }} 
-                            onMouseMove={handlePipDragMove} 
+                            // --- MODIFIED: Added touch move handler ---
+                            onMouseMove={handlePipDragMove}
+                            onTouchMove={handlePipDragMove}
+                            // ---
                             onMouseUp={handlePipDragEnd} 
                             onMouseLeave={handlePipDragEnd}
-                            onTouchMove={handlePipDragMove}
                             onTouchEnd={handlePipDragEnd}
                         >
                             <video 
@@ -1114,13 +1154,14 @@ function Call() {
                                 ref={pipWrapperRef}
                                 className="local-video-pip" 
                                 style={{ opacity: stream ? 1 : 0 }}
-                                onMouseDown={handlePipDragStart}
                                 onClick={(e) => e.stopPropagation()}
+                                // --- MODIFIED: Added all drag handlers ---
+                                onMouseDown={handlePipDragStart}
+                                onTouchStart={handlePipDragStart}
                                 onMouseUp={handlePipDragEnd}
                                 onMouseLeave={handlePipDragEnd}
-                                onTouchStart={handlePipDragStart}
-                                onTouchMove={handlePipDragMove}
                                 onTouchEnd={handlePipDragEnd}
+                                onTouchMove={handlePipDragMove}
                             >
                                 <video
                                     ref={localVideoRef}
