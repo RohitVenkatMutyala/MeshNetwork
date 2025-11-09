@@ -2,7 +2,7 @@ import React, {
     useState, 
     useEffect, 
     useRef, 
-    useLayoutEffect // --- NEW: Import useLayoutEffect ---
+    useLayoutEffect 
 } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -44,6 +44,8 @@ function Call() {
     const [stream, setStream] = useState(null);
     const [muteStatus, setMuteStatus] = useState({});
     const [isVideoOn, setIsVideoOn] = useState(true);
+    const [facingMode, setFacingMode] = useState('user'); // <-- NEW: 'user' (front) or 'environment' (back)
+    const [hasMultipleCameras, setHasMultipleCameras] = useState(false); // <-- NEW: To show/hide swap button
     const peersRef = useRef({});
     const audioContainerRef = useRef(null);
     const remoteVideoRef = useRef(null);
@@ -218,7 +220,7 @@ function Call() {
 
     // Video Toggle UseEffect
     useEffect(() => {
-        if (!stream) return;
+        if (!stream || !stream.getVideoTracks().length) return;
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
             videoTrack.enabled = isVideoOn;
@@ -230,18 +232,36 @@ function Call() {
     // Switched to useLayoutEffect. This runs *before* the browser paints,
     // guaranteeing the localVideoRef.current element is ready.
     useLayoutEffect(() => {
-        if (localVideoRef.current) {
+        // We must wait for THREE things:
+        // 1. The stream to be ready (stream)
+        // 2. The call state to be 'active' (which renders the <video> tag)
+        // 3. The ref to that <video> tag to be populated (localVideoRef.current)
+        if (localVideoRef.current && stream && callState === 'active') {
             localVideoRef.current.srcObject = stream;
         }
-    }, [stream, callState]); // Runs when 'stream' changes (from null to a stream, or from a stream to null)
+    }, [stream, callState]); // <-- FIX: Re-run when callState changes to 'active'
 
 
     // --- Handler Functions ---
 
- const handleAcceptCall = async () => {
+   const handleAcceptCall = async () => {
         try {
-            const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            // <-- MODIFIED: Be explicit about 'user' (front) camera
+            const userStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'user' }, 
+                audio: true 
+            });
+            setFacingMode('user'); // <-- NEW: Set initial state
             
+            // <-- NEW: Check for multiple cameras non-blockingly
+            navigator.mediaDevices.enumerateDevices().then(devices => {
+                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                if (videoDevices.length > 1) {
+                    setHasMultipleCameras(true);
+                }
+            }).catch(console.error);
+            // --- End New Block ---
+
             // First, perform the async database operation
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${user._id}`]: false
@@ -277,6 +297,48 @@ function Call() {
         const newVideoState = !isVideoOn;
         setIsVideoOn(newVideoState);
     };
+
+    // --- NEW: Camera Swap Function ---
+    const handleSwapCamera = async () => {
+        // Ensure stream exists, has a video track, and there are multiple cameras
+        if (!stream || !stream.getVideoTracks().length || !hasMultipleCameras) return;
+
+        const oldVideoTrack = stream.getVideoTracks()[0];
+        const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+
+        try {
+            // 1. Get ONLY the new video stream
+            const newVideoStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: newFacingMode }
+            });
+            const newVideoTrack = newVideoStream.getVideoTracks()[0];
+
+            // 2. Replace the track in all peer connections
+            Object.values(peersRef.current).forEach(peer => {
+                // `replaceTrack` is a simple-peer method
+                peer.replaceTrack(oldVideoTrack, newVideoTrack, stream);
+            });
+
+            // 3. Update the *local* stream object in-place
+            // This will make the localVideoRef update automatically
+            stream.removeTrack(oldVideoTrack);
+            stream.addTrack(newVideoTrack);
+            
+            // 4. Stop the old track
+            oldVideoTrack.stop();
+
+            // 5. Update state
+            setFacingMode(newFacingMode);
+            // Manually set the new track's enabled status to match UI state
+            newVideoTrack.enabled = isVideoOn; 
+
+        } catch (err) {
+            toast.error("Could not swap camera.");
+            console.error("Error swapping camera: ", err);
+        }
+    };
+    // --- End New Function ---
+
 
     const handleToggleMute = async (targetUserId) => {
         const isSelf = targetUserId === user._id;
@@ -562,6 +624,7 @@ function Call() {
                         cursor: move;
                         transition: box-shadow 0.2s ease, opacity 0.3s ease;
                         background: #222; /* Placeholder color */
+                        transform: scaleX(-1); /* <-- NEW: Flip front camera for mirror effect */
                     }
                     /* --- MODIFIED: Hide if no stream --- */
                     .local-video-pip:not([style*="left"]) { /* A bit of a hack: if no 'left' style, it's not dragged */
@@ -774,7 +837,11 @@ function Call() {
                             <video
                                 ref={localVideoRef} 
                                 className="local-video-pip"
-                                style={{ opacity: stream ? 1 : 0 }} // Hide if no stream
+                                // <-- MODIFIED: Add/remove mirror effect based on camera
+                                style={{ 
+                                    opacity: stream ? 1 : 0,
+                                    transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)'
+                                }}
                                 autoPlay
                                 playsInline
                                 muted
@@ -785,6 +852,18 @@ function Call() {
                             {/* --- Call Controls --- */}
                             <div className={`call-controls ${!areControlsVisible ? 'hidden' : ''}`}>
                                 
+                                {/* --- NEW CAMERA SWAP BUTTON --- */}
+                                {hasMultipleCameras && (
+                                    <button
+                                        className="btn btn-light rounded-circle" 
+                                        onClick={(e) => { e.stopPropagation(); handleSwapCamera(); }} 
+                                        title="Swap Camera"
+                                    >
+                                        <i className="bi bi-arrow-repeat"></i>
+                                    </button>
+                                )}
+                                {/* --- END NEW BUTTON --- */}
+
                                 <button
                                     className={`btn rounded-circle ${isVideoOn ? 'btn-light' : 'btn-danger'}`} 
                                     onClick={(e) => { e.stopPropagation(); handleToggleVideo(); }} 
@@ -897,7 +976,7 @@ function Call() {
                                             className="form-control chat-input"
                                             placeholder="Type a message..."
                                             value={newMessage}
-                                            onChange={(e) => setNewMessage(e.g.target.value)}
+                                            onChange={(e) => setNewMessage(e.target.value)}
                                         />
                                         <button className="send-button flex-shrink-0" type="submit" disabled={!newMessage.trim()}>
                                             <i className="bi bi-send-fill"></i>
