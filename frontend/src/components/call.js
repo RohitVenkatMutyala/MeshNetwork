@@ -1,8 +1,8 @@
-import React, {
-    useState,
-    useEffect,
-    useRef,
-    useLayoutEffect
+import React, { 
+    useState, 
+    useEffect, 
+    useRef, 
+    useLayoutEffect 
 } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -464,39 +464,25 @@ function Call() {
                 if (change.type === "added" && data.recipientId === user._id) {
                     const existingPeer = peersRef.current[data.senderId];
 
-                    // --- 
-                    // --- BUG FIX: Robust Refresh/Reconnect Logic ---
-                    // ---
+                    // --- BUG FIX: Handle new offers from refreshing users ---
                     if (data.signal.type === 'offer') {
                         // This is a new offer, likely from a refresh.
-                        // We MUST destroy the old peer completely before creating a new one.
+                        // Destroy any old peer and create a new one.
                         if (existingPeer) {
-                            console.log(`(RECONNECT) Destroying stale peer for ${data.senderId} to accept new offer.`);
-                            
-                            // 1. Remove all listeners to prevent old 'close' handler
-                            //    from deleting the *new* peer.
-                            existingPeer.removeAllListeners(); 
-                            
-                            // 2. Destroy the connection.
+                            console.log(`Destroying stale peer for ${data.senderId} to accept new offer.`);
                             existingPeer.destroy();
-                            
-                            // 3. Manually and synchronously clean up state.
-                            delete peersRef.current[data.senderId];
-                            removeStream(data.senderId);
                         }
                         
-                        // Now that the old peer is gone, create the new one.
                         // Only add peer if they are in the official participants list
                         if (participants.find(p => p.id === data.senderId)) {
-                            console.log(`(RECONNECT) Accepting new offer from ${data.senderId}`);
+                            console.log(`Accepting new offer from ${data.senderId}`);
                             addPeer(data, user._id, stream);
                         }
-                    
+                        
                     } else if (existingPeer && data.signal.type === 'answer') {
                         // This is an "answer" from a peer we already initiated
                         console.log(`Got signal answer from ${data.senderId}`);
                         existingPeer.signal(data.signal);
-                    
                     } else if (existingPeer) {
                         // This is another signal (like ICE candidate) for an existing peer
                         existingPeer.signal(data.signal);
@@ -1941,7 +1927,7 @@ function Call() {
                                 <div ref={chatMessagesEndRef} />
                             </div>
                             <form onSubmit={handleSendMessage} className="mobile-chat-form">
-                                <div className="d-flex align-items: center">
+                                <div className="d-flex align-items-center">
                                     <input
                                         type="text"
                                         className="form-control chat-input"
