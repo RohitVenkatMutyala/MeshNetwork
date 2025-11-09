@@ -1945,31 +1945,94 @@ function Call() {
                 )}
                 
                 {/* --- NEW: Invite People Modal --- */}
-                {isInviteModalOpen && (
-                     <div className="mobile-panel">
-                        <div className="mobile-panel-header">
-                            <h5>Invite People</h5>
-                            <button className="btn-close btn-close-white" onClick={() => setIsInviteModalOpen(false)}></button>
+        
+            {isInviteModalOpen && (
+                <div className="mobile-panel">
+                    <div className="mobile-panel-header">
+                        <h5>Invite People</h5>
+                        <button className="btn-close btn-close-white" onClick={() => setIsInviteModalOpen(false)}></button>
+                    </div>
+
+                    {/* --- MODIFIED: Panel body with new layout --- */}
+                    <div className="mobile-panel-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+                        {/* --- NEW: Copy Link Section --- */}
+                        <div>
+                            <label className="form-label" style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                                Share a direct link
+                            </label>
+                            <div className="input-group">
+                                <input
+                                    type="text"
+                                    readOnly
+                                    className="form-control"
+                                    value={window.location.href} // Automatically gets the current call URL
+                                    style={{
+                                        backgroundColor: 'var(--dark-bg-primary)',
+                                        color: 'var(--text-secondary)',
+                                        borderColor: 'var(--border-color)',
+                                        borderRight: 'none'
+                                    }}
+                                />
+                                <button
+                                    className="btn"
+                                    type="button"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(window.location.href);
+                                        toast.success("Link copied to clipboard!");
+                                    }}
+                                    style={{
+                                        backgroundColor: 'var(--dark-bg-primary)',
+                                        borderColor: 'var(--border-color)',
+                                        color: 'var(--text-primary)',
+                                        borderLeft: 'none'
+                                    }}
+                                >
+                                    <i className="bi bi-clipboard-fill"></i>
+                                </button>
+                            </div>
                         </div>
-                        <form className="mobile-panel-body" onSubmit={handleSendInvites}>
-                            <p className="text-secondary mb-3">
-                                Add more people to this call. Enter emails separated by commas.
+
+                        {/* --- NEW: Divider --- */}
+                        <div className="d-flex align-items-center">
+                            <div style={{ height: '1px', backgroundColor: 'var(--border-color)', flexGrow: 1 }}></div>
+                            <span className="mx-3" style={{ color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: '0.8rem' }}>OR</span>
+                            <div style={{ height: '1px', backgroundColor: 'var(--border-color)', flexGrow: 1 }}></div>
+                        </div>
+
+                        {/* --- MODIFIED: Email Form (for dark theme) --- */}
+                        <form onSubmit={handleSendInvites} style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, gap: '1rem' }}>
+                            <p className="text-secondary" style={{ margin: 0 }}>
+                                Invite with email. Add multiple separated by commas.
                             </p>
-                            <div className="form-floating mb-3">
+                            <div className="form-floating" style={{ flexGrow: 1 }}>
                                 <textarea
                                     className="form-control"
                                     id="inviteEmails"
                                     placeholder="Enter emails"
-                                    style={{ height: '150px' }}
+                                    style={{
+                                        height: '100%',
+                                        minHeight: '120px',
+                                        backgroundColor: 'var(--dark-bg-primary)',
+                                        color: 'var(--text-primary)',
+                                        borderColor: 'var(--border-color)'
+                                    }}
                                     value={inviteEmails}
-                                    onChange={(e) => setInviteEmails(e.target.value)}
+                                    onChange={(e) => setInviteEmails(e.target.value)} // Fixed typo from e.gex
                                 />
-                                <label htmlFor="inviteEmails">Emails (comma-separated)</label>
+                                <label htmlFor="inviteEmails" style={{ color: 'var(--text-secondary)' }}>Emails (comma-separated)</label>
                             </div>
                             <button 
                                 type="submit" 
                                 className="btn btn-primary w-100"
                                 disabled={isInviting}
+                                style={{
+                                    backgroundColor: 'var(--accent-blue)',
+                                    borderColor: 'var(--accent-blue)',
+                                    fontWeight: '600',
+                                    padding: '0.75rem',
+                                    borderRadius: '12px' // Matches participant card radius
+                                }}
                             >
                                 {isInviting ? (
                                     <>
@@ -1982,7 +2045,8 @@ function Call() {
                             </button>
                         </form>
                     </div>
-                )}
+                </div>
+            )}
             </div>
         </>
     );
