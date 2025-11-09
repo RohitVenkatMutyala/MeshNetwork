@@ -261,11 +261,10 @@ function Call() {
             }
 
             const participantsMap = data.activeParticipants || {};
-            // --- MODIFIED: Relaxed filter from 60s to 90s to prevent disconnect bug ---
-            const ninetySecondsAgo = Date.now() - 90000;
+            const oneMinuteAgo = Date.now() - 60000;
 
             const currentUsers = Object.entries(participantsMap)
-                .filter(([_, userData]) => userData.lastSeen && userData.lastSeen.toDate().getTime() > ninetySecondsAgo)
+                .filter(([_, userData]) => userData.lastSeen && userData.lastSeen.toDate().getTime() > oneMinuteAgo)
                 .map(([userId, userData]) => ({
                     id: userId,
                     name: userData.name,
@@ -1125,20 +1124,6 @@ function Call() {
                         padding-bottom: calc(1rem + env(safe-area-inset-bottom));
                     }
 
-                    /* --- NEW: Participant Card Styles --- */
-                    .mobile-panel-body .list-group {
-                        border: none; /* Remove outer list-group border */
-                    }
-                    .mobile-panel-body .list-group-item {
-                        border: 1px solid var(--border-color) !important; /* Restore border */
-                        border-radius: 12px; /* Add rounded corners */
-                        margin-bottom: 0.75rem; /* Add spacing */
-                        background-color: var(--dark-bg-secondary); /* Match card bg */
-                    }
-                    .mobile-panel-body .list-group-item:last-child {
-                        margin-bottom: 0;
-                    }
-
 
                     /* --- 5. DESKTOP VIEW (PC) --- */
                     @media (min-width: 768px) {
@@ -1497,8 +1482,7 @@ function Call() {
                             <button className="btn-close btn-close-white" onClick={() => setIsParticipantsOpen(false)}></button>
                         </div>
                         <div className="mobile-panel-body">
-                            {/* --- MODIFIED: Removed list-group-flush --- */}
-                            <ul className="list-group">
+                            <ul className="list-group list-group-flush">
                                 {activeUsers.map(p => (
                                     <li key={p.id} className="list-group-item d-flex justify-content-between align-items-center">
                                         <div>
