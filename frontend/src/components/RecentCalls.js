@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 // --- NEW ---: Import deleteDoc
-import {
-    collection, query, where, orderBy, limit, onSnapshot,
-    doc, setDoc, serverTimestamp, runTransaction, deleteDoc
+import { 
+    collection, query, where, orderBy, limit, onSnapshot, 
+    doc, setDoc, serverTimestamp, runTransaction, deleteDoc 
 } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
@@ -34,8 +34,8 @@ function RecentCalls({ searchTerm }) {
         const emailjsPublicKey = '3WEPhBvkjCwXVYBJ-';
         const serviceID = 'service_6ar5bgj';
         const templateID = 'template_w4ydq8a';
-        const callLink = `${window.location.origin}/call/${callId}`;
-
+        const callLink = `${window.location.origin}/call/${callId}`; 
+        
         const templateParams = {
             from_name: `${user.firstname} ${user.lastname}`,
             to_email: invitedEmail,
@@ -67,7 +67,7 @@ function RecentCalls({ searchTerm }) {
             await runTransaction(db, async (transaction) => {
                 const limitDoc = await transaction.get(limitDocRef);
                 let currentCount = 0;
-
+                
                 if (limitDoc.exists()) {
                     const data = limitDoc.data();
                     if (data.lastCallDate === today) {
@@ -95,9 +95,9 @@ function RecentCalls({ searchTerm }) {
                     muteStatus: { [user._id]: false },
                 });
 
-                transaction.set(limitDocRef, {
-                    count: newCount,
-                    lastCallDate: today
+                transaction.set(limitDocRef, { 
+                    count: newCount, 
+                    lastCallDate: today 
                 });
             });
 
@@ -145,7 +145,7 @@ function RecentCalls({ searchTerm }) {
             collection(db, 'calls'),
             where('allowedEmails', 'array-contains', user.email),
             orderBy('createdAt', 'desc'),
-            limit(20)
+            limit(20) 
         );
         // onSnapshot listens for real-time changes (including deletions)
         const unsubscribe = onSnapshot(callsQuery, (snapshot) => {
@@ -153,7 +153,7 @@ function RecentCalls({ searchTerm }) {
 
             const uniqueCalls = [];
             const seenEmails = new Set();
-
+            
             for (const call of callsData) {
                 const isOwner = call.ownerId === user._id;
                 const otherPersonEmail = isOwner ? call.recipientEmail : call.ownerEmail;
@@ -376,18 +376,8 @@ function RecentCalls({ searchTerm }) {
                 }
 
             `}</style>
-
-            <div
-                style={{
-                    padding: '8px 12px',
-                    backgroundColor: '#f0f4f8', // A light blue-gray background
-                    borderRadius: '8px',
-                    color: '#333',
-                    fontSize: '14px',
-                    fontFamily: 'Arial, sans-serif',
-                    display: 'inline-block', // Makes it fit the content
-                }}
-            >
+            
+            <div className="call-count-display">
                 Today's Calls: <strong>{dailyCallCount} / {dailyCallLimit}</strong>
             </div>
 
@@ -401,13 +391,13 @@ function RecentCalls({ searchTerm }) {
                         const isCurrentUserOwner = call.ownerId === user._id;
                         const displayName = isCurrentUserOwner ? call.recipientName : call.ownerName;
                         const displayEmail = isCurrentUserOwner ? call.recipientEmail : call.ownerEmail;
-
+                        
                         if (!displayName) return null;
 
                         return (
                             <div key={call.id} className="call-item">
-                                <div
-                                    className="call-avatar"
+                                <div 
+                                    className="call-avatar" 
                                     style={{ backgroundColor: getAvatarColor(displayName) }}
                                 >
                                     {displayName.charAt(0).toUpperCase()}
@@ -435,8 +425,8 @@ function RecentCalls({ searchTerm }) {
                                     </a>
 
                                     {/* 2. The "new call" button */}
-                                    <button
-                                        className="call-button"
+                                    <button 
+                                        className="call-button" 
                                         title={`Call ${displayName} (New Session)`}
                                         onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
                                         disabled={isCalling === call.id || dailyCallCount >= dailyCallLimit || isDeleting === call.id}
@@ -451,8 +441,8 @@ function RecentCalls({ searchTerm }) {
                                     </button>
 
                                     {/* --- NEW ---: 3. The "delete" button */}
-                                    <button
-                                        className="call-button call-delete-button"
+                                    <button 
+                                        className="call-button call-delete-button" 
                                         title={`Delete ${displayName}`}
                                         onClick={() => handleDelete(call.id, displayName)}
                                         disabled={isDeleting === call.id || isCalling === call.id}
