@@ -212,7 +212,6 @@ function Call() {
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [inviteEmails, setInviteEmails] = useState('');
     const [isInviting, setIsInviting] = useState(false);
-    // --- NEW: Filter Modal State ---
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
 
@@ -226,7 +225,6 @@ function Call() {
     const chatMessagesEndRef = useRef(null);
     const [videoQuality, setVideoQuality] = useState('high'); 
     const [videoFit, setVideoFit] = useState('cover'); 
-    // --- NEW: Filter State ---
     const [videoFilter, setVideoFilter] = useState('none');
     
     // --- MODIFIED: Renamed states for clarity ---
@@ -357,13 +355,12 @@ function Call() {
     // --- NEW: Stable participant ID string ---
     const participantIDs = JSON.stringify(participants.map(p => p.id).sort());
 
-    // --- MODIFIED: WebRTC Group Call Logic (Star Topology) ---
+    // --- MODIFIED: Back to stable MESH WebRTC Logic ---
     useEffect(() => {
         if (!stream || callState !== 'active' || !user) return;
 
         const signalingColRef = collection(db, 'calls', callId, 'signaling');
-        const isOwner = user._id === callOwnerId;
-        
+
         // --- NEW: Helper to add stream to state ---
         const addStream = (userId, stream) => {
             setRemoteStreams(prev => {
@@ -376,121 +373,70 @@ function Call() {
         const removeStream = (userId) => {
             setRemoteStreams(prev => prev.filter(s => s.id !== userId));
         };
-        
-        // --- 1. OWNER LOGIC ---
-        if (isOwner) {
-            // Check for new participants who need a connection
-            participants.forEach(p => {
-                if (p.id !== user._id && !peersRef.current[p.id]) {
-                    console.log(`OWNER: Creating peer for ${p.name}`);
-                    const peer = new Peer({ initiator: true, stream: stream });
-                    
-                    // Add existing streams for the new user
-                    remoteStreams.forEach(rs => peer.addStream(rs.stream));
-                    
-                    peer.on('signal', signal => {
-                        addDoc(signalingColRef, { recipientId: p.id, senderId: user._id, signal });
-                    });
-                    
-                    peer.on('stream', remoteStream => {
-                        console.log(`OWNER: Got stream from ${p.name}`);
-                        addStream(p.id, remoteStream);
-                        // Relay this new stream to all *other* peers
-                        Object.entries(peersRef.current).forEach(([peerId, otherPeer]) => {
-                            if (peerId !== p.id) {
-                                otherPeer.addStream(remoteStream);
-                            }
-                        });
-                    });
-                    
-                    peer.on('close', () => {
-                        removeStream(p.id);
-                        delete peersRef.current[p.id];
-                    });
-                    
-                    peer.on('error', (err) => console.error(`Peer error (Owner to ${p.id}):`, err));
-                    
-                    peersRef.current[p.id] = peer;
-                }
+
+        // --- NEW: createPeer function (Initiator) ---
+        const createPeer = (recipientId, senderId, stream) => {
+            console.log(`Creating peer for ${recipientId}`);
+            const peer = new Peer({ initiator: true, trickle: false, stream });
+            
+            peer.on('signal', signal => {
+                addDoc(signalingColRef, { recipientId, senderId, signal });
             });
-        } 
-        // --- 2. CLIENT LOGIC ---
-        else if (!isOwner) {
-            // Client only connects to the OWNER
-            if (!peersRef.current[callOwnerId] && participants.find(p => p.id === callOwnerId)) {
-                console.log("CLIENT: Connecting to Owner");
-                const peer = new Peer({ initiator: false, stream: stream });
+            peer.on('stream', remoteStream => {
+                console.log(`Received stream from ${recipientId}`);
+                addStream(recipientId, remoteStream);
+            });
+            peer.on('close', () => { 
+                console.log(`Connection closed with ${recipientId}`);
+                removeStream(recipientId);
+                delete peersRef.current[recipientId]; // --- FIX ---
+            });
+            peer.on('error', (err) => {
+                console.error(`Peer error (to ${recipientId}):`, err);
+                removeStream(recipientId);
+                delete peersRef.current[recipientId]; // --- FIX ---
+            });
 
-                peer.on('signal', signal => {
-                    addDoc(signalingColRef, { recipientId: callOwnerId, senderId: user._id, signal });
-                });
+            peersRef.current[recipientId] = peer;
+        };
 
-                // This will fire multiple times: once for owner, once for each other client
-                peer.on('stream', remoteStream => {
-                    console.log("CLIENT: Received a stream");
-                    // We don't know who this stream is from, but we can add it
-                    // A more robust solution would pass metadata, but this works for video/audio
-                    addStream(remoteStream.id, remoteStream); 
-                });
+        // --- NEW: addPeer function (Non-Initiator) ---
+        const addPeer = (incoming, recipientId, stream) => {
+            console.log(`Accepting peer from ${incoming.senderId}`);
+            const peer = new Peer({ initiator: false, trickle: false, stream });
+            
+            peer.on('signal', signal => {
+                addDoc(signalingColRef, { recipientId: incoming.senderId, senderId: recipientId, signal });
+            });
+            peer.on('stream', remoteStream => {
+                console.log(`Received stream from ${incoming.senderId}`);
+                addStream(incoming.senderId, remoteStream);
+            });
+            peer.on('close', () => { 
+                console.log(`Connection closed with ${incoming.senderId}`);
+                removeStream(incoming.senderId);
+                delete peersRef.current[incoming.senderId]; // --- FIX ---
+            });
+            peer.on('error', (err) => {
+                console.error(`Peer error (from ${incoming.senderId}):`, err);
+                removeStream(incoming.senderId);
+                delete peersRef.current[incoming.senderId]; // --- FIX ---
+            });
 
-                peer.on('close', () => {
-                    removeStream(callOwnerId); // Only remove owner stream?
-                    setRemoteStreams([]); // Remove all streams
-                    delete peersRef.current[callOwnerId];
-                });
-                
-                peer.on('error', (err) => console.error(`Peer error (Client to Owner):`, err));
-                
-                peersRef.current[callOwnerId] = peer;
+            peer.signal(incoming.signal); // Accept the incoming offer
+            peersRef.current[incoming.senderId] = peer;
+        };
+
+        // --- MODIFIED: Mesh network logic ---
+        // Connect to all other participants
+        participants.forEach(p => { 
+            if (p.id !== user._id && !peersRef.current[p.id]) {
+                createPeer(p.id, user._id, stream);
             }
-        }
-        
-        // --- 3. UNIVERSAL SIGNALING LISTENER ---
-        const unsubscribeSignaling = onSnapshot(query(signalingColRef), snapshot => {
-            snapshot.docChanges().forEach(change => {
-                const data = change.doc.data();
-                if (change.type === "added" && data.recipientId === user._id) {
-                    let peer = peersRef.current[data.senderId];
-
-                    if (isOwner && !peer) {
-                        // This is an answer from a client, create the peer
-                        console.log(`OWNER: Got signal from new client ${data.senderId}`);
-                        peer = new Peer({ initiator: false, stream: stream });
-                        
-                        remoteStreams.forEach(rs => peer.addStream(rs.stream));
-                        
-                        peer.on('signal', signal => {
-                            addDoc(signalingColRef, { recipientId: data.senderId, senderId: user._id, signal });
-                        });
-                        peer.on('stream', remoteStream => {
-                            console.log(`OWNER: Got stream from ${data.senderId}`);
-                            addStream(data.senderId, remoteStream);
-                            Object.entries(peersRef.current).forEach(([peerId, otherPeer]) => {
-                                if (peerId !== data.senderId) {
-                                    otherPeer.addStream(remoteStream);
-                                }
-                            });
-                        });
-                        peer.on('close', () => {
-                            removeStream(data.senderId);
-                            delete peersRef.current[data.senderId];
-                        });
-                        peer.on('error', (err) => console.error(`Peer error (Owner to ${data.senderId}):`, err));
-                        
-                        peersRef.current[data.senderId] = peer;
-                    }
-
-                    if (peer) {
-                        peer.signal(data.signal);
-                    }
-                    
-                    deleteDoc(change.doc.ref);
-                }
-            });
         });
-        
-        // --- 4. CLEANUP LOGIC ---
-        // Clean up peers for users who have left
+
+        // --- MODIFIED: Cleanup logic ---
+        // Remove peers for users who are no longer in the participants list
         Object.keys(peersRef.current).forEach(peerId => { 
             if (!participants.find(p => p.id === peerId)) {
                 console.log(`Destroying peer for ${peerId}`);
@@ -502,10 +448,30 @@ function Call() {
             }
         });
 
+        // --- MODIFIED: Signaling listener ---
+        const unsubscribeSignaling = onSnapshot(query(signalingColRef), snapshot => {
+            snapshot.docChanges().forEach(change => {
+                const data = change.doc.data();
+                if (change.type === "added" && data.recipientId === user._id) {
+                    const peer = peersRef.current[data.senderId];
+                    if (peer) {
+                        // This is an "answer" from a peer we already initiated
+                        console.log(`Got signal answer from ${data.senderId}`);
+                        peer.signal(data.signal);
+                    } else {
+                        // This is a *new* "offer" from a peer we haven't seen yet (e.g., they refreshed)
+                        console.log(`Got new offer from ${data.senderId}`);
+                        addPeer(data, user._id, stream);
+                    }
+                    deleteDoc(change.doc.ref); // Signal consumed, delete it
+                }
+            });
+        });
+
         return () => {
              unsubscribeSignaling();
         };
-    }, [stream, callState, user, callId, callOwnerId, participantIDs]); // --- MODIFIED: Use stable participantIDs
+    }, [stream, callState, user, callId, participantIDs]); // --- MODIFIED: Use stable participantIDs
     
     // Mute Status UseEffect
     useEffect(() => {
