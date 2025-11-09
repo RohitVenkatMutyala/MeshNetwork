@@ -169,6 +169,8 @@ function Call() {
     const chatMessagesEndRef = useRef(null);
     // --- NEW: Quality State ---
     const [videoQuality, setVideoQuality] = useState('high'); // 'low', 'medium', 'high'
+    // --- NEW: Video Fit State ---
+    const [videoFit, setVideoFit] = useState('cover'); // 'cover' or 'contain'
     
     // --- Draggable PiP State ---
     const [isPipDragging, setIsPipDragging] = useState(false);
@@ -553,6 +555,13 @@ function Call() {
         }
     };
 
+    // --- NEW: Toggle video fit mode ---
+    const handleToggleVideoFit = (e) => {
+        e.stopPropagation();
+        setVideoFit(prevFit => (prevFit === 'cover' ? 'contain' : 'cover'));
+        setIsQualityMenuOpen(false);
+    };
+
     const formatTimestamp = (timestamp) => !timestamp ? '' : timestamp.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
     const handleSendMessage = async (e) => {
@@ -749,7 +758,7 @@ function Call() {
                         100% { -webkit-mask-position: -50%; }
                     }
                 `}</style>
-                <div className="d-flex flex-column justify-content-around align-items-center joining-screen" style={{ minHeight: '100dvh' }}>
+                <div className="d-flex flex-column justify-content-around align-items-center joining-screen" style={{ minHeight: 'calc(100dvh - 56px)' }}>
                     
                     <div className="caller-info">
                         <h1 className="caller-name">{callerName}</h1>
@@ -828,14 +837,15 @@ function Call() {
                         background-color: var(--dark-bg-primary); /* --- MODIFIED: Match page bg --- */
                         overflow: hidden;
                         cursor: pointer; 
-                        padding: 1.5rem; /* --- NEW: Added padding for boundary --- */
+                        padding: 0.5rem; /* --- MODIFIED: Responsive padding --- */
                     }
                     .remote-video {
                         width: 100%;
                         height: 100%;
-                        object-fit: cover;
+                        /* object-fit is now a style property */
                         border-radius: 12px; /* --- NEW: Rounded corners --- */
                         background-color: #000; /* --- NEW: Black background for video --- */
+                        transition: object-fit 0.3s ease;
                     }
                     
                     /* --- Draggable Self-View (PiP) --- */
@@ -855,8 +865,8 @@ function Call() {
                     }
                     /* --- MODIFIED: Adjust PiP position for new padding --- */
                     .local-video-pip:not([style*="left"]) { 
-                         bottom: 2.5rem; /* 1rem + 1.5rem padding */
-                         right: 2.5rem; /* 1rem + 1.5rem padding */
+                         bottom: 1.5rem; /* 1rem + 0.5rem padding */
+                         right: 1.5rem; /* 1rem + 0.5rem padding */
                     }
                     .local-video-pip[style*="opacity: 0"] {
                          display: none;
@@ -1027,7 +1037,18 @@ function Call() {
 
 
                     /* --- 5. DESKTOP VIEW (PC) --- */
-                    @media (min-width: 992px) { 
+                    @media (min-width: 768px) {
+                        .video-panel-container {
+                            padding: 1.5rem; /* --- NEW: Larger padding on desktop --- */
+                        }
+                        .local-video-pip:not([style*="left"]) { 
+                            bottom: 2.5rem; /* 1rem + 1.5rem padding */
+                            right: 2.5rem; /* 1rem + 1.5rem padding */
+                        }
+                    }
+
+                    /* --- MODIFIED: Changed 992px to 1200px (lg to xl) --- */
+                    @media (min-width: 1200px) { 
                         .chat-page-container {
                             padding: 0; 
                             min-height: 100dvh; /* --- MODIFIED --- */
@@ -1052,6 +1073,14 @@ function Call() {
                     }
 
                     /* --- 6. CHAT STYLES (Used by both) --- */
+                    
+                    .desktop-sidebar {
+                        height: 100dvh; /* --- NEW: Height for stacked mobile/laptop --- */
+                        overflow-y: auto;
+                        padding: 1.5rem;
+                        gap: 1.5rem;
+                        background-color: var(--dark-bg-primary);
+                    }
                     
                     .chat-card {
                         flex-grow: 1;
@@ -1126,7 +1155,8 @@ function Call() {
                 <div className="row g-0 h-100">
 
                     {/* --- Video Column --- */}
-                    <div className="col-12 col-lg-8 d-flex flex-column">
+                    {/* --- MODIFIED: Responsive column --- */}
+                    <div className="col-12 col-xl-8 d-flex flex-column">
                         <div 
                             className="video-panel-container shadow-sm"
                             onClick={() => {
@@ -1147,6 +1177,8 @@ function Call() {
                                 autoPlay 
                                 playsInline 
                                 controls={false}
+                                // --- NEW: Video Fit Style ---
+                                style={{ objectFit: videoFit }}
                             />
                             
                             {/* --- MODIFIED: Self-View (PiP) Wrapper --- */}
@@ -1241,10 +1273,19 @@ function Call() {
                                 >
                                     <i className="bi bi-gear-fill"></i>
                                 </button>
+                                
+                                {/* --- NEW: Video Fit Toggle Button --- */}
+                                <button
+                                    className={`btn rounded-circle ${videoFit === 'contain' ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={handleToggleVideoFit} 
+                                    title={videoFit === 'cover' ? "Fit video to screen" : "Fill screen with video"}
+                                >
+                                    <i className={`bi ${videoFit === 'contain' ? 'bi-fullscreen-exit' : 'bi-aspect-ratio'}`}></i>
+                                </button>
 
                                 {/* Chat (MOBILE ONLY) */}
                                 <button
-                                    className="btn btn-primary rounded-circle d-lg-none" 
+                                    className="btn btn-primary rounded-circle d-xl-none" // --- MODIFIED: d-xl-none ---
                                     onClick={(e) => { e.stopPropagation(); setIsChatOpen(true); }} 
                                     title="Show Chat"
                                 >
@@ -1253,7 +1294,7 @@ function Call() {
                                 
                                 {/* Participants (MOBILE ONLY) */}
                                 <button
-                                    className="btn btn-primary rounded-circle d-lg-none" 
+                                    className="btn btn-primary rounded-circle d-xl-none" // --- MODIFIED: d-xl-none ---
                                     onClick={(e) => { e.stopPropagation(); setIsParticipantsOpen(true); }} 
                                     title="Show Participants"
                                 >
@@ -1262,7 +1303,7 @@ function Call() {
 
                                 {/* Share (MOBILE ONLY) */}
                                 <button
-                                    className="btn btn-primary rounded-circle d-lg-none" 
+                                    className="btn btn-primary rounded-circle d-xl-none" // --- MODIFIED: d-xl-none ---
                                     onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} 
                                     title="Share Link"
                                 >
@@ -1283,13 +1324,7 @@ function Call() {
 
                     {/* --- Desktop-Only Sidebar --- */}
                     <div 
-                        className="col-lg-4 d-none d-lg-flex flex-column desktop-sidebar" // <-- Added class
-                        style={{
-                            height: '100dvh', // --- MODIFIED: Full height ---
-                            gap: '1.5rem', 
-                            padding: '1.5rem',
-                            overflowY: 'auto'
-                        }}
+                        className="col-12 col-xl-4 d-xl-flex flex-column desktop-sidebar" // --- MODIFIED: col-xl-4, d-xl-flex ---
                     >
                         {/* Participants Card (Desktop) */}
                         <div className="card shadow-sm">
@@ -1362,7 +1397,7 @@ function Call() {
 
                 {/* Participants Panel (Mobile) */}
                 {isParticipantsOpen && (
-                    <div className="mobile-panel d-lg-none">
+                    <div className="mobile-panel d-xl-none">
                         <div className="mobile-panel-header">
                             <h5>Participants ({activeUsers.length})</h5>
                             <button className="btn-close btn-close-white" onClick={() => setIsParticipantsOpen(false)}></button>
@@ -1394,7 +1429,7 @@ function Call() {
 
                 {/* Share Panel (Mobile) */}
                 {isShareOpen && (
-                    <div className="mobile-panel d-lg-none">
+                    <div className="mobile-panel d-xl-none">
                         <div className="mobile-panel-header">
                             <h5>Share Call Link</h5>
                             <button className="btn-close btn-close-white" onClick={() => setIsShareOpen(false)}></button>
@@ -1407,7 +1442,7 @@ function Call() {
 
                 {/* Chat Panel (Mobile) */}
                 {isChatOpen && (
-                    <div className="mobile-panel mobile-chat-panel d-lg-none">
+                    <div className="mobile-panel mobile-chat-panel d-xl-none">
                         <div className="mobile-panel-header">
                             <h5>Live Chat</h5>
                             <button className="btn-close btn-close-white" onClick={() => setIsChatOpen(false)}></button>
