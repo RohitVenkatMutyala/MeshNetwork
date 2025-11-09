@@ -1798,7 +1798,7 @@ function Call() {
                         </div>
 
                         {/* Share Card (Desktop) */}
-                        <div><SharingComponent sessionId={callId} /></div>
+                       {/* <div><SharingComponent sessionId={callId} /></div> */}
 
                         {/* Chat Card (Desktop) */}
                         <div className="card shadow-sm flex-grow-1 chat-card">
