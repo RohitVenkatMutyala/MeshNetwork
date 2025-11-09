@@ -177,9 +177,9 @@ function Navbar() {
                         alt="NETWORK.RANDOMAN Logo"
                         className={`logo-image ${theme === 'dark' ? 'logo-dark-theme' : ''}`}
                     /> */}
-                   {/* <Link to={user ? "/new-call" : "/new-call"} className="navbar-brand-custom py-2">
+                    <Link to={user ? "/new-call" : "/new-call"} className="navbar-brand-custom py-2">
                         NETWORK
-                    </Link> */}
+                    </Link>
 
                     <button
                         className="navbar-toggler border-0 p-2"
