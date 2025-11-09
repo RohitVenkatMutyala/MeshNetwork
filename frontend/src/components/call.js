@@ -261,11 +261,12 @@ function Call() {
             }
 
             const participantsMap = data.activeParticipants || {};
-            // --- MODIFIED: Relaxed filter from 60s to 90s to prevent disconnect bug ---
-            const ninetySecondsAgo = Date.now() - 90000;
 
+            // --- MODIFIED: Removed time-based filter ---
+            // This fixes the bug where users would be disconnected
+            // when someone muted. We now rely *only* on the unmount
+            // function to remove users from the list.
             const currentUsers = Object.entries(participantsMap)
-                .filter(([_, userData]) => userData.lastSeen && userData.lastSeen.toDate().getTime() > ninetySecondsAgo)
                 .map(([userId, userData]) => ({
                     id: userId,
                     name: userData.name,
@@ -612,24 +613,30 @@ function Call() {
 
     // --- REMOVED handleSwapCamera FUNCTION ---
 
+    // --- MODIFIED: Mute logic updated ---
     const handleToggleMute = async (targetUserId) => {
         const isSelf = targetUserId === user._id;
 
         if (isSelf) {
+            // Users can always mute themselves
             const currentMuteState = muteStatus[targetUserId] ?? false;
             const newMuteState = !currentMuteState;
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${targetUserId}`]: newMuteState 
             });
         } else {
+            // Only the owner can mute/unmute others
             const isTrueOwner = user && user._id === callOwnerId;
             if (isTrueOwner) {
+                const currentMuteState = muteStatus[targetUserId] ?? false;
+                const newMuteState = !currentMuteState;
                 await updateDoc(doc(db, 'calls', callId), { 
-                    [`muteStatus.${targetUserId}`]: true 
+                    [`muteStatus.${targetUserId}`]: newMuteState 
                 });
-                toast.success("Muted participant");
+                const targetName = activeUsers.find(u => u.id === targetUserId)?.name || 'Participant';
+                toast.success(newMuteState ? `Muted ${targetName}` : `Unmuted ${targetName}`);
             } else {
-                toast.error("You can only mute yourself.");
+                toast.error("Only the call owner can mute/unmute others.");
             }
         }
     };
@@ -1126,16 +1133,22 @@ function Call() {
                     }
 
                     /* --- NEW: Participant Card Styles --- */
-                    .mobile-panel-body .list-group {
-                        border: none; /* Remove outer list-group border */
+                    .participant-card-list {
+                        list-style-type: none;
+                        padding: 0;
+                        margin: 0;
                     }
-                    .mobile-panel-body .list-group-item {
-                        border: 1px solid var(--border-color) !important; /* Restore border */
-                        border-radius: 12px; /* Add rounded corners */
-                        margin-bottom: 0.75rem; /* Add spacing */
-                        background-color: var(--dark-bg-secondary); /* Match card bg */
+                    .participant-card {
+                        background-color: var(--dark-bg-secondary);
+                        border: 1px solid var(--border-color);
+                        border-radius: 12px;
+                        margin-bottom: 0.75rem;
+                        padding: 1rem;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
                     }
-                    .mobile-panel-body .list-group-item:last-child {
+                    .participant-card:last-child {
                         margin-bottom: 0;
                     }
 
@@ -1426,9 +1439,10 @@ function Call() {
                                 <span>Participants ({activeUsers.length})</span>
                                 <i className="bi bi-broadcast text-success"></i>
                             </div>
-                            <ul className="list-group list-group-flush" style={{maxHeight: '150px', overflowY: 'auto'}}>
+                            {/* --- MODIFIED: Participant Card List --- */}
+                            <ul className="list-group list-group-flush p-3 participant-card-list" style={{maxHeight: '150px', overflowY: 'auto'}}>
                                 {activeUsers.map(p => (
-                                    <li key={p.id} className="list-group-item d-flex justify-content-between align-items-center">
+                                    <li key={p.id} className="participant-card">
                                         <div>
                                             <span className="fw-bold">{p.name}</span>
                                             {p.id === user?._id && <span className="ms-2 text-muted small">(You)</span>}
@@ -1497,10 +1511,10 @@ function Call() {
                             <button className="btn-close btn-close-white" onClick={() => setIsParticipantsOpen(false)}></button>
                         </div>
                         <div className="mobile-panel-body">
-                            {/* --- MODIFIED: Removed list-group-flush --- */}
-                            <ul className="list-group">
+                            {/* --- MODIFIED: Participant Card List --- */}
+                            <ul className="participant-card-list">
                                 {activeUsers.map(p => (
-                                    <li key={p.id} className="list-group-item d-flex justify-content-between align-items-center">
+                                    <li key={p.id} className="participant-card">
                                         <div>
                                             <span className="fw-bold">{p.name}</span>
                                             {p.id === user?._id && <span className="ms-2 text-muted small">(You)</span>}
@@ -1591,7 +1605,7 @@ function Call() {
                                     placeholder="Enter emails"
                                     style={{ height: '150px' }}
                                     value={inviteEmails}
-                                    onChange={(e) => setInviteEmails(e.target.value)}
+                                    onChange={(e) => setInviteEmails(e.g.target.value)}
                                 />
                                 <label htmlFor="inviteEmails">Emails (comma-separated)</label>
                             </div>
