@@ -51,7 +51,7 @@ const RemoteVideo = ({ peer, name, videoFit }) => {
     const [isMuted, setIsMuted] = useState(false);
 
     useEffect(() => {
-        if (peer && videoRef.current) {
+        if (peer && peer.stream && videoRef.current) {
             videoRef.current.srcObject = peer.stream;
 
             // Check for audio tracks to determine mute state
@@ -195,6 +195,7 @@ function Call() {
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [areControlsVisible, setAreControlsVisible] = useState(true);
     const [isQualityMenuOpen, setIsQualityMenuOpen] = useState(false);
+    // --- NEW: Invite Modal State ---
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [inviteEmails, setInviteEmails] = useState('');
     const [isInviting, setIsInviting] = useState(false);
@@ -216,6 +217,11 @@ function Call() {
     const [waitingUsers, setWaitingUsers] = useState([]); // Users *waiting* to join
     const [remoteStreams, setRemoteStreams] = useState([]); // Remote streams
     
+    // --- RE-ADDED: Draggable PiP State ---
+    const [isPipDragging, setIsPipDragging] = useState(false);
+    const pipOffsetRef = useRef({ x: 0, y: 0 });
+    const pipWrapperRef = useRef(null);
+
 
     // Auto-scroll chat
     useEffect(() => {
@@ -234,6 +240,7 @@ function Call() {
             setCallState('loading');
             return;
         }
+        // --- End Auth Check ---
 
         const callDocRef = doc(db, 'calls', callId);
 
@@ -344,7 +351,7 @@ function Call() {
         const addStream = (userId, stream) => {
             setRemoteStreams(prev => {
                 if (prev.find(s => s.id === userId)) return prev;
-                return [...prev, { id: userId, stream }];
+                return [...prev, { id: userId, stream, userId }];
             });
         };
 
@@ -410,7 +417,8 @@ function Call() {
                 });
 
                 peer.on('close', () => {
-                    removeStream(callOwnerId);
+                    removeStream(callOwnerId); // Only remove owner stream?
+                    setRemoteStreams([]); // Remove all streams
                     delete peersRef.current[callOwnerId];
                 });
                 
@@ -425,14 +433,12 @@ function Call() {
             snapshot.docChanges().forEach(change => {
                 const data = change.doc.data();
                 if (change.type === "added" && data.recipientId === user._id) {
-                    const peer = peersRef.current[data.senderId];
-                    if (peer) {
-                        peer.signal(data.signal);
-                        deleteDoc(change.doc.ref);
-                    } else if (isOwner && !peer) {
+                    let peer = peersRef.current[data.senderId];
+
+                    if (isOwner && !peer) {
                         // This is an answer from a client, create the peer
                         console.log(`OWNER: Got signal from new client ${data.senderId}`);
-                        const peer = new Peer({ initiator: false, stream: stream });
+                        peer = new Peer({ initiator: false, stream: stream });
                         
                         remoteStreams.forEach(rs => peer.addStream(rs.stream));
                         
@@ -454,10 +460,14 @@ function Call() {
                         });
                         peer.on('error', (err) => console.error(`Peer error (Owner to ${data.senderId}):`, err));
                         
-                        peer.signal(data.signal);
                         peersRef.current[data.senderId] = peer;
-                        deleteDoc(change.doc.ref);
                     }
+
+                    if (peer) {
+                        peer.signal(data.signal);
+                    }
+                    
+                    deleteDoc(change.doc.ref);
                 }
             });
         });
@@ -497,13 +507,12 @@ function Call() {
     }, [isVideoOn, stream]);
 
 
-    // Switched to useLayoutEffect. This runs *before* the browser paints,
-    // guaranteeing the localVideoRef.current element is ready.
+    // --- MODIFIED: BUG FIX - Re-attach stream when isVideoOn changes ---
     useLayoutEffect(() => {
         if (localVideoRef.current && stream && callState === 'active') {
             localVideoRef.current.srcObject = stream;
         }
-    }, [stream, callState]); // <-- Re-run when callState changes to 'active'
+    }, [stream, callState, isVideoOn]); // <-- ADDED isVideoOn
 
 
     // --- NEW useEffect to handle refresh ---
@@ -794,7 +803,50 @@ function Call() {
         setNewMessage('');
     };
 
-    // --- REMOVED PiP Drag Handlers ---
+    // --- RE-ADDED: Helper to get clientX/Y from touch or mouse ---
+    const getClient = (e) => ({
+        x: e.touches ? e.touches[0].clientX : e.clientX,
+        y: e.touches ? e.touches[0].clientY : e.clientY,
+    });
+
+    // --- RE-ADDED: PiP Drag Handlers for Touch + Mouse ---
+    const handlePipDragStart = (e) => {
+        if (!pipWrapperRef.current) return;
+        setIsPipDragging(true);
+        const { x, y } = getClient(e); // Use helper
+        pipOffsetRef.current = {
+            x: x - pipWrapperRef.current.getBoundingClientRect().left,
+            y: y - pipWrapperRef.current.getBoundingClientRect().top,
+        };
+        pipWrapperRef.current.style.cursor = 'grabbing';
+    };
+
+    const handlePipDragEnd = () => {
+        setIsPipDragging(false);
+        if (pipWrapperRef.current) {
+            pipWrapperRef.current.style.cursor = 'move';
+        }
+    };
+
+    const handlePipDragMove = (e) => {
+        if (!isPipDragging || !pipWrapperRef.current || !pipWrapperRef.current.parentElement) return; 
+        
+        const { x, y } = getClient(e); // Use helper
+        const parentRect = pipWrapperRef.current.parentElement.getBoundingClientRect();
+        let newX = x - parentRect.left - pipOffsetRef.current.x;
+        let newY = y - parentRect.top - pipOffsetRef.current.y;
+
+        // Constrain to parent
+        newX = Math.max(0, Math.min(newX, parentRect.width - pipWrapperRef.current.offsetWidth));
+        newY = Math.max(0, Math.min(newY, parentRect.height - pipWrapperRef.current.offsetHeight));
+
+        pipWrapperRef.current.style.left = `${newX}px`;
+        pipWrapperRef.current.style.top = `${newY}px`;
+        pipWrapperRef.current.style.bottom = 'auto';
+        pipWrapperRef.current.style.right = 'auto';
+    };
+    // --- END PiP Handler Modifications ---
+
 
     // --- Render Functions ---
 
@@ -1081,18 +1133,48 @@ function Call() {
                         z-index: 5;
                     }
                     
-                    /* --- NEW: Camera-Off Placeholder --- */
-                    .video-placeholder {
+                    /* --- RE-ADDED: Draggable Self-View (PiP) --- */
+                    .local-video-pip { /* This is now the wrapper */
+                        position: absolute;
+                        bottom: 1rem;
+                        right: 1rem;
+                        width: 150px;
+                        height: 150px;
+                        border-radius: 50%;
+                        border: 2px solid var(--border-color);
+                        z-index: 10;
+                        cursor: move;
+                        transition: box-shadow 0.2s ease, opacity 0.3s ease;
+                        background: #333; /* Background for placeholder */
+                        overflow: hidden; /* --- NEW: To keep icon inside --- */
+                    }
+                    /* --- MODIFIED: Adjust PiP position for new padding --- */
+                    .local-video-pip:not([style*="left"]) { 
+                         bottom: 1.5rem; /* 1rem + 0.5rem padding */
+                         right: 1.5rem; /* 1rem + 0.5rem padding */
+                    }
+                    .local-video-pip[style*="opacity: 0"] {
+                         display: none;
+                    }
+                    .local-video-pip:active {
+                        box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.3);
+                        cursor: grabbing;
+                    }
+
+                    /* --- RE-ADDED: PiP Camera-Off Placeholder --- */
+                    .local-video-placeholder {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        width: 100%;
-                        height: 100%;
-                        background: #333;
-                    }
-                    .video-placeholder i {
-                        font-size: 4rem;
-                        color: #666;
+                        color: #fff;
+                        font-size: 3rem;
+                        border-radius: 50%;
+                        z-index: 1; /* Below the video element */
                     }
 
 
@@ -1253,6 +1335,10 @@ function Call() {
                         .video-panel-container {
                             padding: 1.5rem; /* --- NEW: Larger padding on desktop --- */
                         }
+                        .local-video-pip:not([style*="left"]) { 
+                            bottom: 2.5rem; /* 1rem + 1.5rem padding */
+                            right: 2.5rem; /* 1rem + 1.5rem padding */
+                        }
                     }
 
                     /* --- MODIFIED: Changed 992px to 1200px (lg to xl) --- */
@@ -1374,30 +1460,16 @@ function Call() {
                                 setAreControlsVisible(!areControlsVisible);
                                 setIsQualityMenuOpen(false); // Close menu when clicking bg
                             }}
+                            // --- MODIFIED: Added touch move handler ---
+                            onMouseMove={handlePipDragMove}
+                            onTouchMove={handlePipDragMove}
+                            // ---
+                            onMouseUp={handlePipDragEnd} 
+                            onMouseLeave={handlePipDragEnd}
+                            onTouchEnd={handlePipDragEnd}
                         >
-                            {/* --- NEW: Video Grid --- */}
-                            <div className={`video-grid-container grid-${remoteStreams.length + 1}`}>
-                                {/* Local Video Tile */}
-                                <div className="video-tile">
-                                    {stream && isVideoOn ? (
-                                        <video
-                                            ref={localVideoRef}
-                                            className="local-video-element"
-                                            autoPlay
-                                            playsInline
-                                            muted
-                                        />
-                                    ) : (
-                                        <div className="video-placeholder">
-                                            <i className="bi bi-camera-video-off-fill"></i>
-                                        </div>
-                                    )}
-                                    <div className="video-label">
-                                        {muteStatus[user?._id] && <i className="bi bi-mic-mute-fill me-2 text-danger"></i>}
-                                        You
-                                    </div>
-                                </div>
-
+                            {/* --- MODIFIED: Video Grid --- */}
+                            <div className={`video-grid-container grid-${remoteStreams.length}`}>
                                 {/* Remote Video Tiles */}
                                 {remoteStreams.map(data => (
                                     <RemoteVideo 
@@ -1407,6 +1479,40 @@ function Call() {
                                         videoFit={videoFit}
                                     />
                                 ))}
+                            </div>
+                            
+                            
+                            {/* --- RE-ADDED: Self-View (PiP) Wrapper --- */}
+                            <div
+                                ref={pipWrapperRef}
+                                className="local-video-pip" 
+                                style={{ opacity: stream ? 1 : 0 }}
+                                onClick={(e) => e.stopPropagation()}
+                                // --- MODIFIED: Added all drag handlers ---
+                                onMouseDown={handlePipDragStart}
+                                onTouchStart={handlePipDragStart}
+                                onMouseUp={handlePipDragEnd}
+                                onMouseLeave={handlePipDragEnd}
+                                onTouchEnd={handlePipDragEnd}
+                                onTouchMove={handlePipDragMove}
+                            >
+                                <video
+                                    ref={localVideoRef}
+                                    className="local-video-element"
+                                    style={{ 
+                                        transform: 'scaleX(-1)', // --- MODIFIED: Hardcoded mirror ---
+                                        opacity: isVideoOn ? 1 : 0 // Hide video element
+                                    }}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                />
+                                {/* --- NEW: Camera-Off Placeholder --- */}
+                                {!isVideoOn && (
+                                    <div className="local-video-placeholder">
+                                        <i className="bi bi-camera-video-off-fill"></i>
+                                    </div>
+                                )}
                             </div>
                             
                             
