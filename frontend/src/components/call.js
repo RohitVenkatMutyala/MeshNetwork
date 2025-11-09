@@ -1,8 +1,8 @@
-import React, { 
-    useState, 
-    useEffect, 
-    useRef, 
-    useLayoutEffect 
+import React, {
+    useState,
+    useEffect,
+    useRef,
+    useLayoutEffect
 } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -72,7 +72,7 @@ const RemoteVideo = ({ peer, name, videoFit, videoFilter }) => {
             const audioTracks = peer.stream.getAudioTracks();
             if (audioTracks.length > 0) {
                 setIsMuted(!audioTracks[0].enabled);
-                
+
                 // Listen for mute/unmute events on the track
                 const track = audioTracks[0];
                 const handleMute = () => setIsMuted(true);
@@ -130,15 +130,15 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
 
         const containerRect = containerRef.current.getBoundingClientRect();
         const sliderRect = sliderRef.current.getBoundingClientRect();
-        
+
         const startX = containerRect.left;
         const currentX = getClientX(e);
-        
+
         let newLeft = currentX - startX - (sliderRect.width / 2);
-        
+
         const maxLeft = containerRect.width - sliderRect.width - 2; // -2 for borders
         newLeft = Math.max(0, Math.min(newLeft, maxLeft));
-        
+
         setSliderLeft(newLeft);
 
         if (newLeft > maxLeft * 0.9) { // 90% threshold
@@ -162,8 +162,8 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
     };
 
     return (
-        <div 
-            className="slider-container" 
+        <div
+            className="slider-container"
             ref={containerRef}
             onMouseMove={handleDragMove}
             onMouseUp={handleDragEnd}
@@ -171,7 +171,7 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
             onTouchMove={handleDragMove}
             onTouchEnd={handleDragEnd}
         >
-            <div 
+            <div
                 className={`slider-thumb ${colorClass}`}
                 ref={sliderRef}
                 style={{ left: `${sliderLeft}px` }}
@@ -198,12 +198,12 @@ function Call() {
     const heartbeatIntervalRef = useRef(null);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
-    
+
     // -- Call State --
     const [callState, setCallState] = useState('loading');
     const [callData, setCallData] = useState(null);
     const [callOwnerId, setCallOwnerId] = useState(null);
-    
+
     // --- UI State ---
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
@@ -222,22 +222,22 @@ function Call() {
     const [isVideoOn, setIsVideoOn] = useState(true);
     const peersRef = useRef({});
     const audioContainerRef = useRef(null);
-    const localVideoRef = useRef(null); 
+    const localVideoRef = useRef(null);
     const chatMessagesEndRef = useRef(null);
-    const [videoQuality, setVideoQuality] = useState('high'); 
-    const [videoFit, setVideoFit] = useState('cover'); 
+    const [videoQuality, setVideoQuality] = useState('high');
+    const [videoFit, setVideoFit] = useState('cover');
     const [videoFilter, setVideoFilter] = useState('none');
-    
+
     // --- MODIFIED: Renamed states for clarity ---
     const [participants, setParticipants] = useState([]); // Users *in* the call
     const [waitingUsers, setWaitingUsers] = useState([]); // Users *waiting* to join
     const [remoteStreams, setRemoteStreams] = useState([]); // Remote streams
-    
+
     // --- RE-ADDED: Draggable PiP State ---
     const [isPipDragging, setIsPipDragging] = useState(false);
     const pipOffsetRef = useRef({ x: 0, y: 0 });
     const pipWrapperRef = useRef(null);
-    
+
     // --- FIX: Moved participantsRef and its useEffect to the top level ---
     const participantsRef = React.useRef(participants);
     useEffect(() => {
@@ -285,7 +285,7 @@ function Call() {
             }
 
             const data = docSnap.data();
-            setCallData(data); 
+            setCallData(data);
             setCallOwnerId(data.ownerId);
 
             const isOwner = user && data.ownerId === user._id;
@@ -344,7 +344,7 @@ function Call() {
         const unsubscribeMessages = onSnapshot(messagesQuery, qSnap => setMessages(qSnap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
         return () => {
-            clearInterval(heartbeatIntervalRef.current); 
+            clearInterval(heartbeatIntervalRef.current);
             if (user) {
                 // Remove user from all possible maps on exit
                 updateDoc(doc(db, 'calls', callId), {
@@ -360,7 +360,7 @@ function Call() {
         };
     }, [callId, user, navigate]); // --- MODIFIED ---
 
-    
+
     // --- NEW: Stable participant ID string ---
     const participantIDs = JSON.stringify(participants.map(p => p.id).sort());
 
@@ -387,7 +387,7 @@ function Call() {
         const createPeer = (recipientId, senderId, stream) => {
             console.log(`Creating peer for ${recipientId}`);
             const peer = new Peer({ initiator: true, trickle: false, stream });
-            
+
             peer.on('signal', signal => {
                 addDoc(signalingColRef, { recipientId, senderId, signal });
             });
@@ -395,7 +395,7 @@ function Call() {
                 console.log(`Received stream from ${recipientId}`);
                 addStream(recipientId, remoteStream);
             });
-            peer.on('close', () => { 
+            peer.on('close', () => {
                 console.log(`Connection closed with ${recipientId}`);
                 removeStream(recipientId);
                 delete peersRef.current[recipientId];
@@ -413,7 +413,7 @@ function Call() {
         const addPeer = (incoming, recipientId, stream) => {
             console.log(`Accepting peer from ${incoming.senderId}`);
             const peer = new Peer({ initiator: false, trickle: false, stream });
-            
+
             peer.on('signal', signal => {
                 addDoc(signalingColRef, { recipientId: incoming.senderId, senderId: recipientId, signal });
             });
@@ -421,7 +421,7 @@ function Call() {
                 console.log(`Received stream from ${incoming.senderId}`);
                 addStream(incoming.senderId, remoteStream);
             });
-            peer.on('close', () => { 
+            peer.on('close', () => {
                 console.log(`Connection closed with ${incoming.senderId}`);
                 removeStream(incoming.senderId);
                 delete peersRef.current[incoming.senderId];
@@ -438,7 +438,7 @@ function Call() {
 
         // --- MODIFIED: Mesh network logic ---
         // Connect to all other participants
-        participants.forEach(p => { 
+        participants.forEach(p => {
             if (p.id !== user._id && !peersRef.current[p.id]) {
                 createPeer(p.id, user._id, stream);
             }
@@ -446,7 +446,7 @@ function Call() {
 
         // --- MODIFIED: Cleanup logic ---
         // Remove peers for users who are no longer in the participants list
-        Object.keys(peersRef.current).forEach(peerId => { 
+        Object.keys(peersRef.current).forEach(peerId => {
             if (!participants.find(p => p.id === peerId)) {
                 console.log(`Destroying peer for ${peerId}`);
                 if (peersRef.current[peerId]) {
@@ -472,13 +472,13 @@ function Call() {
                             console.log(`Destroying stale peer for ${data.senderId} to accept new offer.`);
                             existingPeer.destroy();
                         }
-                        
+
                         // Only add peer if they are in the official participants list
                         if (participants.find(p => p.id === data.senderId)) {
                             console.log(`Accepting new offer from ${data.senderId}`);
                             addPeer(data, user._id, stream);
                         }
-                        
+
                     } else if (existingPeer && data.signal.type === 'answer') {
                         // This is an "answer" from a peer we already initiated
                         console.log(`Got signal answer from ${data.senderId}`);
@@ -488,18 +488,18 @@ function Call() {
                         existingPeer.signal(data.signal);
                     }
                     // --- END BUG FIX ---
-                    
+
                     deleteDoc(change.doc.ref); // Signal consumed, delete it
                 }
             });
         });
 
         return () => {
-             unsubscribeSignaling();
+            unsubscribeSignaling();
         };
-    // --- MODIFIED: Use stable participantIDs ---
-    }, [stream, callState, user, callId, participantIDs]); 
-    
+        // --- MODIFIED: Use stable participantIDs ---
+    }, [stream, callState, user, callId, participantIDs]);
+
     // Mute Status UseEffect
     useEffect(() => {
         if (!stream || !user || !stream.getAudioTracks().length) { return; }
@@ -533,7 +533,7 @@ function Call() {
             const getMediaOnRefresh = async () => {
                 try {
                     const userStream = await getQualityStream(videoQuality, true);
-                    setStream(userStream); 
+                    setStream(userStream);
                     setIsVideoOn(true);
                     // No need to setCallState('active'), it already is
                 } catch (err) {
@@ -566,10 +566,10 @@ function Call() {
                 }
             }));
         }
-        
+
         // Add audio-only as the last resort, or if video is disabled
         constraintsToTry.push({ audio: true, video: false });
-        
+
         for (const constraints of constraintsToTry) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -588,9 +588,9 @@ function Call() {
         try {
             // Use the quality from state, request video by default
             const userStream = await getQualityStream(videoQuality, true);
-            
+
             // Add user to active participants
-            await updateDoc(doc(db, 'calls', callId), { 
+            await updateDoc(doc(db, 'calls', callId), {
                 [`muteStatus.${user._id}`]: false,
                 [`activeParticipants.${user._id}`]: {
                     name: `${user.firstname} ${user.lastname}`,
@@ -599,10 +599,10 @@ function Call() {
                 [`waitingRoom.${user._id}`]: deleteField() // Remove from waiting room
             });
 
-            setStream(userStream); 
+            setStream(userStream);
             setIsVideoOn(true); // Video is on by default
-            setCallState('active'); 
-            
+            setCallState('active');
+
             // --- NEW: Set session storage flag ---
             sessionStorage.setItem(`call_joined_${callId}`, 'true');
 
@@ -611,7 +611,7 @@ function Call() {
             console.error(err);
         }
     };
-    
+
     // --- NEW: Owner allows a user ---
     const handleAllowUser = async (userId, name) => {
         try {
@@ -634,18 +634,18 @@ function Call() {
     const handleDeclineCall = () => {
         sessionStorage.removeItem(`call_joined_${callId}`);
         // Replace the current history item ("/call/:callId") with "/new-call"
-        navigate('/new-call', { replace: true }); 
+        navigate('/new-call', { replace: true });
     };
-    
+
     // --- MODIFIED: Routing Fix ---
     const handleHangUp = () => {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
-        setStream(null); 
+        setStream(null);
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
-        
+
         sessionStorage.removeItem(`call_joined_${callId}`);
         // Replace the current history item ("/call/:callId") with "/new-call"
         navigate('/new-call', { replace: true });
@@ -669,7 +669,7 @@ function Call() {
             // Get a new stream (video only) at the new quality
             // --- FIX: Always request video, even if isVideoOn is false ---
             const newTrackStream = await getQualityStream(newQuality, true);
-            
+
             if (!newTrackStream.getVideoTracks().length) {
                 // We wanted video but couldn't get it
                 toast.error(`Could not get ${newQuality} video. Turning camera off.`);
@@ -679,17 +679,17 @@ function Call() {
             }
 
             const newVideoTrack = newTrackStream.getVideoTracks()[0];
-            
+
             // Replace the track in all peer connections
-            if(oldVideoTrack) {
+            if (oldVideoTrack) {
                 for (const peerId in peersRef.current) {
                     peersRef.current[peerId].replaceTrack(oldVideoTrack, newVideoTrack, stream);
                 }
             }
-            
+
             // Stop the old track to release the camera
             if (oldVideoTrack) oldVideoTrack.stop();
-            
+
             // Update the local stream object in-place
             if (oldVideoTrack) stream.removeTrack(oldVideoTrack);
             stream.addTrack(newVideoTrack);
@@ -699,9 +699,9 @@ function Call() {
                 localVideoRef.current.srcObject = null;
                 localVideoRef.current.srcObject = stream;
             }
-            
+
             // Ensure video enabled-state is consistent
-            newVideoTrack.enabled = isVideoOn; 
+            newVideoTrack.enabled = isVideoOn;
             toast.success(`Video quality set to ${newQuality}`);
 
         } catch (err) {
@@ -721,8 +721,8 @@ function Call() {
             // Users can always mute themselves
             const currentMuteState = muteStatus[targetUserId] ?? false;
             const newMuteState = !currentMuteState;
-            await updateDoc(doc(db, 'calls', callId), { 
-                [`muteStatus.${targetUserId}`]: newMuteState 
+            await updateDoc(doc(db, 'calls', callId), {
+                [`muteStatus.${targetUserId}`]: newMuteState
             });
         } else {
             // Only the owner can mute/unmute others
@@ -730,8 +730,8 @@ function Call() {
             if (isTrueOwner) {
                 const currentMuteState = muteStatus[targetUserId] ?? false;
                 const newMuteState = !currentMuteState;
-                await updateDoc(doc(db, 'calls', callId), { 
-                    [`muteStatus.${targetUserId}`]: newMuteState 
+                await updateDoc(doc(db, 'calls', callId), {
+                    [`muteStatus.${targetUserId}`]: newMuteState
                 });
                 const targetName = participants.find(u => u.id === targetUserId)?.name || 'Participant';
                 toast.success(newMuteState ? `Muted ${targetName}` : `Unmuted ${targetName}`);
@@ -756,14 +756,14 @@ function Call() {
             return;
         }
         setIsInviting(true);
-        
+
         const emails = inviteEmails.split(',').map(email => email.trim()).filter(email => email);
         if (emails.length === 0) {
             toast.warn("No valid emails found.");
             setIsInviting(false);
             return;
         }
-        
+
         const callLink = `${window.location.origin}/call/${callId}`;
         const emailjsPublicKey = '3WEPhBvkjCwXVYBJ-';
         const serviceID = 'service_6ar5bgj';
@@ -792,7 +792,7 @@ function Call() {
                     console.error(`Failed to send invite to ${email}:`, err);
                 }
             }
-            
+
             toast.success(`Sent ${successCount} invite(s)!`);
             setIsInviteModalOpen(false);
             setInviteEmails('');
@@ -841,8 +841,8 @@ function Call() {
     };
 
     const handlePipDragMove = (e) => {
-        if (!isPipDragging || !pipWrapperRef.current || !pipWrapperRef.current.parentElement) return; 
-        
+        if (!isPipDragging || !pipWrapperRef.current || !pipWrapperRef.current.parentElement) return;
+
         const { x, y } = getClient(e); // Use helper
         const parentRect = pipWrapperRef.current.parentElement.getBoundingClientRect();
         let newX = x - parentRect.left - pipOffsetRef.current.x;
@@ -888,7 +888,7 @@ function Call() {
     // --- NEW: Waiting Room Screen ---
     if (callState === 'waiting') {
         return (
-             <div className="d-flex justify-content-center align-items-center" style={{ height: '100dvh', backgroundColor: '#12121c' }}>
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '100dvh', backgroundColor: '#12121c' }}>
                 <div className="text-center">
                     <div className="spinner-border text-primary mb-3" style={{ width: '3rem', height: '3rem' }} role="status">
                         <span className="visually-hidden">Loading...</span>
@@ -899,7 +899,7 @@ function Call() {
             </div>
         );
     }
-    
+
     if (callState === 'joining') {
         const callerName = callData?.ownerName || 'Unknown Caller';
         return (
@@ -1018,7 +1018,7 @@ function Call() {
                     }
                 `}</style>
                 <div className="d-flex flex-column justify-content-around align-items-center joining-screen" style={{ minHeight: 'calc(100dvh - 56px)' }}>
-                    
+
                     <div className="caller-info">
                         <h1 className="caller-name">{callerName}</h1>
                         <h3 className="caller-id">{callData?.description || 'Incoming Call...'}</h3>
@@ -1051,7 +1051,7 @@ function Call() {
     return (
         <>
             {/* --- MODIFIED: Navbar is **REMOVED** from active call --- */}
-            
+
             <div className="chat-page-container">
                 {/* --- MODIFIED: Adjusted CSS for no-navbar --- */}
                 <style jsx>{`
@@ -1520,7 +1520,7 @@ function Call() {
                     {/* --- Video Column --- */}
                     {/* --- MODIFIED: Responsive column --- */}
                     <div className="col-12 col-xl-8 d-flex flex-column">
-                        <div 
+                        <div
                             className="video-panel-container shadow-sm"
                             onClick={() => {
                                 setAreControlsVisible(!areControlsVisible);
@@ -1531,7 +1531,7 @@ function Call() {
                             onMouseMove={handlePipDragMove}
                             onTouchMove={handlePipDragMove}
                             // ---
-                            onMouseUp={handlePipDragEnd} 
+                            onMouseUp={handlePipDragEnd}
                             onMouseLeave={handlePipDragEnd}
                             onTouchEnd={handlePipDragEnd}
                         >
@@ -1539,21 +1539,21 @@ function Call() {
                             <div className={`video-grid-container grid-${remoteStreams.length}`}>
                                 {/* Remote Video Tiles */}
                                 {remoteStreams.map(data => (
-                                    <RemoteVideo 
-                                        key={data.id} 
+                                    <RemoteVideo
+                                        key={data.id}
                                         peer={data}
-                                        name={participants.find(u => u.id === data.id)?.name} 
+                                        name={participants.find(u => u.id === data.id)?.name}
                                         videoFit={videoFit}
                                         videoFilter={videoFilter} // --- NEW: Apply filter ---
                                     />
                                 ))}
                             </div>
-                            
-                            
+
+
                             {/* --- RE-ADDED: Self-View (PiP) Wrapper --- */}
                             <div
                                 ref={pipWrapperRef}
-                                className="local-video-pip" 
+                                className="local-video-pip"
                                 style={{ opacity: stream ? 1 : 0 }}
                                 onClick={(e) => e.stopPropagation()}
                                 // --- MODIFIED: Added all drag handlers ---
@@ -1567,7 +1567,7 @@ function Call() {
                                 <video
                                     ref={localVideoRef}
                                     className="local-video-element"
-                                    style={{ 
+                                    style={{
                                         transform: 'scaleX(-1)', // --- MODIFIED: Hardcoded mirror ---
                                         opacity: isVideoOn ? 1 : 0, // Hide video element
                                         filter: 'none' // --- MODIFIED: Local video has no filter ---
@@ -1583,29 +1583,29 @@ function Call() {
                                     </div>
                                 )}
                             </div>
-                            
-                            
+
+
                             {/* --- Call Controls --- */}
                             <div className={`call-controls ${!areControlsVisible ? 'hidden' : ''}`}>
-                                
+
                                 {/* --- FIX: Quality Menu moved INSIDE call-controls --- */}
                                 {isQualityMenuOpen && (
                                     <div className="quality-menu" onClick={(e) => e.stopPropagation()}>
-                                        <button 
+                                        <button
                                             className={`quality-menu-button ${videoQuality === 'high' ? 'active' : ''}`}
                                             onClick={() => handleChangeVideoQuality('high')}
                                         >
                                             <span>High (1080p)</span>
                                             {videoQuality === 'high' && <i className="bi bi-check"></i>}
                                         </button>
-                                        <button 
+                                        <button
                                             className={`quality-menu-button ${videoQuality === 'medium' ? 'active' : ''}`}
                                             onClick={() => handleChangeVideoQuality('medium')}
                                         >
                                             <span>Medium (720p)</span>
                                             {videoQuality === 'medium' && <i className="bi bi-check"></i>}
                                         </button>
-                                        <button 
+                                        <button
                                             className={`quality-menu-button ${videoQuality === 'low' ? 'active' : ''}`}
                                             onClick={() => handleChangeVideoQuality('low')}
                                         >
@@ -1615,13 +1615,13 @@ function Call() {
                                     </div>
                                 )}
                                 {/* --- END FIX --- */}
-                                
+
                                 {/* --- NEW: Filter Panel --- */}
                                 {isFilterModalOpen && (
                                     <div className="filter-panel" onClick={(e) => e.stopPropagation()}>
                                         {VIDEO_FILTERS.map(filter => (
-                                            <div 
-                                                key={filter.name} 
+                                            <div
+                                                key={filter.name}
                                                 className={`filter-thumbnail ${videoFilter === filter.value ? 'active' : ''}`}
                                                 onClick={() => {
                                                     setVideoFilter(filter.value);
@@ -1648,39 +1648,39 @@ function Call() {
                                 {/* --- REMOVED: CAMERA SWAP BUTTON --- */}
 
                                 <button
-                                    className={`btn rounded-circle ${isVideoOn ? 'btn-secondary' : 'btn-danger'}`} 
-                                    onClick={(e) => { e.stopPropagation(); handleToggleVideo(); }} 
+                                    className={`btn rounded-circle ${isVideoOn ? 'btn-secondary' : 'btn-danger'}`}
+                                    onClick={(e) => { e.stopPropagation(); handleToggleVideo(); }}
                                     title={isVideoOn ? "Turn off camera" : "Turn on camera"}
                                 >
                                     <i className={`bi ${isVideoOn ? 'bi-camera-video-fill' : 'bi-camera-video-off-fill'}`}></i>
                                 </button>
-                                
+
                                 <button
-                                    className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-danger' : 'btn-secondary'}`} 
-                                    onClick={(e) => { e.stopPropagation(); handleToggleMute(user._id); }} 
+                                    className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-danger' : 'btn-secondary'}`}
+                                    onClick={(e) => { e.stopPropagation(); handleToggleMute(user._id); }}
                                     title={muteStatus[user._id] ? "Unmute" : "Mute"}
                                 >
                                     <i className={`bi ${muteStatus[user._id] ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
                                 </button>
-                                
+
                                 {/* --- NEW: Quality Settings Button --- */}
                                 <button
                                     className={`btn rounded-circle ${isQualityMenuOpen ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={(e) => { e.stopPropagation(); setIsQualityMenuOpen(!isQualityMenuOpen); setIsFilterModalOpen(false); }} 
+                                    onClick={(e) => { e.stopPropagation(); setIsQualityMenuOpen(!isQualityMenuOpen); setIsFilterModalOpen(false); }}
                                     title="Video Quality"
                                 >
                                     <i className="bi bi-gear-fill"></i>
                                 </button>
-                                
+
                                 {/* --- NEW: Video Fit Toggle Button --- */}
                                 <button
                                     className={`btn rounded-circle ${videoFit === 'contain' ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={handleToggleVideoFit} 
+                                    onClick={handleToggleVideoFit}
                                     title={videoFit === 'cover' ? "Fit video to screen" : "Fill screen with video"}
                                 >
                                     <i className={`bi ${videoFit === 'contain' ? 'bi-fullscreen-exit' : 'bi-aspect-ratio'}`}></i>
                                 </button>
-                                
+
                                 {/* --- NEW: Filter Button --- */}
                                 <button
                                     className={`btn rounded-circle ${isFilterModalOpen ? 'btn-primary' : 'btn-secondary'}`}
@@ -1689,7 +1689,7 @@ function Call() {
                                 >
                                     <i className="bi bi-magic"></i>
                                 </button>
-                                
+
                                 {/* --- NEW: Add People Button --- */}
                                 <button
                                     className="btn btn-primary rounded-circle"
@@ -1702,16 +1702,16 @@ function Call() {
                                 {/* Chat (MOBILE ONLY) */}
                                 <button
                                     className="btn btn-primary rounded-circle d-xl-none" // --- MODIFIED: d-xl-none ---
-                                    onClick={(e) => { e.stopPropagation(); setIsChatOpen(true); }} 
+                                    onClick={(e) => { e.stopPropagation(); setIsChatOpen(true); }}
                                     title="Show Chat"
                                 >
                                     <i className="bi bi-chat-dots-fill"></i>
                                 </button>
-                                
+
                                 {/* Participants (MOBILE ONLY) */}
                                 <button
                                     className="btn btn-primary rounded-circle d-xl-none" // --- MODIFIED: d-xl-none ---
-                                    onClick={(e) => { e.stopPropagation(); setIsParticipantsOpen(true); }} 
+                                    onClick={(e) => { e.stopPropagation(); setIsParticipantsOpen(true); }}
                                     title="Show Participants"
                                 >
                                     <i className="bi bi-people-fill"></i>
@@ -1720,16 +1720,16 @@ function Call() {
                                 {/* Share (MOBILE ONLY) */}
                                 <button
                                     className="btn btn-primary rounded-circle d-xl-none" // --- MODIFIED: d-xl-none ---
-                                    onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }} 
+                                    onClick={(e) => { e.stopPropagation(); setIsShareOpen(true); }}
                                     title="Share Link"
                                 >
                                     <i className="bi bi-share-fill"></i>
                                 </button>
 
                                 {/* Hangup Button */}
-                                <button 
+                                <button
                                     className="btn btn-danger rounded-circle"
-                                    onClick={(e) => { e.stopPropagation(); handleHangUp(); }} 
+                                    onClick={(e) => { e.stopPropagation(); handleHangUp(); }}
                                     title="Hang Up"
                                 >
                                     <i className="bi bi-telephone-fill" style={{ transform: 'rotate(135deg)' }}></i>
@@ -1739,7 +1739,7 @@ function Call() {
                     </div>
 
                     {/* --- Desktop-Only Sidebar --- */}
-                    <div 
+                    <div
                         className="col-12 col-xl-4 d-xl-flex flex-column desktop-sidebar" // --- MODIFIED: col-xl-4, d-xl-flex ---
                     >
                         {/* --- NEW: Waiting Room Card --- */}
@@ -1749,7 +1749,7 @@ function Call() {
                                     <span>Waiting Room ({waitingUsers.length})</span>
                                     <i className="bi bi-person-exclamation"></i>
                                 </div>
-                                <ul className="list-group list-group-flush p-3 participant-card-list" style={{maxHeight: '150px', overflowY: 'auto'}}>
+                                <ul className="list-group list-group-flush p-3 participant-card-list" style={{ maxHeight: '150px', overflowY: 'auto' }}>
                                     {waitingUsers.map(p => (
                                         <li key={p.id} className="participant-card">
                                             <div>
@@ -1766,7 +1766,7 @@ function Call() {
                                 </ul>
                             </div>
                         )}
-                        
+
                         {/* Participants Card (Desktop) */}
                         <div className="card shadow-sm">
                             <div className="card-header d-flex justify-content-between">
@@ -1774,7 +1774,7 @@ function Call() {
                                 <i className="bi bi-broadcast text-success"></i>
                             </div>
                             {/* --- MODIFIED: Participant Card List --- */}
-                            <ul className="list-group list-group-flush p-3 participant-card-list" style={{maxHeight: '150px', overflowY: 'auto'}}>
+                            <ul className="list-group list-group-flush p-3 participant-card-list" style={{ maxHeight: '150px', overflowY: 'auto' }}>
                                 {participants.map(p => (
                                     <li key={p.id} className="participant-card">
                                         <div>
@@ -1798,11 +1798,19 @@ function Call() {
                         </div>
 
                         {/* Share Card (Desktop) */}
-                       {/* <div><SharingComponent sessionId={callId} /></div> */}
+                        {/* <div><SharingComponent sessionId={callId} /></div> */}
 
                         {/* Chat Card (Desktop) */}
                         <div className="card shadow-sm flex-grow-1 chat-card">
-                            <div className="card-header">Live Chat</div>
+                            <div className="card-header d-flex align-items-center">
+                                <span
+                                    className="spinner-grow spinner-grow-sm text-success me-2"
+                                    role="status"
+                                    aria-hidden="true"
+                                    style={{ width: '0.8rem', height: '0.8rem' }}
+                                ></span>
+                                Chat
+                            </div>
                             <div className="card-body">
                                 <div className="chat-messages-container">
                                     {messages.map(msg => (
@@ -1910,7 +1918,17 @@ function Call() {
                 {isChatOpen && (
                     <div className="mobile-panel mobile-chat-panel d-xl-none">
                         <div className="mobile-panel-header">
-                            <h5>Live Chat</h5>
+                            {/* --- MODIFIED: Added div and spinner --- */}
+                            <div className="d-flex align-items-center">
+                                <span
+                                    className="spinner-grow spinner-grow-sm text-success me-2"
+                                    role="status"
+                                    aria-hidden="true"
+                                    style={{ width: '0.8rem', height: '0.8rem' }}
+                                ></span>
+                                <h5> Chat</h5>
+                            </div>
+
                             <button className="btn-close btn-close-white" onClick={() => setIsChatOpen(false)}></button>
                         </div>
                         <div className="mobile-chat-body">
@@ -1943,68 +1961,68 @@ function Call() {
                         </div>
                     </div>
                 )}
-                
+
                 {/* --- NEW: Invite People Modal --- */}
-        
-            {isInviteModalOpen && (
-                <div className="mobile-panel">
-                    <div className="mobile-panel-header">
-                        <h5>Invite People</h5>
-                        <button className="btn-close btn-close-white" onClick={() => setIsInviteModalOpen(false)}></button>
-                    </div>
 
-                    {/* --- MODIFIED: Panel body with new layout --- */}
-                    <div className="mobile-panel-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {isInviteModalOpen && (
+                    <div className="mobile-panel">
+                        <div className="mobile-panel-header">
+                            <h5>Invite People</h5>
+                            <button className="btn-close btn-close-white" onClick={() => setIsInviteModalOpen(false)}></button>
+                        </div>
 
-                       
+                        {/* --- MODIFIED: Panel body with new layout --- */}
+                        <div className="mobile-panel-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-                        {/* --- MODIFIED: Email Form (for dark theme) --- */}
-                        <form onSubmit={handleSendInvites} style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, gap: '1rem' }}>
-                            <p className="text-secondary" style={{ margin: 0 }}>
-                                Invite with email. Add multiple separated by commas.
-                            </p>
-                            <div className="form-floating" style={{ flexGrow: 1 }}>
-                                <textarea
-                                    className="form-control"
-                                    id="inviteEmails"
-                                    
+
+
+                            {/* --- MODIFIED: Email Form (for dark theme) --- */}
+                            <form onSubmit={handleSendInvites} style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, gap: '1rem' }}>
+                                <p className="text-secondary" style={{ margin: 0 }}>
+                                    Invite with email. Add multiple separated by commas.
+                                </p>
+                                <div className="form-floating" style={{ flexGrow: 1 }}>
+                                    <textarea
+                                        className="form-control"
+                                        id="inviteEmails"
+
+                                        style={{
+                                            height: '100%',
+                                            minHeight: '120px',
+                                            backgroundColor: 'var(--dark-bg-primary)',
+                                            color: 'var(--text-primary)',
+                                            borderColor: 'var(--border-color)'
+                                        }}
+                                        value={inviteEmails}
+                                        onChange={(e) => setInviteEmails(e.target.value)} // Fixed typo from e.gex
+                                    />
+                                    <label htmlFor="inviteEmails" style={{ color: 'var(--text-secondary)' }}>Emails (comma-separated)</label>
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary w-100"
+                                    disabled={isInviting}
                                     style={{
-                                        height: '100%',
-                                        minHeight: '120px',
-                                        backgroundColor: 'var(--dark-bg-primary)',
-                                        color: 'var(--text-primary)',
-                                        borderColor: 'var(--border-color)'
+                                        backgroundColor: 'var(--accent-blue)',
+                                        borderColor: 'var(--accent-blue)',
+                                        fontWeight: '600',
+                                        padding: '0.75rem',
+                                        borderRadius: '12px' // Matches participant card radius
                                     }}
-                                    value={inviteEmails}
-                                    onChange={(e) => setInviteEmails(e.target.value)} // Fixed typo from e.gex
-                                />
-                                <label htmlFor="inviteEmails" style={{ color: 'var(--text-secondary)' }}>Emails (comma-separated)</label>
-                            </div>
-                            <button 
-                                type="submit" 
-                                className="btn btn-primary w-100"
-                                disabled={isInviting}
-                                style={{
-                                    backgroundColor: 'var(--accent-blue)',
-                                    borderColor: 'var(--accent-blue)',
-                                    fontWeight: '600',
-                                    padding: '0.75rem',
-                                    borderRadius: '12px' // Matches participant card radius
-                                }}
-                            >
-                                {isInviting ? (
-                                    <>
-                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                        Sending Invites...
-                                    </>
-                                ) : (
-                                    'Send Invites'
-                                )}
-                            </button>
-                        </form>
+                                >
+                                    {isInviting ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Sending Invites...
+                                        </>
+                                    ) : (
+                                        'Send Invites'
+                                    )}
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
             </div>
         </>
     );
