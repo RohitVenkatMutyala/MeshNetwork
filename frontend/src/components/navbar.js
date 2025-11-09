@@ -168,11 +168,11 @@ function Navbar() {
 
             <nav className={`navbar navbar-expand-lg sticky-top shadow-sm navbar-custom theme-${theme}`}>
                 <div className="container-fluid px-4">
-                   <img
+                   {/* <img
                         src={logo} 
                         alt="NETWORK.RANDOMAN Logo"
                         className={`logo-image ${theme === 'dark' ? 'logo-dark-theme' : ''}`}
-                    /> 
+                    /> */}
                     <Link to={user ? "/new-call" : "/new-call"} className="navbar-brand-custom py-2">
                         NETWORK
                     </Link>
