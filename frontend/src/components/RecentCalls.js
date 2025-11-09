@@ -352,25 +352,12 @@ function RecentCalls({ searchTerm }) {
                     align-items: center;
                     gap: 0.4rem; 
                 }
-                .call-rejoin-link {
-                    font-family: "Courier New", Courier, monospace;
-                    font-size: 0.9rem;
-                    font-weight: 600;
-                    color: var(--bs-primary);
-                    text-decoration: none;
-                    padding: 0.5rem;
-                    border-radius: 0.3rem;
-                    transition: background-color 0.2s ease, color 0.2s ease;
-                }
-                .call-rejoin-link:hover {
-                    background-color: var(--bs-secondary-bg);
-                    text-decoration: underline;
-                }
+
+                /* --- REMOVED .call-rejoin-link styles --- */
+
                 .call-button {
                     background: none;
                     border: none;
-                    /* --- MODIFIED: Phone icon color --- */
-                    color: var(--bs-success);
                     font-size: 1.4rem; 
                     padding: 0.5rem;
                     border-radius: 50%;
@@ -379,18 +366,43 @@ function RecentCalls({ searchTerm }) {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    transition: background-color 0.2s ease;
+                    transition: all 0.2s ease;
                     flex-shrink: 0; 
                 }
-                .call-button:hover {
-                    /* --- MODIFIED: Phone icon hover color --- */
+                .call-button:disabled {
+                    color: var(--bs-secondary-color) !important; /* !important to override */
+                    background-color: transparent !important;
+                    cursor: not-allowed;
+                }
+                
+                /* --- NEW: Rejoin Button Style --- */
+                .call-button-rejoin {
+                    color: var(--bs-primary);
+                }
+                .call-button-rejoin:hover {
+                    background-color: var(--bs-primary-bg-subtle);
+                    color: var(--bs-primary-text-emphasis);
+                }
+                
+                /* --- NEW: Call Button Style --- */
+                .call-button-call {
+                    color: var(--bs-success);
+                }
+                .call-button-call:hover {
                     background-color: var(--bs-success-bg-subtle);
                     color: var(--bs-success-text-emphasis);
                 }
-                .call-button:disabled {
-                    color: var(--bs-secondary-color);
-                    cursor: not-allowed;
+
+                /* --- MODIFIED: Delete button color --- */
+                .call-delete-button {
+                    color: #8a9199; /* Neutral gray */
                 }
+                .call-delete-button:hover {
+                    background-color: var(--bs-danger-bg-subtle);
+                    color: var(--bs-danger-text-emphasis); /* Red on hover */
+                }
+
+
                 .empty-state {
                     padding: 2rem;
                     text-align: center;
@@ -412,20 +424,7 @@ function RecentCalls({ searchTerm }) {
                     font-weight: 600;
                 }
 
-                /* --- MODIFIED: Delete button color --- */
-                .call-delete-button {
-                    color: #8a9199; /* Neutral gray */
-                }
-                .call-delete-button:hover {
-                    background-color: var(--bs-danger-bg-subtle);
-                    color: var(--bs-danger-text-emphasis); /* Red on hover */
-                }
-                .call-delete-button:disabled {
-                    color: var(--bs-secondary-color);
-                    background-color: transparent;
-                }
-
-                /* --- NEW: Media query for responsive time --- */
+                /* --- MODIFIED: Media query for responsive time --- */
                 @media (max-width: 576px) {
                     .call-details {
                         flex-direction: column;
@@ -439,9 +438,6 @@ function RecentCalls({ searchTerm }) {
                         font-size: 0.75rem;
                         /* Align with text, not icon */
                         padding-left: 26px; /* Approx width of icon + margin */
-                    }
-                    .call-rejoin-link {
-                        display: none; /* Hide long ID on small screens */
                     }
                     .call-item {
                         padding: 1rem 0.75rem;
@@ -489,22 +485,21 @@ function RecentCalls({ searchTerm }) {
                                 </div>
 
                                 <div className="call-action">
-                                    {/* 1. The re-join link */}
-                                    <a
-                                        href={`/call/${call.id}`}
-                                        className="call-rejoin-link"
+                                    {/* --- MODIFIED: 1. Re-join button --- */}
+                                    <button
+                                        className="call-button call-button-rejoin"
                                         title={`Re-join session ${call.id}`}
                                         onClick={(e) => {
                                             e.preventDefault();
                                             navigate(`/call/${call.id}`);
                                         }}
                                     >
-                                        {call.id}
-                                    </a>
+                                        <i className="bi bi-box-arrow-in-right"></i>
+                                    </button>
 
                                     {/* 2. The "new call" button */}
                                     <button 
-                                        className="call-button" 
+                                        className="call-button call-button-call" 
                                         title={`Call ${displayName} (New Session)`}
                                         onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
                                         disabled={isCalling === call.id || dailyCallCount >= dailyCallLimit || isDeleting === call.id}
@@ -518,7 +513,7 @@ function RecentCalls({ searchTerm }) {
                                         )}
                                     </button>
 
-                                    {/* --- NEW ---: 3. The "delete" button */}
+                                    {/* 3. The "delete" button */}
                                     <button 
                                         className="call-button call-delete-button" 
                                         title={`Delete ${displayName}`}
