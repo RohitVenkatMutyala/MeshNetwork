@@ -308,9 +308,6 @@ function Call() {
         };
     }, [callId, user]); 
 
-    // --- NEW: Create a stable dependency for the user list ---
-    const activeUserIDs = JSON.stringify(activeUsers.map(u => u.id).sort());
-
     // --- MODIFIED: WebRTC Group Call Logic ---
     useEffect(() => {
         if (!stream || callState !== 'active' || !user) return;
@@ -424,8 +421,7 @@ function Call() {
              peersRef.current = {};
              setPeers([]);
         };
-    // --- MODIFIED: Use stable activeUserIDs dependency ---
-    }, [stream, activeUserIDs, callState, callId, user]); 
+    }, [stream, activeUsers, callState, callId, user]); // Re-run when stream or users change
     
     // Mute Status UseEffect
     useEffect(() => {
@@ -1266,8 +1262,7 @@ function Call() {
                     .send-button {
                         background: var(--accent-blue); border: none; color: white;
                         border-radius: 50%; width: 40px; height: 40px;
-                        display: flex; align-items: center;
-                        justify-content: center;
+                        display: flex; align-items: center; justify-content: center;
                         margin-left: 0.5rem; transition: background-color 0.2s ease;
                     }
                 `}</style>
@@ -1610,7 +1605,7 @@ function Call() {
                                     placeholder="Enter emails"
                                     style={{ height: '150px' }}
                                     value={inviteEmails}
-                                    onChange={(e) => setInviteEmails(e.target.value)}
+                                    onChange={(e) => setInviteEmails(e.g.target.value)}
                                 />
                                 <label htmlFor="inviteEmails">Emails (comma-separated)</label>
                             </div>
