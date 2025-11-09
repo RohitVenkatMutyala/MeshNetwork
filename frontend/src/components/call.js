@@ -44,6 +44,20 @@ const QUALITY_PROFILES = {
     }
 };
 
+// --- NEW: Filter Definitions ---
+const VIDEO_FILTERS = [
+    { name: 'None', value: 'none' },
+    { name: 'Noir', value: 'grayscale(100%)' },
+    { name: 'Sepia', value: 'sepia(100%)' },
+    { name: 'Vivid', value: 'saturate(200%)' },
+    { name: 'Contrast', value: 'contrast(150%)' },
+    { name: 'Bright', value: 'brightness(130%)' },
+    { name: 'Invert', value: 'invert(100%)' },
+    { name: 'Vintage', value: 'sepia(60%) contrast(110%) brightness(90%)' },
+    { name: 'Cool', value: 'contrast(110%) saturate(150%) hue-rotate(-15deg)' },
+];
+
+
 // --- NEW: RemoteVideo Component ---
 // This component handles rendering the remote streams in the grid
 const RemoteVideo = ({ peer, name, videoFit }) => {
@@ -195,10 +209,11 @@ function Call() {
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [areControlsVisible, setAreControlsVisible] = useState(true);
     const [isQualityMenuOpen, setIsQualityMenuOpen] = useState(false);
-    // --- NEW: Invite Modal State ---
     const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
     const [inviteEmails, setInviteEmails] = useState('');
     const [isInviting, setIsInviting] = useState(false);
+    // --- NEW: Filter Modal State ---
+    const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
 
     // --- Voice/Video Chat State ---
@@ -211,6 +226,8 @@ function Call() {
     const chatMessagesEndRef = useRef(null);
     const [videoQuality, setVideoQuality] = useState('high'); 
     const [videoFit, setVideoFit] = useState('cover'); 
+    // --- NEW: Filter State ---
+    const [videoFilter, setVideoFilter] = useState('none');
     
     // --- MODIFIED: Renamed states for clarity ---
     const [participants, setParticipants] = useState([]); // Users *in* the call
@@ -507,12 +524,13 @@ function Call() {
     }, [isVideoOn, stream]);
 
 
-    // --- MODIFIED: BUG FIX - Re-attach stream when isVideoOn changes ---
+    // Switched to useLayoutEffect. This runs *before* the browser paints,
+    // guaranteeing the localVideoRef.current element is ready.
     useLayoutEffect(() => {
         if (localVideoRef.current && stream && callState === 'active') {
             localVideoRef.current.srcObject = stream;
         }
-    }, [stream, callState, isVideoOn]); // <-- ADDED isVideoOn
+    }, [stream, callState, isVideoOn]); // <-- ADDED isVideoOn to fix toggle bug
 
 
     // --- NEW useEffect to handle refresh ---
@@ -812,6 +830,7 @@ function Call() {
     // --- RE-ADDED: PiP Drag Handlers for Touch + Mouse ---
     const handlePipDragStart = (e) => {
         if (!pipWrapperRef.current) return;
+        // e.preventDefault(); // May prevent text selection but also scrolling on touch
         setIsPipDragging(true);
         const { x, y } = getClient(e); // Use helper
         pipOffsetRef.current = {
@@ -1096,6 +1115,7 @@ function Call() {
                         /* Dynamic grid based on participant count */
                     }
                     /* Classes to be added dynamically */
+                    .grid-0 { grid-template-columns: 1fr; } /* Added for 0 remote streams */
                     .grid-1 { grid-template-columns: 1fr; }
                     .grid-2 { grid-template-columns: 1fr 1fr; }
                     .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
@@ -1114,11 +1134,14 @@ function Call() {
                     .remote-video-element, .local-video-element {
                         width: 100%;
                         height: 100%;
-                        object-fit: ${videoFit}; /* Use state for zoom/fit */
                         transition: object-fit 0.3s ease;
                     }
                     .local-video-element {
                         transform: scaleX(-1); /* Mirror self-view */
+                        object-fit: cover; /* PiP is always cover */
+                    }
+                    .remote-video-element {
+                         object-fit: ${videoFit}; /* Use state for zoom/fit */
                     }
                     .video-label {
                         position: absolute;
@@ -1138,8 +1161,8 @@ function Call() {
                         position: absolute;
                         bottom: 1rem;
                         right: 1rem;
-                        width: 150px;
-                        height: 150px;
+                        width: 130px; /* --- MODIFIED: Slightly smaller --- */
+                        height: 130px;
                         border-radius: 50%;
                         border: 2px solid var(--border-color);
                         z-index: 10;
@@ -1185,16 +1208,15 @@ function Call() {
                         transform: translateX(-50%);
                         background-color: rgba(0, 0, 0, 0.7);
                         border-radius: 50px;
-                        padding: 0.75rem; 
+                        padding: 0.5rem; /* --- MODIFIED: Smaller padding --- */
                         display: flex;
-                        gap: 0.75rem; 
+                        gap: 0.5rem; /* --- MODIFIED: Smaller gap --- */
                         z-index: 20;
                         transition: opacity 0.3s ease; 
                         flex-wrap: wrap;
                         justify-content: center;
-                        max-width: 90%;
+                        max-width: 95%; /* --- MODIFIED: Allow more width --- */
                         
-                        /* --- FIX: Added position: relative --- */
                         position: absolute; 
                     }
                     .call-controls.hidden { 
@@ -1202,9 +1224,9 @@ function Call() {
                         pointer-events: none;
                     }
                     .call-controls .btn {
-                        width: 48px; 
-                        height: 48px; 
-                        font-size: 1.2rem; 
+                        width: 44px; /* --- MODIFIED: Smaller buttons --- */
+                        height: 44px; 
+                        font-size: 1.1rem; /* --- MODIFIED: Smaller icon --- */
                         display: flex;
                         align-items: center;
                         justify-content: center;
@@ -1251,6 +1273,57 @@ function Call() {
                         font-size: 0.75rem;
                     }
                     /* --- End Quality Menu CSS --- */
+
+                    /* --- NEW: Filter Panel CSS --- */
+                    .filter-panel {
+                        position: absolute;
+                        bottom: calc(100% + 1rem);
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background-color: rgba(30, 30, 47, 0.95);
+                        border-radius: 12px;
+                        padding: 0.75rem;
+                        z-index: 21;
+                        border: 1px solid var(--border-color);
+                        backdrop-filter: blur(5px);
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 0.5rem;
+                        width: 240px;
+                    }
+                    .filter-thumbnail {
+                        width: 100%;
+                        padding-top: 100%; /* 1:1 Aspect Ratio */
+                        position: relative;
+                        border-radius: 8px;
+                        overflow: hidden;
+                        cursor: pointer;
+                        border: 2px solid transparent;
+                        transition: border-color 0.2s ease;
+                    }
+                    .filter-thumbnail.active {
+                        border-color: var(--accent-blue);
+                    }
+                    .filter-thumbnail video {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                        transform: scaleX(-1);
+                    }
+                    .filter-thumbnail span {
+                        position: absolute;
+                        bottom: 0;
+                        left: 0;
+                        right: 0;
+                        text-align: center;
+                        font-size: 0.75rem;
+                        color: white;
+                        background: rgba(0,0,0,0.5);
+                        padding: 2px 0;
+                    }
 
                     
                     /* --- 4. MOBILE OVERLAY PANELS (MODIFIED) --- */
@@ -1459,6 +1532,7 @@ function Call() {
                             onClick={() => {
                                 setAreControlsVisible(!areControlsVisible);
                                 setIsQualityMenuOpen(false); // Close menu when clicking bg
+                                setIsFilterModalOpen(false); // --- NEW: Close filter panel ---
                             }}
                             // --- MODIFIED: Added touch move handler ---
                             onMouseMove={handlePipDragMove}
@@ -1468,7 +1542,7 @@ function Call() {
                             onMouseLeave={handlePipDragEnd}
                             onTouchEnd={handlePipDragEnd}
                         >
-                            {/* --- MODIFIED: Video Grid --- */}
+                            {/* --- MODIFIED: Video Grid (Remote Only) --- */}
                             <div className={`video-grid-container grid-${remoteStreams.length}`}>
                                 {/* Remote Video Tiles */}
                                 {remoteStreams.map(data => (
@@ -1501,7 +1575,8 @@ function Call() {
                                     className="local-video-element"
                                     style={{ 
                                         transform: 'scaleX(-1)', // --- MODIFIED: Hardcoded mirror ---
-                                        opacity: isVideoOn ? 1 : 0 // Hide video element
+                                        opacity: isVideoOn ? 1 : 0, // Hide video element
+                                        filter: videoFilter // --- NEW: Apply filter ---
                                     }}
                                     autoPlay
                                     playsInline
@@ -1546,6 +1621,34 @@ function Call() {
                                     </div>
                                 )}
                                 {/* --- END FIX --- */}
+                                
+                                {/* --- NEW: Filter Panel --- */}
+                                {isFilterModalOpen && (
+                                    <div className="filter-panel" onClick={(e) => e.stopPropagation()}>
+                                        {VIDEO_FILTERS.map(filter => (
+                                            <div 
+                                                key={filter.name} 
+                                                className={`filter-thumbnail ${videoFilter === filter.value ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    setVideoFilter(filter.value);
+                                                    setIsFilterModalOpen(false);
+                                                }}
+                                            >
+                                                {stream && (
+                                                    <video
+                                                        srcObject={stream}
+                                                        style={{ filter: filter.value }}
+                                                        autoPlay
+                                                        muted
+                                                        playsInline
+                                                    />
+                                                )}
+                                                <span>{filter.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {/* --- END Filter Panel --- */}
 
 
                                 {/* --- REMOVED: CAMERA SWAP BUTTON --- */}
@@ -1569,7 +1672,7 @@ function Call() {
                                 {/* --- NEW: Quality Settings Button --- */}
                                 <button
                                     className={`btn rounded-circle ${isQualityMenuOpen ? 'btn-primary' : 'btn-secondary'}`}
-                                    onClick={(e) => { e.stopPropagation(); setIsQualityMenuOpen(!isQualityMenuOpen); }} 
+                                    onClick={(e) => { e.stopPropagation(); setIsQualityMenuOpen(!isQualityMenuOpen); setIsFilterModalOpen(false); }} 
                                     title="Video Quality"
                                 >
                                     <i className="bi bi-gear-fill"></i>
@@ -1582,6 +1685,15 @@ function Call() {
                                     title={videoFit === 'cover' ? "Fit video to screen" : "Fill screen with video"}
                                 >
                                     <i className={`bi ${videoFit === 'contain' ? 'bi-fullscreen-exit' : 'bi-aspect-ratio'}`}></i>
+                                </button>
+                                
+                                {/* --- NEW: Filter Button --- */}
+                                <button
+                                    className={`btn rounded-circle ${isFilterModalOpen ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={(e) => { e.stopPropagation(); setIsFilterModalOpen(!isFilterModalOpen); setIsQualityMenuOpen(false); }}
+                                    title="Video Filters"
+                                >
+                                    <i className="bi bi-magic"></i>
                                 </button>
                                 
                                 {/* --- NEW: Add People Button --- */}
