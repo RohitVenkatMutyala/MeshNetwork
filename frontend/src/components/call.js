@@ -57,11 +57,11 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
     const handleDragStart = (e) => {
         if (unlocked) return;
         setIsDragging(true);
-        sliderRef.current.style.transition = 'none'; // Disable transition while dragging
+        if (sliderRef.current) sliderRef.current.style.transition = 'none'; // Disable transition while dragging
     };
 
     const handleDragMove = (e) => {
-        if (!isDragging || unlocked) return;
+        if (!isDragging || unlocked || !containerRef.current || !sliderRef.current) return;
 
         const containerRect = containerRef.current.getBoundingClientRect();
         const sliderRect = sliderRef.current.getBoundingClientRect();
@@ -82,7 +82,7 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
             setUnlocked(true);
             setIsDragging(false);
             setSliderLeft(maxLeft); // Snap to end
-            sliderRef.current.style.transition = 'left 0.3s ease-out';
+            if (sliderRef.current) sliderRef.current.style.transition = 'left 0.3s ease-out';
             onAction();
         }
     };
@@ -92,7 +92,7 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
             // Snap back to start
             setIsDragging(false);
             setSliderLeft(0);
-            sliderRef.current.style.transition = 'left 0.3s ease-out';
+            if (sliderRef.current) sliderRef.current.style.transition = 'left 0.3s ease-out';
         }
     };
 
@@ -350,14 +350,14 @@ function Call() {
 
     // --- Handler Functions ---
 
-    // --- MODIFIED: getQualityStream now uses QUALITY_PROFILES and has fallbacks ---
-    const getQualityStream = async (facingMode, quality, audioOnly = false) => {
+    // --- MODIFIED: getQualityStream logic simplified ---
+    const getQualityStream = async (facingMode, quality, requestVideo) => {
         const qualityLevels = ['high', 'medium', 'low'];
         // Start trying from the requested quality level down
         const levelsToTry = qualityLevels.slice(qualityLevels.indexOf(quality));
 
         let constraintsToTry = [];
-        if (!audioOnly) {
+        if (requestVideo) { // If user *wants* video
             constraintsToTry = levelsToTry.map(level => ({
                 audio: true,
                 ...QUALITY_PROFILES[level],
@@ -367,14 +367,15 @@ function Call() {
                 }
             }));
         }
-        // Add audio-only as the last resort
+        
+        // Add audio-only as the last resort, or if video is disabled
         constraintsToTry.push({ audio: true, video: false });
         
         for (const constraints of constraintsToTry) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 console.log(`Acquired stream with constraints:`, constraints);
-                return stream;
+                return stream; // Return the first one that works
             } catch (err) {
                 console.warn(`Failed to get stream with constraints:`, constraints, err.name);
             }
@@ -386,8 +387,8 @@ function Call() {
     // --- MODIFIED: Uses new getQualityStream with state ---
     const handleAcceptCall = async () => {
         try {
-            // Use the quality from state
-            const userStream = await getQualityStream('user', videoQuality);
+            // Use the quality from state, request video by default
+            const userStream = await getQualityStream('user', videoQuality, true);
             setFacingMode('user');
             
             // Check for multiple cameras non-blockingly
@@ -403,7 +404,7 @@ function Call() {
             });
 
             setStream(userStream); 
-            setIsVideoOn(true);
+            setIsVideoOn(true); // Video is on by default
             setCallState('active'); 
         } catch (err) {
             toast.error("Could not access camera/microphone.");
@@ -431,7 +432,7 @@ function Call() {
         setIsVideoOn(newVideoState);
     };
 
-    // --- NEW: Function to change video quality during the call ---
+    // --- MODIFIED: Function to change video quality during the call ---
     const handleChangeVideoQuality = async (newQuality) => {
         if (!stream || videoQuality === newQuality) return;
 
@@ -441,15 +442,14 @@ function Call() {
 
         try {
             // Get a new stream (video only) at the new quality
-            const newTrackStream = await getQualityStream(facingMode, newQuality, !isVideoOn);
+            // --- FIX: Always request video, even if isVideoOn is false ---
+            const newTrackStream = await getQualityStream(facingMode, newQuality, true);
             
             if (!newTrackStream.getVideoTracks().length) {
-                if (isVideoOn) {
-                    // We wanted video but couldn't get it
-                    toast.error(`Could not get ${newQuality} video. Turning camera off.`);
-                    setIsVideoOn(false); // Turn off video
-                }
-                // If video is already off, we just got an audio track, which we don't need to swap
+                // We wanted video but couldn't get it
+                toast.error(`Could not get ${newQuality} video. Turning camera off.`);
+                setIsVideoOn(false); // Turn off video
+                if (oldVideoTrack) oldVideoTrack.stop(); // Stop the old track
                 return;
             }
 
@@ -461,7 +461,7 @@ function Call() {
             }
             
             // Stop the old track to release the camera
-            oldVideoTrack.stop();
+            if (oldVideoTrack) oldVideoTrack.stop();
             
             // Update the local stream object in-place
             stream.removeTrack(oldVideoTrack);
@@ -486,14 +486,15 @@ function Call() {
 
     // --- MODIFIED: Camera Swap logic fixed and uses quality state ---
     const handleSwapCamera = async () => {
-        if (!stream || !stream.getVideoTracks().length || !hasMultipleCameras) return;
+        if (!stream || !hasMultipleCameras) return;
 
-        const oldVideoTrack = stream.getVideoTracks()[0];
+        const oldVideoTrack = stream.getVideoTracks()[0]; // Might be undefined, that's OK
         const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
 
         try {
             // Get new stream using the *current* quality setting
-            const newTrackStream = await getQualityStream(newFacingMode, videoQuality, !isVideoOn);
+            // --- FIX: Always request video, even if isVideoOn is false ---
+            const newTrackStream = await getQualityStream(newFacingMode, videoQuality, true);
             
             if (!newTrackStream.getVideoTracks().length) {
                 toast.error("Could not get video from other camera.");
@@ -503,15 +504,17 @@ function Call() {
             const newVideoTrack = newTrackStream.getVideoTracks()[0];
             
             // Replace track for all peers
-            for (const peerId in peersRef.current) {
-                peersRef.current[peerId].replaceTrack(oldVideoTrack, newVideoTrack, stream);
+            if (oldVideoTrack) {
+                for (const peerId in peersRef.current) {
+                    peersRef.current[peerId].replaceTrack(oldVideoTrack, newVideoTrack, stream);
+                }
             }
             
             // Stop old track
-            oldVideoTrack.stop();
+            if (oldVideoTrack) oldVideoTrack.stop();
 
             // Update local stream in-place
-            stream.removeTrack(oldVideoTrack);
+            if (oldVideoTrack) stream.removeTrack(oldVideoTrack);
             stream.addTrack(newVideoTrack);
             
             // --- THE FIX ---
@@ -857,6 +860,9 @@ function Call() {
                         flex-wrap: wrap;
                         justify-content: center;
                         max-width: 90%;
+                        
+                        /* --- FIX: Added position: relative --- */
+                        position: absolute; 
                     }
                     .call-controls.hidden { 
                         opacity: 0;
@@ -1095,36 +1101,39 @@ function Call() {
                                 onClick={(e) => e.stopPropagation()} 
                             />
                             
-                            {/* --- NEW: Quality Menu --- */}
-                            {isQualityMenuOpen && areControlsVisible && (
-                                <div className="quality-menu" onClick={(e) => e.stopPropagation()}>
-                                    <button 
-                                        className={`quality-menu-button ${videoQuality === 'high' ? 'active' : ''}`}
-                                        onClick={() => handleChangeVideoQuality('high')}
-                                    >
-                                        <span>High (1080p)</span>
-                                        {videoQuality === 'high' && <i className="bi bi-check"></i>}
-                                    </button>
-                                    <button 
-                                        className={`quality-menu-button ${videoQuality === 'medium' ? 'active' : ''}`}
-                                        onClick={() => handleChangeVideoQuality('medium')}
-                                    >
-                                        <span>Medium (720p)</span>
-                                        {videoQuality === 'medium' && <i className="bi bi-check"></i>}
-                                    </button>
-                                    <button 
-                                        className={`quality-menu-button ${videoQuality === 'low' ? 'active' : ''}`}
-                                        onClick={() => handleChangeVideoQuality('low')}
-                                    >
-                                        <span>Low (360p)</span>
-                                        {videoQuality === 'low' && <i className="bi bi-check"></i>}
-                                    </button>
-                                </div>
-                            )}
                             
                             {/* --- Call Controls --- */}
                             <div className={`call-controls ${!areControlsVisible ? 'hidden' : ''}`}>
                                 
+                                {/* --- FIX: Quality Menu moved INSIDE call-controls --- */}
+                                {isQualityMenuOpen && (
+                                    <div className="quality-menu" onClick={(e) => e.stopPropagation()}>
+                                        <button 
+                                            className={`quality-menu-button ${videoQuality === 'high' ? 'active' : ''}`}
+                                            onClick={() => handleChangeVideoQuality('high')}
+                                        >
+                                            <span>High (1080p)</span>
+                                            {videoQuality === 'high' && <i className="bi bi-check"></i>}
+                                        </button>
+                                        <button 
+                                            className={`quality-menu-button ${videoQuality === 'medium' ? 'active' : ''}`}
+                                            onClick={() => handleChangeVideoQuality('medium')}
+                                        >
+                                            <span>Medium (720p)</span>
+                                            {videoQuality === 'medium' && <i className="bi bi-check"></i>}
+                                        </button>
+                                        <button 
+                                            className={`quality-menu-button ${videoQuality === 'low' ? 'active' : ''}`}
+                                            onClick={() => handleChangeVideoQuality('low')}
+                                        >
+                                            <span>Low (360p)</span>
+                                            {videoQuality === 'low' && <i className="bi bi-check"></i>}
+                                        </button>
+                                    </div>
+                                )}
+                                {/* --- END FIX --- */}
+
+
                                 {/* --- CAMERA SWAP BUTTON --- */}
                                 {hasMultipleCameras && (
                                     <button
