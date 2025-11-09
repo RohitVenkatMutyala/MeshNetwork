@@ -1,5 +1,3 @@
-// src/components/CreateCall.js
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -26,7 +24,7 @@ function CreateCall() {
     // This function is no longer called from this component.
     // It is now only called by handleReCall in RecentCalls.js
     const sendInvitationEmails = async (callId, callDescription, invitedEmails) => {
-        // ...
+    // ...
     };
     */
 
@@ -198,9 +196,9 @@ function CreateCall() {
 
      if (!user) {
          return (
-           <div className="container mt-5">
-             <div className="alert alert-danger text-center">You are not logged in.</div>
-           </div>
+            <div className="container mt-5">
+               <div className="alert alert-danger text-center">You are not logged in.</div>
+            </div>
          );
      }
 
@@ -216,29 +214,31 @@ function CreateCall() {
                         overflow: hidden; 
                         background: var(--bs-body-bg);
                     }
+                    
+                    /* --- MODIFIED: Removed gradient --- */
                     .gradient-title { 
-                        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ef4444); 
-                        -webkit-background-clip: text; 
-                        -webkit-text-fill-color: transparent; 
-                        background-clip: text; 
+                        color: var(--bs-body-color); /* Use theme text color */
                         font-weight: 700; 
                         font-size: 2rem; 
                         margin-bottom: 1.5rem; 
                     }
-                    /* This is for the form steps, not the icon button */
+                    
+                    /* --- MODIFIED: Replaced gradient with solid color --- */
                     .create-btn { 
-                        background: linear-gradient(135deg, #f12711, #f5af19); 
-                        border: none; 
+                        background-color: #4A69BD; /* Professional blue */
+                        border: 1px solid #4A69BD;
                         color: white; 
                         font-weight: 600; 
-                        transition: all 0.3s ease; 
-                        box-shadow: 0 4px 15px rgba(241, 39, 17, 0.3);
+                        transition: all 0.2s ease; 
+                        box-shadow: 0 4px 12px rgba(74, 105, 189, 0.25);
                         padding: 0.75rem 1.5rem;
                     }
                     .create-btn:hover { 
-                        transform: translateY(-2px); 
-                        box-shadow: 0 8px 25px rgba(241, 39, 17, 0.4); 
+                        background-color: #3e5aa8; /* Darker blue */
+                        border-color: #3e5aa8;
+                        box-shadow: 0 6px 16px rgba(74, 105, 189, 0.3); 
                         color: white; 
+                        transform: translateY(-1px);
                     }
                 `}</style>
                 <div className="card calls-page-card shadow-lg border-0 position-relative">
