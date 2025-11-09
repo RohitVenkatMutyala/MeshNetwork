@@ -18,6 +18,112 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import Navbar from './navbar';
 
+// --- NEW: Quality Definitions ---
+const QUALITY_PROFILES = {
+    high: {
+        video: {
+            width: { ideal: 1920, max: 1920 },
+            height: { ideal: 1080, max: 1080 },
+            frameRate: { ideal: 30 }
+        }
+    },
+    medium: {
+        video: {
+            width: { ideal: 1280, max: 1280 },
+            height: { ideal: 720, max: 720 },
+            frameRate: { ideal: 30 }
+        }
+    },
+    low: {
+        video: {
+            width: { ideal: 640, max: 640 },
+            height: { ideal: 360, max: 360 },
+            frameRate: { ideal: 15 }
+        }
+    }
+};
+
+// --- NEW: SlideToActionButton Component ---
+// This is a self-contained component for the "slide-to-action" button
+function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType }) {
+    const [isDragging, setIsDragging] = useState(false);
+    const [sliderLeft, setSliderLeft] = useState(0);
+    const [unlocked, setUnlocked] = useState(false);
+    const containerRef = useRef(null);
+    const sliderRef = useRef(null);
+
+    const getClientX = (e) => e.touches ? e.touches[0].clientX : e.clientX;
+
+    const handleDragStart = (e) => {
+        if (unlocked) return;
+        setIsDragging(true);
+        sliderRef.current.style.transition = 'none'; // Disable transition while dragging
+    };
+
+    const handleDragMove = (e) => {
+        if (!isDragging || unlocked) return;
+
+        const containerRect = containerRef.current.getBoundingClientRect();
+        const sliderRect = sliderRef.current.getBoundingClientRect();
+        
+        const startX = containerRect.left;
+        const currentX = getClientX(e);
+        
+        let newLeft = currentX - startX - (sliderRect.width / 2);
+        
+        // Constrain
+        const maxLeft = containerRect.width - sliderRect.width - 2; // -2 for borders
+        newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+        
+        setSliderLeft(newLeft);
+
+        // Check for unlock
+        if (newLeft > maxLeft * 0.9) { // 90% threshold
+            setUnlocked(true);
+            setIsDragging(false);
+            setSliderLeft(maxLeft); // Snap to end
+            sliderRef.current.style.transition = 'left 0.3s ease-out';
+            onAction();
+        }
+    };
+
+    const handleDragEnd = () => {
+        if (isDragging && !unlocked) {
+            // Snap back to start
+            setIsDragging(false);
+            setSliderLeft(0);
+            sliderRef.current.style.transition = 'left 0.3s ease-out';
+        }
+    };
+
+    return (
+        <div 
+            className="slider-container" 
+            ref={containerRef}
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+        >
+            <div 
+                className={`slider-thumb ${colorClass}`}
+                ref={sliderRef}
+                style={{ left: `${sliderLeft}px` }}
+                onMouseDown={handleDragStart}
+                onTouchStart={handleDragStart}
+            >
+                <i className={`bi ${actionType === 'accept' ? 'bi-arrow-right' : 'bi-x-lg'}`}></i>
+            </div>
+            <div className="slider-text-overlay">
+                <i className={`bi ${iconClass} me-2`}></i>
+                {text}
+            </div>
+        </div>
+    );
+}
+
+
 function Call() {
     const { user } = useAuth();
     const { callId } = useParams();
@@ -39,6 +145,9 @@ function Call() {
     const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [areControlsVisible, setAreControlsVisible] = useState(true);
+    // --- NEW: Quality Menu State ---
+    const [isQualityMenuOpen, setIsQualityMenuOpen] = useState(false);
+
 
     // --- Voice/Video Chat State ---
     const [stream, setStream] = useState(null);
@@ -51,6 +160,8 @@ function Call() {
     const remoteVideoRef = useRef(null);
     const localVideoRef = useRef(null); // Ref for PiP video
     const chatMessagesEndRef = useRef(null);
+    // --- NEW: Quality State ---
+    const [videoQuality, setVideoQuality] = useState('high'); // 'low', 'medium', 'high'
     
     // --- Draggable PiP State ---
     const [isPipDragging, setIsPipDragging] = useState(false);
@@ -231,10 +342,6 @@ function Call() {
     // Switched to useLayoutEffect. This runs *before* the browser paints,
     // guaranteeing the localVideoRef.current element is ready.
     useLayoutEffect(() => {
-        // We must wait for THREE things:
-        // 1. The stream to be ready (stream)
-        // 2. The call state to be 'active' (which renders the <video> tag)
-        // 3. The ref to that <video> tag to be populated (localVideoRef.current)
         if (localVideoRef.current && stream && callState === 'active') {
             localVideoRef.current.srcObject = stream;
         }
@@ -243,49 +350,44 @@ function Call() {
 
     // --- Handler Functions ---
 
-    // --- MODIFIED: Higher Quality & Fallbacks ---
-    const getQualityStream = async (facingMode) => {
-        const constraints = [
-            { // 1. Try 1080p
-                video: {
-                    facingMode,
-                    width: { ideal: 1920, max: 1920 },
-                    height: { ideal: 1080, max: 1080 },
-                    frameRate: { ideal: 30 }
-                },
-                audio: true
-            },
-            { // 2. Fallback to 720p
-                video: {
-                    facingMode,
-                    width: { ideal: 1280, max: 1280 },
-                    height: { ideal: 720, max: 720 },
-                    frameRate: { ideal: 30 }
-                },
-                audio: true
-            },
-            { // 3. Fallback to default
-                video: { facingMode },
-                audio: true
-            }
-        ];
+    // --- MODIFIED: getQualityStream now uses QUALITY_PROFILES and has fallbacks ---
+    const getQualityStream = async (facingMode, quality, audioOnly = false) => {
+        const qualityLevels = ['high', 'medium', 'low'];
+        // Start trying from the requested quality level down
+        const levelsToTry = qualityLevels.slice(qualityLevels.indexOf(quality));
 
-        for (const constraint of constraints) {
+        let constraintsToTry = [];
+        if (!audioOnly) {
+            constraintsToTry = levelsToTry.map(level => ({
+                audio: true,
+                ...QUALITY_PROFILES[level],
+                video: {
+                    ...QUALITY_PROFILES[level].video,
+                    facingMode: facingMode
+                }
+            }));
+        }
+        // Add audio-only as the last resort
+        constraintsToTry.push({ audio: true, video: false });
+        
+        for (const constraints of constraintsToTry) {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraint);
-                console.log(`Acquired stream with constraints:`, constraint.video);
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log(`Acquired stream with constraints:`, constraints);
                 return stream;
             } catch (err) {
-                console.warn(`Failed to get stream with constraints:`, constraint.video, err.name);
+                console.warn(`Failed to get stream with constraints:`, constraints, err.name);
             }
         }
+
         throw new Error("Could not access camera/microphone with any constraints.");
     };
 
-    // --- MODIFIED: Uses new getQualityStream ---
+    // --- MODIFIED: Uses new getQualityStream with state ---
     const handleAcceptCall = async () => {
         try {
-            const userStream = await getQualityStream('user');
+            // Use the quality from state
+            const userStream = await getQualityStream('user', videoQuality);
             setFacingMode('user');
             
             // Check for multiple cameras non-blockingly
@@ -296,15 +398,13 @@ function Call() {
                 }
             }).catch(console.error);
 
-            // First, perform the async database operation
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${user._id}`]: false
             });
 
-            // NOW, set all state updates together.
             setStream(userStream); 
             setIsVideoOn(true);
-            setCallState('active'); // This makes the <video> element appear
+            setCallState('active'); 
         } catch (err) {
             toast.error("Could not access camera/microphone.");
             console.error(err);
@@ -319,7 +419,7 @@ function Call() {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
-        setStream(null); // This will trigger the useLayoutEffect to clear the PiP video
+        setStream(null); 
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
         navigate('/new-call');
@@ -331,66 +431,106 @@ function Call() {
         setIsVideoOn(newVideoState);
     };
 
-    // --- NEW: Rewritten handleSwapCamera function ---
-// --- NEW: Rewritten handleSwapCamera function (FIXED) ---
-    const handleSwapCamera = async () => {
-        if (!stream || !stream.getVideoTracks().length || !hasMultipleCameras) return;
+    // --- NEW: Function to change video quality during the call ---
+    const handleChangeVideoQuality = async (newQuality) => {
+        if (!stream || videoQuality === newQuality) return;
 
+        setVideoQuality(newQuality);
+        setIsQualityMenuOpen(false);
         const oldVideoTrack = stream.getVideoTracks()[0];
-        const audioTrack = stream.getAudioTracks()[0];
-        const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
-
-        // --- FIX: Declare here for access in catch block ---
-        let newVideoTrackStream = null; 
 
         try {
-            // 1. Get ONLY the new video stream
-            // We only need the video track, audio track is preserved
-            // --- FIX: Assign to existing variable ---
-            newVideoTrackStream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    facingMode: newFacingMode,
-                    width: { ideal: 1920, max: 1920 },
-                    height: { ideal: 1080, max: 1080 },
-                    frameRate: { ideal: 30 }
+            // Get a new stream (video only) at the new quality
+            const newTrackStream = await getQualityStream(facingMode, newQuality, !isVideoOn);
+            
+            if (!newTrackStream.getVideoTracks().length) {
+                if (isVideoOn) {
+                    // We wanted video but couldn't get it
+                    toast.error(`Could not get ${newQuality} video. Turning camera off.`);
+                    setIsVideoOn(false); // Turn off video
                 }
-            });
-            const newVideoTrack = newVideoTrackStream.getVideoTracks()[0];
+                // If video is already off, we just got an audio track, which we don't need to swap
+                return;
+            }
 
-            // 2. Create a new composite MediaStream
-            // This is crucial for React to detect a state change
-            const newStream = new MediaStream();
-            if (audioTrack) newStream.addTrack(audioTrack);
-            newStream.addTrack(newVideoTrack);
-
-            // 3. Replace the track in all peer connections
-            // We pass the *original* stream object to replaceTrack, as required by simple-peer
+            const newVideoTrack = newTrackStream.getVideoTracks()[0];
+            
+            // Replace the track in all peer connections
             for (const peerId in peersRef.current) {
                 peersRef.current[peerId].replaceTrack(oldVideoTrack, newVideoTrack, stream);
             }
             
-            // 4. Stop the old track to release the camera
+            // Stop the old track to release the camera
+            oldVideoTrack.stop();
+            
+            // Update the local stream object in-place
+            stream.removeTrack(oldVideoTrack);
+            stream.addTrack(newVideoTrack);
+
+            // Force the <video> element to refresh
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = null;
+                localVideoRef.current.srcObject = stream;
+            }
+            
+            // Ensure video enabled-state is consistent
+            newVideoTrack.enabled = isVideoOn; 
+            toast.success(`Video quality set to ${newQuality}`);
+
+        } catch (err) {
+            toast.error(`Failed to switch to ${newQuality} quality.`);
+            console.error("Error changing quality: ", err);
+        }
+    };
+
+
+    // --- MODIFIED: Camera Swap logic fixed and uses quality state ---
+    const handleSwapCamera = async () => {
+        if (!stream || !stream.getVideoTracks().length || !hasMultipleCameras) return;
+
+        const oldVideoTrack = stream.getVideoTracks()[0];
+        const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+
+        try {
+            // Get new stream using the *current* quality setting
+            const newTrackStream = await getQualityStream(newFacingMode, videoQuality, !isVideoOn);
+            
+            if (!newTrackStream.getVideoTracks().length) {
+                toast.error("Could not get video from other camera.");
+                return;
+            }
+            
+            const newVideoTrack = newTrackStream.getVideoTracks()[0];
+            
+            // Replace track for all peers
+            for (const peerId in peersRef.current) {
+                peersRef.current[peerId].replaceTrack(oldVideoTrack, newVideoTrack, stream);
+            }
+            
+            // Stop old track
             oldVideoTrack.stop();
 
-            // 5. Update state with the *new* stream object
-            setStream(newStream);
-            setFacingMode(newFacingMode);
+            // Update local stream in-place
+            stream.removeTrack(oldVideoTrack);
+            stream.addTrack(newVideoTrack);
             
-            // 6. Ensure video enabled-state is consistent
+            // --- THE FIX ---
+            // Force the <video> element to refresh by resetting srcObject
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = null; // Unset it
+                localVideoRef.current.srcObject = stream; // Re-set it
+            }
+            // --- END FIX ---
+
+            setFacingMode(newFacingMode);
             newVideoTrack.enabled = isVideoOn; 
 
         } catch (err) {
             toast.error("Could not swap camera.");
             console.error("Error swapping camera: ", err);
-            
-            // --- FIX: Now safely accessible ---
-            // Stop the new track if it exists and we failed
-            const newTrack = newVideoTrackStream?.getVideoTracks()[0];
-            if (newTrack) newTrack.stop();
         }
     };
-    // --- End New Function ---
-    // --- End New Function ---
+    // --- End Modified Function ---
 
 
     const handleToggleMute = async (targetUserId) => {
@@ -464,7 +604,6 @@ function Call() {
 
     if (callState === 'loading') {
         return (
-            // --- MODIFIED: Use 100dvh ---
             <div className="d-flex justify-content-center align-items-center" style={{ height: '100dvh', backgroundColor: '#12121c' }}>
                 <div className="text-center">
                     <div className="spinner-border text-primary mb-3" style={{ width: '3rem', height: '3rem' }} role="status">
@@ -491,7 +630,7 @@ function Call() {
         return (
             <>
                 <Navbar />
-                {/* --- MODIFIED: Added slider-text styles and keyframes --- */}
+                {/* --- MODIFIED: Added CSS for new SlideToActionButton --- */}
                 <style jsx>{`
                     .joining-screen {
                         background-color: #2b2b2b;
@@ -499,6 +638,7 @@ function Call() {
                     }
                     .caller-info {
                         text-align: center;
+                        padding: 0 1rem; /* Added padding */
                     }
                     .caller-name {
                         font-size: 2.5rem;
@@ -509,93 +649,86 @@ function Call() {
                         font-size: 1.5rem;
                         color: #aaa;
                     }
-                    .call-actions {
-                        display: flex;
-                        justify-content: space-around;
-                        width: 100%;
-                        max-width: 300px;
-                        margin-top: 5rem;
-                    }
-                    .action-button {
+                    .call-actions-container {
                         display: flex;
                         flex-direction: column;
-                        align-items: center;
-                        text-decoration: none;
-                        color: white;
-                        font-weight: 500;
+                        gap: 1.5rem; /* Space between sliders */
+                        width: 100%;
+                        max-width: 350px; /* Wider for slider */
+                        margin-top: 5rem;
+                        padding: 0 1rem; /* Added padding */
                     }
-                    .button-circle {
-                        width: 70px;
-                        height: 70px;
-                        border-radius: 50%;
+
+                    /* --- NEW: Slider Button CSS --- */
+                    .slider-container {
+                        position: relative;
+                        width: 100%;
+                        height: 60px;
+                        background-color: rgba(255, 255, 255, 0.15);
+                        border-radius: 30px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        font-size: 1.8rem;
-                        margin-bottom: 0.5rem;
-                        position: relative;
-                        background-color: rgba(255, 255, 255, 0.1);
-                        border: none; /* Ensure it's a button */
-                    }
-                    .button-circle.accept {
-                        background-color: #28a745;
-                    }
-                    .button-circle.decline {
-                        background-color: #dc3545;
-                    }
-                    
-                    /* Ripple Animation */
-                    .button-circle::before, .button-circle::after {
-                        content: '';
-                        position: absolute;
-                        border-radius: 50%;
-                        z-index: -1;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100%;
-                        animation: ripple 2s infinite ease-out;
-                    }
-                    .button-circle.accept::before, .button-circle.accept::after {
-                        background-color: #28a745;
-                    }
-                    .button-circle.decline::before, .button-circle.decline::after {
-                        background-color: #dc3545;
-                    }
-                    .button-circle::after {
-                        animation-delay: 0.5s;
-                    }
-
-                    @keyframes ripple {
-                        0% {
-                            transform: scale(1);
-                            opacity: 0.6;
-                        }
-                        100% {
-                            transform: scale(1.7);
-                            opacity: 0;
-                        }
-                    }
-
-                    /* --- NEW: Slider Text Animation --- */
-                    .slider-text {
-                        font-weight: 500;
-                        position: relative;
                         overflow: hidden;
-                        display: inline-block;
+                        user-select: none;
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                    }
+                    .slider-text-overlay {
+                        position: absolute;
+                        left: 0;
+                        right: 0;
+                        top: 0;
+                        bottom: 0;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 1.1rem;
+                        font-weight: 500;
+                        color: white;
+                        pointer-events: none; /* Allows click-through */
+                        z-index: 1;
+                        
+                        /* Shine animation */
                         -webkit-mask-image: linear-gradient(-75deg, rgba(0,0,0,.6) 30%, #000 50%, rgba(0,0,0,.6) 70%);
                         -webkit-mask-size: 200%;
                         animation: slide-shine 2s infinite;
                     }
+                    .slider-thumb {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        bottom: 0;
+                        width: 60px; /* Square shape */
+                        height: 100%;
+                        border-radius: 30px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 1.8rem;
+                        color: white;
+                        cursor: grab;
+                        z-index: 2;
+                        border: 2px solid transparent;
+                    }
+                    .slider-thumb:active {
+                        cursor: grabbing;
+                    }
+                    .slider-thumb.accept-color {
+                        background-color: #28a745;
+                        border-color: #58c775;
+                    }
+                    .slider-thumb.decline-color {
+                        background-color: #dc3545;
+                        border-color: #e76573;
+                    }
+                    /* --- End Slider CSS --- */
+
 
                     @keyframes slide-shine {
                         0% { -webkit-mask-position: 150%; }
                         100% { -webkit-mask-position: -50%; }
                     }
-                    /* --- End New CSS --- */
-
                 `}</style>
-                {/* --- MODIFIED: Use 100dvh --- */}
                 <div className="d-flex flex-column justify-content-around align-items-center joining-screen" style={{ minHeight: '100dvh' }}>
                     
                     <div className="caller-info">
@@ -603,29 +736,22 @@ function Call() {
                         <h3 className="caller-id">{callData?.description || 'Incoming Call...'}</h3>
                     </div>
 
-                    <div className="call-actions">
-                        <div className="action-button">
-                            <button 
-                                className="button-circle decline"
-                                onClick={handleDeclineCall}
-                                aria-label="Decline"
-                            >
-                                <i className="bi bi-telephone-fill" style={{ transform: 'rotate(135deg)' }}></i>
-                            </button>
-                            {/* --- MODIFIED: Added .slider-text --- */}
-                            <span className="slider-text">Decline</span>
-                        </div>
-                        <div className="action-button">
-                            <button 
-                                className="button-circle accept"
-                                onClick={handleAcceptCall}
-                                aria-label="Accept"
-                            >
-                                <i className="bi bi-telephone-fill"></i>
-                            </button>
-                            {/* --- MODIFIED: Added .slider-text --- */}
-                            <span className="slider-text">Accept</span>
-                        </div>
+                    {/* --- MODIFIED: Replaced buttons with sliders --- */}
+                    <div className="call-actions-container">
+                        <SlideToActionButton
+                            onAction={handleAcceptCall}
+                            text="Slide to Accept"
+                            iconClass="bi-telephone-fill"
+                            colorClass="accept-color"
+                            actionType="accept"
+                        />
+                        <SlideToActionButton
+                            onAction={handleDeclineCall}
+                            text="Slide to Decline"
+                            iconClass="bi-telephone-x-fill"
+                            colorClass="decline-color"
+                            actionType="decline"
+                        />
                     </div>
                 </div>
             </>
@@ -636,9 +762,10 @@ function Call() {
     // RENDER: Active Call UI
     return (
         <>
-            <Navbar />
+        <Navbar />
+            
             <div className="chat-page-container">
-                {/* --- MODIFIED: Use 100dvh and fix mobile buttons --- */}
+                {/* --- MODIFIED: Added .quality-menu CSS --- */}
                 <style jsx>{`
                     /* --- 1. General Page & Layout Styles --- */
                     :root {
@@ -652,7 +779,6 @@ function Call() {
                     .chat-page-container {
                         background-color: var(--dark-bg-primary);
                         color: var(--text-primary);
-                        /* --- MODIFIED: Use 100dvh --- */
                         min-height: calc(100dvh - 56px); /* 56px is navbar height */
                         padding: 0;
                     }
@@ -678,7 +804,6 @@ function Call() {
                     .video-panel-container {
                         position: relative;
                         width: 100%;
-                        /* --- MODIFIED: Use 100dvh --- */
                         height: calc(100dvh - 56px); /* Full height minus navbar */
                         background-color: #000;
                         overflow: hidden;
@@ -729,10 +854,8 @@ function Call() {
                         gap: 0.75rem; 
                         z-index: 20;
                         transition: opacity 0.3s ease; 
-                        /* --- NEW: Fix for button merging --- */
                         flex-wrap: wrap;
                         justify-content: center;
-                        /* --- NEW: Add max-width to prevent full-width takeover --- */
                         max-width: 90%;
                     }
                     .call-controls.hidden { 
@@ -748,6 +871,48 @@ function Call() {
                         justify-content: center;
                         margin: 0; 
                     }
+
+                    /* --- NEW: Quality Menu CSS --- */
+                    .quality-menu {
+                        position: absolute;
+                        bottom: calc(100% + 1rem); /* 1rem above the controls */
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background-color: rgba(30, 30, 47, 0.95); /* var(--dark-bg-secondary) with opacity */
+                        border-radius: 12px;
+                        padding: 0.5rem;
+                        z-index: 21;
+                        border: 1px solid var(--border-color);
+                        backdrop-filter: blur(5px);
+                        display: flex;
+                        flex-direction: column;
+                        gap: 0.25rem;
+                        width: 150px;
+                    }
+                    .quality-menu-button {
+                        background-color: transparent;
+                        border: none;
+                        color: var(--text-primary);
+                        padding: 0.5rem 0.75rem;
+                        border-radius: 8px;
+                        text-align: left;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        font-size: 0.9rem;
+                    }
+                    .quality-menu-button:hover {
+                        background-color: var(--accent-blue);
+                    }
+                    .quality-menu-button.active {
+                        background-color: var(--accent-blue);
+                        font-weight: bold;
+                    }
+                    .quality-menu-button i {
+                        font-size: 0.75rem;
+                    }
+                    /* --- End Quality Menu CSS --- */
+
                     
                     /* --- 4. MOBILE OVERLAY PANELS (WhatsApp-like) --- */
                     .mobile-panel {
@@ -755,7 +920,6 @@ function Call() {
                         top: 0;
                         left: 0;
                         width: 100%;
-                        /* --- MODIFIED: Use 100dvh --- */
                         height: 100dvh;
                         background-color: var(--dark-bg-primary);
                         z-index: 100;
@@ -818,7 +982,6 @@ function Call() {
                         .call-controls {
                             padding: 0.5rem 1rem;
                             gap: 1rem;
-                            /* --- MODIFIED: Stop wrapping on desktop --- */
                             flex-wrap: nowrap;
                         }
                     }
@@ -901,7 +1064,10 @@ function Call() {
                     <div className="col-12 col-lg-8 d-flex flex-column">
                         <div 
                             className="video-panel-container shadow-sm"
-                            onClick={() => setAreControlsVisible(!areControlsVisible)} 
+                            onClick={() => {
+                                setAreControlsVisible(!areControlsVisible);
+                                setIsQualityMenuOpen(false); // Close menu when clicking bg
+                            }} 
                             onMouseMove={handlePipMouseMove} 
                             onMouseUp={handlePipMouseUp} 
                             onMouseLeave={handlePipMouseUp} 
@@ -929,6 +1095,33 @@ function Call() {
                                 onClick={(e) => e.stopPropagation()} 
                             />
                             
+                            {/* --- NEW: Quality Menu --- */}
+                            {isQualityMenuOpen && areControlsVisible && (
+                                <div className="quality-menu" onClick={(e) => e.stopPropagation()}>
+                                    <button 
+                                        className={`quality-menu-button ${videoQuality === 'high' ? 'active' : ''}`}
+                                        onClick={() => handleChangeVideoQuality('high')}
+                                    >
+                                        <span>High (1080p)</span>
+                                        {videoQuality === 'high' && <i className="bi bi-check"></i>}
+                                    </button>
+                                    <button 
+                                        className={`quality-menu-button ${videoQuality === 'medium' ? 'active' : ''}`}
+                                        onClick={() => handleChangeVideoQuality('medium')}
+                                    >
+                                        <span>Medium (720p)</span>
+                                        {videoQuality === 'medium' && <i className="bi bi-check"></i>}
+                                    </button>
+                                    <button 
+                                        className={`quality-menu-button ${videoQuality === 'low' ? 'active' : ''}`}
+                                        onClick={() => handleChangeVideoQuality('low')}
+                                    >
+                                        <span>Low (360p)</span>
+                                        {videoQuality === 'low' && <i className="bi bi-check"></i>}
+                                    </button>
+                                </div>
+                            )}
+                            
                             {/* --- Call Controls --- */}
                             <div className={`call-controls ${!areControlsVisible ? 'hidden' : ''}`}>
                                 
@@ -942,7 +1135,6 @@ function Call() {
                                         <i className="bi bi-arrow-repeat"></i>
                                     </button>
                                 )}
-                                {/* --- END NEW BUTTON --- */}
 
                                 <button
                                     className={`btn rounded-circle ${isVideoOn ? 'btn-secondary' : 'btn-danger'}`} 
@@ -960,6 +1152,15 @@ function Call() {
                                     <i className={`bi ${muteStatus[user._id] ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
                                 </button>
                                 
+                                {/* --- NEW: Quality Settings Button --- */}
+                                <button
+                                    className={`btn rounded-circle ${isQualityMenuOpen ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={(e) => { e.stopPropagation(); setIsQualityMenuOpen(!isQualityMenuOpen); }} 
+                                    title="Video Quality"
+                                >
+                                    <i className="bi bi-gear-fill"></i>
+                                </button>
+
                                 {/* Chat (MOBILE ONLY) */}
                                 <button
                                     className="btn btn-primary rounded-circle d-lg-none" 
@@ -1003,7 +1204,6 @@ function Call() {
                     <div 
                         className="col-lg-4 d-none d-lg-flex flex-column" 
                         style={{
-                            /* --- MODIFIED: Use 100dvh --- */
                             height: 'calc(100dvh - 56px)', 
                             gap: '1.5rem', 
                             padding: '1.5rem',
