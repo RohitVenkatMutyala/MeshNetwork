@@ -247,12 +247,13 @@ function RecentCalls({ searchTerm }) {
 
     return (
         <>
-            {/* --- NEW: Global styles for parent search bar --- */}
+            {/* --- MODIFIED: Global styles for parent search bar --- */}
             <style jsx global>{`
                 /* Target the search input in the parent */
                 .form-control[placeholder="Search recent calls..."] {
                     height: 48px;
-                    border-radius: 12px !important; /* Use !important to override bootstrap */
+                    /* --- FIX: Correct border radius --- */
+                    border-radius: 0 12px 12px 0 !important; 
                     padding-left: 2.5rem !important;
                     font-size: 0.95rem;
                 }
@@ -262,7 +263,7 @@ function RecentCalls({ searchTerm }) {
                     height: 48px;
                 }
                 /* Target the add button */
-                .btn-primary.btn-sm { /* --- MODIFIED: Target .btn-sm --- */
+                .btn-primary.btn-sm { 
                     background-color: #4A69BD; /* Professional blue */
                     border-color: #4A69BD;
                     border-radius: 12px !important;
@@ -278,24 +279,26 @@ function RecentCalls({ searchTerm }) {
             
             {/* --- MODIFIED: Component-specific styles --- */}
             <style jsx>{`
-                /* --- REMOVED .recent-calls-container --- */
-            
                 .recent-calls-list {
                     max-height: 60vh;
                     overflow-y: auto;
-                    /* --- MODIFIED: Add radius to match parent card --- */
-                    border-radius: 0 0 0.5rem 0.5rem; 
-                    overflow: hidden;
+                    /* --- MODIFIED: Add padding --- */
+                    padding: 0 1.25rem 1.25rem 1.25rem;
                 }
                 .call-item {
                     display: flex;
                     align-items: center;
                     padding: 1rem 1.25rem;
-                    border-bottom: 1px solid var(--bs-border-color);
+                    /* --- MODIFIED: Border instead of border-bottom --- */
+                    border: 1px solid var(--bs-border-color); 
                     transition: background-color 0.2s ease;
+                    border-radius: 12px; /* --- NEW --- */
+                    margin-bottom: 0.5rem; /* --- NEW --- */
                 }
                 .call-item:last-child {
-                    border-bottom: none;
+                     /* --- MODIFIED --- */
+                    border-bottom: 1px solid var(--bs-border-color);
+                    margin-bottom: 0;
                 }
                 .call-item:hover {
                     background-color: var(--bs-tertiary-bg);
@@ -409,15 +412,17 @@ function RecentCalls({ searchTerm }) {
                     color: var(--bs-secondary-color);
                 }
                 
-                /* --- MODIFIED: "Today's Calls" UI (now a header) --- */
+                /* --- MODIFIED: "Today's Calls" UI (now a badge) --- */
                 .call-count-display {
-                    padding: 0.75rem 1.25rem;
+                    padding: 0.6rem 1rem;
                     background-color: var(--bs-tertiary-bg);
-                    border-bottom: 1px solid var(--bs-border-color);
-                    text-align: center;
+                    border-radius: 10px;
                     font-size: 0.9rem;
                     color: var(--bs-secondary-color);
-                    /* This will be the top of the card now */
+                    font-weight: 500;
+                    /* --- FIX: Use margin to create the inset badge look --- */
+                    margin: 0.5rem 1.25rem 1rem 1.25rem; 
+                    text-align: left;
                 }
                 .call-count-display strong {
                     color: var(--bs-body-color);
@@ -441,6 +446,13 @@ function RecentCalls({ searchTerm }) {
                     }
                     .call-item {
                         padding: 1rem 0.75rem;
+                    }
+                    /* --- MODIFIED: Adjust badge margin on mobile --- */
+                    .call-count-display {
+                        margin: 0.5rem 0.75rem 1rem 0.75rem;
+                    }
+                    .recent-calls-list {
+                        padding: 0 0.75rem 0.75rem 0.75rem;
                     }
                 }
             `}</style>
