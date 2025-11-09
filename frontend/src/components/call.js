@@ -60,7 +60,7 @@ const VIDEO_FILTERS = [
 
 // --- NEW: RemoteVideo Component ---
 // This component handles rendering the remote streams in the grid
-const RemoteVideo = ({ peer, name, videoFit, videoFilter }) => {
+const RemoteVideo = ({ peer, name, videoFit }) => {
     const videoRef = useRef(null);
     const [isMuted, setIsMuted] = useState(false);
 
@@ -94,8 +94,7 @@ const RemoteVideo = ({ peer, name, videoFit, videoFilter }) => {
                 autoPlay
                 playsInline
                 className="remote-video-element"
-                // --- MODIFIED: Apply filter prop ---
-                style={{ objectFit: videoFit, filter: videoFilter }}
+                style={{ objectFit: videoFit }}
             />
             <div className="video-label">
                 {isMuted && <i className="bi bi-mic-mute-fill me-2 text-danger"></i>}
@@ -262,21 +261,13 @@ function Call() {
 
         const updatePresence = () => {
             // Only update presence if user is in `activeParticipants`
-            // --- FIX: Check participants list before updating ---
-            const amIActive = (participantsRef.current || []).find(p => p.id === user._id);
-            if (amIActive) {
+            if (participants.find(p => p.id === user._id)) {
                 updateDoc(callDocRef, {
                     [`activeParticipants.${user._id}.lastSeen`]: serverTimestamp()
                 }).catch(console.error);
             }
         };
         heartbeatIntervalRef.current = setInterval(updatePresence, 30000);
-        
-        // --- NEW: Ref to hold participants for use in interval ---
-        const participantsRef = React.useRef(participants);
-        useEffect(() => {
-            participantsRef.current = participants;
-        }, [participants]);
 
         const unsubscribeCall = onSnapshot(callDocRef, (docSnap) => {
             if (!docSnap.exists()) {
@@ -303,7 +294,7 @@ function Call() {
                     id: userId,
                     name: userData.name,
                 }));
-            setParticipants(currentParticipants); // <--- THIS IS THE "SOURCE OF TRUTH"
+            setParticipants(currentParticipants);
 
             const waitingMap = data.waitingRoom || {};
             const currentWaiting = Object.entries(waitingMap)
@@ -361,7 +352,7 @@ function Call() {
     }, [callId, user, navigate]); // --- MODIFIED ---
 
     
-    // --- MODIFIED: Stable participant ID string ---
+    // --- NEW: Stable participant ID string ---
     const participantIDs = JSON.stringify(participants.map(p => p.id).sort());
 
     // --- MODIFIED: Back to stable MESH WebRTC Logic ---
@@ -398,12 +389,12 @@ function Call() {
             peer.on('close', () => { 
                 console.log(`Connection closed with ${recipientId}`);
                 removeStream(recipientId);
-                delete peersRef.current[recipientId];
+                delete peersRef.current[recipientId]; // --- FIX ---
             });
             peer.on('error', (err) => {
                 console.error(`Peer error (to ${recipientId}):`, err);
                 removeStream(recipientId);
-                delete peersRef.current[recipientId];
+                delete peersRef.current[recipientId]; // --- FIX ---
             });
 
             peersRef.current[recipientId] = peer;
@@ -424,12 +415,12 @@ function Call() {
             peer.on('close', () => { 
                 console.log(`Connection closed with ${incoming.senderId}`);
                 removeStream(incoming.senderId);
-                delete peersRef.current[incoming.senderId];
+                delete peersRef.current[incoming.senderId]; // --- FIX ---
             });
             peer.on('error', (err) => {
                 console.error(`Peer error (from ${incoming.senderId}):`, err);
                 removeStream(incoming.senderId);
-                delete peersRef.current[incoming.senderId];
+                delete peersRef.current[incoming.senderId]; // --- FIX ---
             });
 
             peer.signal(incoming.signal); // Accept the incoming offer
@@ -462,33 +453,16 @@ function Call() {
             snapshot.docChanges().forEach(change => {
                 const data = change.doc.data();
                 if (change.type === "added" && data.recipientId === user._id) {
-                    const existingPeer = peersRef.current[data.senderId];
-
-                    // --- BUG FIX: Handle new offers from refreshing users ---
-                    if (data.signal.type === 'offer') {
-                        // This is a new offer, likely from a refresh.
-                        // Destroy any old peer and create a new one.
-                        if (existingPeer) {
-                            console.log(`Destroying stale peer for ${data.senderId} to accept new offer.`);
-                            existingPeer.destroy();
-                        }
-                        
-                        // Only add peer if they are in the official participants list
-                        if (participants.find(p => p.id === data.senderId)) {
-                            console.log(`Accepting new offer from ${data.senderId}`);
-                            addPeer(data, user._id, stream);
-                        }
-                        
-                    } else if (existingPeer && data.signal.type === 'answer') {
+                    const peer = peersRef.current[data.senderId];
+                    if (peer) {
                         // This is an "answer" from a peer we already initiated
                         console.log(`Got signal answer from ${data.senderId}`);
-                        existingPeer.signal(data.signal);
-                    } else if (existingPeer) {
-                        // This is another signal (like ICE candidate) for an existing peer
-                        existingPeer.signal(data.signal);
+                        peer.signal(data.signal);
+                    } else {
+                        // This is a *new* "offer" from a peer we haven't seen yet (e.g., they refreshed)
+                        console.log(`Got new offer from ${data.senderId}`);
+                        addPeer(data, user._id, stream);
                     }
-                    // --- END BUG FIX ---
-                    
                     deleteDoc(change.doc.ref); // Signal consumed, delete it
                 }
             });
@@ -497,8 +471,7 @@ function Call() {
         return () => {
              unsubscribeSignaling();
         };
-    // --- MODIFIED: Use stable participantIDs ---
-    }, [stream, callState, user, callId, participantIDs]); 
+    }, [stream, callState, user, callId, participantIDs]); // --- MODIFIED: Use stable participantIDs
     
     // Mute Status UseEffect
     useEffect(() => {
@@ -1544,7 +1517,6 @@ function Call() {
                                         peer={data}
                                         name={participants.find(u => u.id === data.id)?.name} 
                                         videoFit={videoFit}
-                                        videoFilter={videoFilter} // --- NEW: Apply filter ---
                                     />
                                 ))}
                             </div>
@@ -1570,7 +1542,7 @@ function Call() {
                                     style={{ 
                                         transform: 'scaleX(-1)', // --- MODIFIED: Hardcoded mirror ---
                                         opacity: isVideoOn ? 1 : 0, // Hide video element
-                                        filter: 'none' // --- MODIFIED: Local video has no filter ---
+                                        filter: videoFilter // --- NEW: Apply filter ---
                                     }}
                                     autoPlay
                                     playsInline
