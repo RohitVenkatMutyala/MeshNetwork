@@ -232,6 +232,10 @@ function Call() {
     const [participants, setParticipants] = useState([]); // Users *in* the call
     const [waitingUsers, setWaitingUsers] = useState([]); // Users *waiting* to join
     const [remoteStreams, setRemoteStreams] = useState([]); // Remote streams
+
+    // --- NEW: Screen Share State ---
+    const [isScreenSharing, setIsScreenSharing] = useState(false);
+    const cameraVideoTrackRef = useRef(null); // To store camera track
     
     // --- RE-ADDED: Draggable PiP State ---
     const [isPipDragging, setIsPipDragging] = useState(false);
@@ -547,6 +551,10 @@ function Call() {
             const getMediaOnRefresh = async () => {
                 try {
                     const userStream = await getQualityStream(videoQuality, true);
+                    // --- NEW: Store camera track on refresh ---
+                    if (userStream.getVideoTracks().length > 0) {
+                        cameraVideoTrackRef.current = userStream.getVideoTracks()[0];
+                    }
                     setStream(userStream); 
                     setIsVideoOn(true);
                     // No need to setCallState('active'), it already is
@@ -603,6 +611,11 @@ function Call() {
             // Use the quality from state, request video by default
             const userStream = await getQualityStream(videoQuality, true);
             
+            // --- NEW: Store the initial camera track ---
+            if (userStream.getVideoTracks().length > 0) {
+                cameraVideoTrackRef.current = userStream.getVideoTracks()[0];
+            }
+
             // Add user to active participants
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${user._id}`]: false,
@@ -671,6 +684,83 @@ function Call() {
         setIsVideoOn(newVideoState);
     };
 
+    // --- NEW: Screen Share Toggle ---
+    const handleToggleScreenShare = async () => {
+        if (!stream) return;
+
+        if (isScreenSharing) {
+            // --- STOP SCREEN SHARE ---
+            if (!cameraVideoTrackRef.current) {
+                toast.error("Could not find camera to switch back.");
+                return;
+            }
+
+            const oldScreenTrack = stream.getVideoTracks()[0];
+            const newCameraTrack = cameraVideoTrackRef.current;
+            
+            // Replace track in all peers
+            for (const peerId in peersRef.current) {
+                peersRef.current[peerId].replaceTrack(oldScreenTrack, newCameraTrack, stream);
+            }
+
+            // Update local stream
+            stream.removeTrack(oldScreenTrack);
+            stream.addTrack(newCameraTrack);
+            oldScreenTrack.stop(); // Stop the screen sharing track
+
+            // Update local video element
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = stream;
+            }
+
+            setIsVideoOn(true); // Turn camera "on"
+            setIsScreenSharing(false);
+            toast.info("Stopped sharing screen.");
+
+        } else {
+            // --- START SCREEN SHARE ---
+            try {
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: false // Don't capture screen audio
+                });
+
+                const newScreenTrack = screenStream.getVideoTracks()[0];
+                const oldCameraTrack = stream.getVideoTracks()[0];
+                
+                // Store the camera track *before* replacing it
+                cameraVideoTrackRef.current = oldCameraTrack;
+
+                // Replace track in all peers
+                for (const peerId in peersRef.current) {
+                    peersRef.current[peerId].replaceTrack(oldCameraTrack, newScreenTrack, stream);
+                }
+
+                // Update local stream
+                stream.removeTrack(oldCameraTrack);
+                stream.addTrack(newScreenTrack);
+
+                // Update local video element
+                if (localVideoRef.current) {
+                    localVideoRef.current.srcObject = stream;
+                }
+                
+                setIsVideoOn(true); // Video is now the screen, and it's on
+                setIsScreenSharing(true);
+                toast.success("Started sharing screen.");
+
+                // Listen for when user clicks the browser's "Stop sharing" button
+                newScreenTrack.onended = () => {
+                    handleToggleScreenShare(); // Call this same function to stop
+                };
+
+            } catch (err) {
+                toast.error("Could not start screen share.");
+                console.error("Screen share error:", err);
+            }
+        }
+    };
+
     // --- MODIFIED: Function to change video quality during the call ---
     const handleChangeVideoQuality = async (newQuality) => {
         if (!stream || videoQuality === newQuality) return;
@@ -678,6 +768,13 @@ function Call() {
         setVideoQuality(newQuality);
         setIsQualityMenuOpen(false);
         const oldVideoTrack = stream.getVideoTracks()[0];
+        
+        // --- NEW: Stop screen sharing if active ---
+        if (isScreenSharing) {
+            oldVideoTrack.stop(); // Stop the screen track
+            setIsScreenSharing(false);
+            toast.info("Screen share stopped to change quality.");
+        }
 
         try {
             // Get a new stream (video only) at the new quality
@@ -694,6 +791,9 @@ function Call() {
 
             const newVideoTrack = newTrackStream.getVideoTracks()[0];
             
+            // --- NEW: Store the new camera track ---
+            cameraVideoTrackRef.current = newVideoTrack;
+
             // Replace the track in all peer connections
             if(oldVideoTrack) {
                 for (const peerId in peersRef.current) {
@@ -1144,8 +1244,8 @@ function Call() {
                         transition: object-fit 0.3s ease;
                     }
                     .local-video-element {
-                        transform: scaleX(-1); /* Mirror self-view */
-                        object-fit: cover; /* PiP is always cover */
+                        /* --- MODIFIED: Transform is now in-line --- */
+                        object-fit: contain; /* --- MODIFIED: Contain for screen share --- */
                     }
                     .remote-video-element {
                          object-fit: ${videoFit}; /* Use state for zoom/fit */
@@ -1582,7 +1682,8 @@ function Call() {
                                     ref={localVideoRef}
                                     className="local-video-element"
                                     style={{ 
-                                        transform: 'scaleX(-1)', // --- MODIFIED: Hardcoded mirror ---
+                                        // --- NEW: Dynamic transform for screen share ---
+                                        transform: isScreenSharing ? 'scaleX(1)' : 'scaleX(-1)', 
                                         opacity: isVideoOn ? 1 : 0, // Hide video element
                                         filter: 'none' // --- MODIFIED: Local video has no filter ---
                                     }}
@@ -1667,6 +1768,15 @@ function Call() {
                                     title={isVideoOn ? "Turn off camera" : "Turn on camera"}
                                 >
                                     <i className={`bi ${isVideoOn ? 'bi-camera-video-fill' : 'bi-camera-video-off-fill'}`}></i>
+                                </button>
+
+                                {/* --- NEW: Screen Share Button --- */}
+                                <button
+                                    className={`btn rounded-circle ${isScreenSharing ? 'btn-primary' : 'btn-secondary'}`} 
+                                    onClick={(e) => { e.stopPropagation(); handleToggleScreenShare(); }} 
+                                    title={isScreenSharing ? "Stop sharing" : "Share screen"}
+                                >
+                                    <i className="bi bi-display-fill"></i>
                                 </button>
                                 
                                 <button
@@ -1976,7 +2086,7 @@ function Call() {
                                     placeholder="Enter emails"
                                     style={{ height: '150px' }}
                                     value={inviteEmails}
-                                    onChange={(e) => setInviteEmails(e.target.value)}
+                                    onChange={(e) => setInviteEmails(e.gex.target.value)}
                                 />
                                 <label htmlFor="inviteEmails">Emails (comma-separated)</label>
                             </div>
