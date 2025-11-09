@@ -7,6 +7,8 @@ import { Eye, EyeOff } from 'lucide-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import Navbar from './navbar'; // <-- 3. IMPORT Navbar
+import Footer from './Footer'; // <-- IMPORT FOOTER
+
 function RegisterForm() {
   const API_URL = process.env.REACT_APP_SERVER_API;
   const [form, setForm] = useState({
@@ -58,11 +60,16 @@ function RegisterForm() {
       <Navbar />
       {/* 3. UPDATED STYLES TO USE CSS VARIABLES */}
       <style>{`
+        :root {
+            /* --- NEW: Professional Colors --- */
+            --brand-primary: #4A69BD;
+            --brand-primary-dark: #3e5aa8;
+        }
         body, html {
           height: 100%;
         }
         .auth-container {
-          min-height: 100vh;
+          min-height: calc(100vh - 56px); /* 56px for navbar */
           display: flex;
           align-items: center;
           justify-content: center;
@@ -97,18 +104,32 @@ function RegisterForm() {
         }
         .feature-icon {
           font-size: 1.5rem;
-          color: var(--bs-primary);
+          color: var(--brand-primary); /* --- MODIFIED --- */
         }
+        
+        /* --- MODIFIED: Button Styles --- */
         .btn-primary {
-          background-color: var(--bs-primary);
-          border: none;
+          background-color: var(--brand-primary);
+          border-color: var(--brand-primary);
           transition: all 0.3s ease;
         }
         .btn-primary:hover {
-          background-color: var(--bs-primary-dark);
+          background-color: var(--brand-primary-dark);
+          border-color: var(--brand-primary-dark);
           transform: translateY(-2px);
-          box-shadow: 0 4px 10px rgba(var(--bs-primary-rgb), 0.3);
+          box-shadow: 0 4px 10px rgba(74, 105, 189, 0.3);
         }
+        .btn-outline-primary {
+            color: var(--brand-primary);
+            border-color: var(--brand-primary);
+        }
+        .btn-outline-primary:hover {
+            background-color: var(--brand-primary);
+            border-color: var(--brand-primary);
+            color: #fff;
+        }
+        /* --- END MODIFICATION --- */
+        
         .auth-form-col h2, .auth-welcome-col h1 {
           color: var(--bs-body-color);
         }
@@ -125,7 +146,7 @@ function RegisterForm() {
                   <div className="col-lg-6 d-none d-lg-flex align-items-center auth-welcome-col">
                     <div className="text-start">
                       <h1 className="display-5 fw-bold mb-3">
-                        Join MeshNetwork
+                        Join Network
                       </h1>
                       <p className="text-muted mb-4">
                         Connect securely with peer-to-peer video.
@@ -167,7 +188,7 @@ function RegisterForm() {
                     <div className="w-100" style={{ maxWidth: '400px' }}>
                       <form onSubmit={handleSubmit}>
                         <div className="text-center mb-4">
-                          <i className="bi bi-person-plus-fill text-primary" style={{ fontSize: '3rem' }}></i>
+                          <i className="bi bi-person-plus-fill" style={{ fontSize: '3rem', color: 'var(--brand-primary)' }}></i>
                           <h2 className="fw-bold mt-2">
                             Create Account
                           </h2>
@@ -282,6 +303,7 @@ function RegisterForm() {
           </div>
         </div>
       </div>
+      <Footer />
     </>
   );
 }
