@@ -636,7 +636,7 @@ function Call() {
     // RENDER: Active Call UI
     return (
         <>
-            
+            <Navbar />
             <div className="chat-page-container">
                 {/* --- MODIFIED: Use 100dvh and fix mobile buttons --- */}
                 <style jsx>{`
