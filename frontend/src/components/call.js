@@ -228,7 +228,6 @@ function Call() {
     }, [isVideoOn, stream]);
 
 
-    // --- *** CORRECTED *** ---
     // Switched to useLayoutEffect. This runs *before* the browser paints,
     // guaranteeing the localVideoRef.current element is ready.
     useLayoutEffect(() => {
@@ -239,24 +238,54 @@ function Call() {
         if (localVideoRef.current && stream && callState === 'active') {
             localVideoRef.current.srcObject = stream;
         }
-    }, [stream, callState]); // <-- FIX: Re-run when callState changes to 'active'
+    }, [stream, callState]); // <-- Re-run when callState changes to 'active'
 
 
     // --- Handler Functions ---
 
-   const handleAcceptCall = async () => {
-        try {
-            // <-- MODIFIED: Increase video quality
-            const videoConstraints = {
-                facingMode: 'user',
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            };
+    // --- MODIFIED: Higher Quality & Fallbacks ---
+    const getQualityStream = async (facingMode) => {
+        const constraints = [
+            { // 1. Try 1080p
+                video: {
+                    facingMode,
+                    width: { ideal: 1920, max: 1920 },
+                    height: { ideal: 1080, max: 1080 },
+                    frameRate: { ideal: 30 }
+                },
+                audio: true
+            },
+            { // 2. Fallback to 720p
+                video: {
+                    facingMode,
+                    width: { ideal: 1280, max: 1280 },
+                    height: { ideal: 720, max: 720 },
+                    frameRate: { ideal: 30 }
+                },
+                audio: true
+            },
+            { // 3. Fallback to default
+                video: { facingMode },
+                audio: true
+            }
+        ];
 
-            const userStream = await navigator.mediaDevices.getUserMedia({ 
-                video: videoConstraints, 
-                audio: true 
-            });
+        for (const constraint of constraints) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraint);
+                console.log(`Acquired stream with constraints:`, constraint.video);
+                return stream;
+            } catch (err) {
+                console.warn(`Failed to get stream with constraints:`, constraint.video, err.name);
+            }
+        }
+        throw new Error("Could not access camera/microphone with any constraints.");
+    };
+
+    // --- MODIFIED: Uses new getQualityStream ---
+    const handleAcceptCall = async () => {
+        try {
+            const userStream = await getQualityStream('user');
             setFacingMode('user');
             
             // Check for multiple cameras non-blockingly
@@ -277,23 +306,8 @@ function Call() {
             setIsVideoOn(true);
             setCallState('active'); // This makes the <video> element appear
         } catch (err) {
-            // Fallback to lower resolution if 720p fails
-            if (err.name === "OverconstrainedError" || err.name === "ConstraintNotSatisfiedError") {
-                try {
-                    const userStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
-                    setFacingMode('user');
-                    await updateDoc(doc(db, 'calls', callId), { [`muteStatus.${user._id}`]: false });
-                    setStream(userStream);
-                    setIsVideoOn(true);
-                    setCallState('active');
-                } catch (fallbackErr) {
-                    toast.error("Could not access camera/microphone.");
-                    console.error(fallbackErr);
-                }
-            } else {
-                toast.error("Could not access camera/microphone.");
-                console.error(err);
-            }
+            toast.error("Could not access camera/microphone.");
+            console.error(err);
         }
     };
 
@@ -317,51 +331,55 @@ function Call() {
         setIsVideoOn(newVideoState);
     };
 
-    // --- Camera Swap Function ---
+    // --- NEW: Rewritten handleSwapCamera function ---
     const handleSwapCamera = async () => {
         if (!stream || !stream.getVideoTracks().length || !hasMultipleCameras) return;
 
         const oldVideoTrack = stream.getVideoTracks()[0];
+        const audioTrack = stream.getAudioTracks()[0];
         const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
 
         try {
-            // 1. Get ONLY the new video stream with higher quality
-            const newVideoStream = await navigator.mediaDevices.getUserMedia({
+            // 1. Get ONLY the new video stream
+            // We only need the video track, audio track is preserved
+            const newVideoTrackStream = await navigator.mediaDevices.getUserMedia({
                 video: { 
                     facingMode: newFacingMode,
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
+                    width: { ideal: 1920, max: 1920 },
+                    height: { ideal: 1080, max: 1080 },
+                    frameRate: { ideal: 30 }
                 }
             });
-            const newVideoTrack = newVideoStream.getVideoTracks()[0];
+            const newVideoTrack = newVideoTrackStream.getVideoTracks()[0];
 
-            // 2. Replace the track in all peer connections
-            Object.values(peersRef.current).forEach(peer => {
-                peer.replaceTrack(oldVideoTrack, newVideoTrack, stream);
-            });
+            // 2. Create a new composite MediaStream
+            // This is crucial for React to detect a state change
+            const newStream = new MediaStream();
+            if (audioTrack) newStream.addTrack(audioTrack);
+            newStream.addTrack(newVideoTrack);
 
-            // 3. Update the *local* stream object in-place
-            stream.removeTrack(oldVideoTrack);
-            stream.addTrack(newVideoTrack);
+            // 3. Replace the track in all peer connections
+            // We pass the *original* stream object to replaceTrack, as required by simple-peer
+            for (const peerId in peersRef.current) {
+                peersRef.current[peerId].replaceTrack(oldVideoTrack, newVideoTrack, stream);
+            }
             
-            // 4. Stop the old track
+            // 4. Stop the old track to release the camera
             oldVideoTrack.stop();
 
-            // 5. --- THE FIX ---
-            // Force the <video> element to refresh
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = null; // Unset it
-                localVideoRef.current.srcObject = stream; // Re-set it
-            }
-            // --- END FIX ---
-
-            // 6. Update state
+            // 5. Update state with the *new* stream object
+            setStream(newStream);
             setFacingMode(newFacingMode);
+            
+            // 6. Ensure video enabled-state is consistent
             newVideoTrack.enabled = isVideoOn; 
 
         } catch (err) {
             toast.error("Could not swap camera.");
             console.error("Error swapping camera: ", err);
+            // Stop the new track if it exists and we failed
+            const newTrack = newVideoTrackStream?.getVideoTracks()[0];
+            if (newTrack) newTrack.stop();
         }
     };
     // --- End New Function ---
@@ -438,7 +456,8 @@ function Call() {
 
     if (callState === 'loading') {
         return (
-            <div className="d-flex justify-content-center align-items-center vh-100" style={{ backgroundColor: '#12121c' }}>
+            // --- MODIFIED: Use 100dvh ---
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '100dvh', backgroundColor: '#12121c' }}>
                 <div className="text-center">
                     <div className="spinner-border text-primary mb-3" style={{ width: '3rem', height: '3rem' }} role="status">
                         <span className="visually-hidden">Loading...</span>
@@ -464,6 +483,7 @@ function Call() {
         return (
             <>
                 <Navbar />
+                {/* --- MODIFIED: Added slider-text styles and keyframes --- */}
                 <style jsx>{`
                     .joining-screen {
                         background-color: #2b2b2b;
@@ -507,6 +527,7 @@ function Call() {
                         margin-bottom: 0.5rem;
                         position: relative;
                         background-color: rgba(255, 255, 255, 0.1);
+                        border: none; /* Ensure it's a button */
                     }
                     .button-circle.accept {
                         background-color: #28a745;
@@ -515,7 +536,7 @@ function Call() {
                         background-color: #dc3545;
                     }
                     
-                    /* New Ripple Animation */
+                    /* Ripple Animation */
                     .button-circle::before, .button-circle::after {
                         content: '';
                         position: absolute;
@@ -547,8 +568,27 @@ function Call() {
                             opacity: 0;
                         }
                     }
+
+                    /* --- NEW: Slider Text Animation --- */
+                    .slider-text {
+                        font-weight: 500;
+                        position: relative;
+                        overflow: hidden;
+                        display: inline-block;
+                        -webkit-mask-image: linear-gradient(-75deg, rgba(0,0,0,.6) 30%, #000 50%, rgba(0,0,0,.6) 70%);
+                        -webkit-mask-size: 200%;
+                        animation: slide-shine 2s infinite;
+                    }
+
+                    @keyframes slide-shine {
+                        0% { -webkit-mask-position: 150%; }
+                        100% { -webkit-mask-position: -50%; }
+                    }
+                    /* --- End New CSS --- */
+
                 `}</style>
-                <div className="d-flex flex-column justify-content-around align-items-center vh-100 joining-screen">
+                {/* --- MODIFIED: Use 100dvh --- */}
+                <div className="d-flex flex-column justify-content-around align-items-center joining-screen" style={{ minHeight: '100dvh' }}>
                     
                     <div className="caller-info">
                         <h1 className="caller-name">{callerName}</h1>
@@ -564,7 +604,8 @@ function Call() {
                             >
                                 <i className="bi bi-telephone-fill" style={{ transform: 'rotate(135deg)' }}></i>
                             </button>
-                            <span>Decline</span>
+                            {/* --- MODIFIED: Added .slider-text --- */}
+                            <span className="slider-text">Decline</span>
                         </div>
                         <div className="action-button">
                             <button 
@@ -574,7 +615,8 @@ function Call() {
                             >
                                 <i className="bi bi-telephone-fill"></i>
                             </button>
-                            <span>Accept</span>
+                            {/* --- MODIFIED: Added .slider-text --- */}
+                            <span className="slider-text">Accept</span>
                         </div>
                     </div>
                 </div>
@@ -588,6 +630,7 @@ function Call() {
         <>
             
             <div className="chat-page-container">
+                {/* --- MODIFIED: Use 100dvh and fix mobile buttons --- */}
                 <style jsx>{`
                     /* --- 1. General Page & Layout Styles --- */
                     :root {
@@ -601,7 +644,8 @@ function Call() {
                     .chat-page-container {
                         background-color: var(--dark-bg-primary);
                         color: var(--text-primary);
-                        min-height: calc(100vh - 56px); /* 56px is navbar height */
+                        /* --- MODIFIED: Use 100dvh --- */
+                        min-height: calc(100dvh - 56px); /* 56px is navbar height */
                         padding: 0;
                     }
                     
@@ -626,7 +670,8 @@ function Call() {
                     .video-panel-container {
                         position: relative;
                         width: 100%;
-                        height: calc(100vh - 56px); /* Full height minus navbar */
+                        /* --- MODIFIED: Use 100dvh --- */
+                        height: calc(100dvh - 56px); /* Full height minus navbar */
                         background-color: #000;
                         overflow: hidden;
                         cursor: pointer; 
@@ -652,7 +697,6 @@ function Call() {
                         transition: box-shadow 0.2s ease, opacity 0.3s ease;
                         background: #222; /* Placeholder color */
                     }
-                    /* --- MODIFIED: Hide if no stream --- */
                     .local-video-pip:not([style*="left"]) { 
                          bottom: 1rem;
                          right: 1rem;
@@ -672,24 +716,29 @@ function Call() {
                         transform: translateX(-50%);
                         background-color: rgba(0, 0, 0, 0.7);
                         border-radius: 50px;
-                        padding: 0.75rem; /* <-- UPDATED */
+                        padding: 0.75rem; 
                         display: flex;
-                        gap: 0.75rem; /* <-- UPDATED */
+                        gap: 0.75rem; 
                         z-index: 20;
                         transition: opacity 0.3s ease; 
+                        /* --- NEW: Fix for button merging --- */
+                        flex-wrap: wrap;
+                        justify-content: center;
+                        /* --- NEW: Add max-width to prevent full-width takeover --- */
+                        max-width: 90%;
                     }
                     .call-controls.hidden { 
                         opacity: 0;
                         pointer-events: none;
                     }
                     .call-controls .btn {
-                        width: 48px; /* <-- UPDATED */
-                        height: 48px; /* <-- UPDATED */
-                        font-size: 1.2rem; /* <-- UPDATED */
+                        width: 48px; 
+                        height: 48px; 
+                        font-size: 1.2rem; 
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        margin: 0; /* <-- UPDATED */
+                        margin: 0; 
                     }
                     
                     /* --- 4. MOBILE OVERLAY PANELS (WhatsApp-like) --- */
@@ -698,7 +747,8 @@ function Call() {
                         top: 0;
                         left: 0;
                         width: 100%;
-                        height: 100%;
+                        /* --- MODIFIED: Use 100dvh --- */
+                        height: 100dvh;
                         background-color: var(--dark-bg-primary);
                         z-index: 100;
                         display: flex;
@@ -748,10 +798,7 @@ function Call() {
                     /* --- 5. DESKTOP VIEW (PC) --- */
                     @media (min-width: 992px) { 
                         .chat-page-container {
-                            padding: 0; /* <-- UPDATED: Remove padding */
-                        }
-                        .video-panel-container {
-                            /* <-- UPDATED: Removed height: 80vh and border-radius: 8px */
+                            padding: 0; 
                         }
                         
                         .call-controls .btn {
@@ -763,6 +810,8 @@ function Call() {
                         .call-controls {
                             padding: 0.5rem 1rem;
                             gap: 1rem;
+                            /* --- MODIFIED: Stop wrapping on desktop --- */
+                            flex-wrap: nowrap;
                         }
                     }
 
@@ -838,7 +887,6 @@ function Call() {
                     }
                 `}</style>
 
-                {/* --- UPDATED: g-0 (no gutters) --- */}
                 <div className="row g-0 h-100">
 
                     {/* --- Video Column --- */}
@@ -862,7 +910,6 @@ function Call() {
                             <video
                                 ref={localVideoRef} 
                                 className="local-video-pip"
-                                // <-- MODIFIED: Add conditional transform for mirror effect
                                 style={{ 
                                     opacity: stream ? 1 : 0,
                                     transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)'
@@ -880,7 +927,6 @@ function Call() {
                                 {/* --- CAMERA SWAP BUTTON --- */}
                                 {hasMultipleCameras && (
                                     <button
-                                        // <-- UPDATED: Color changed to btn-secondary
                                         className="btn btn-secondary rounded-circle" 
                                         onClick={(e) => { e.stopPropagation(); handleSwapCamera(); }} 
                                         title="Swap Camera"
@@ -891,7 +937,6 @@ function Call() {
                                 {/* --- END NEW BUTTON --- */}
 
                                 <button
-                                    // <-- UPDATED: Color changed to btn-secondary
                                     className={`btn rounded-circle ${isVideoOn ? 'btn-secondary' : 'btn-danger'}`} 
                                     onClick={(e) => { e.stopPropagation(); handleToggleVideo(); }} 
                                     title={isVideoOn ? "Turn off camera" : "Turn on camera"}
@@ -900,7 +945,6 @@ function Call() {
                                 </button>
                                 
                                 <button
-                                    // <-- UPDATED: Color changed to btn-secondary
                                     className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-danger' : 'btn-secondary'}`} 
                                     onClick={(e) => { e.stopPropagation(); handleToggleMute(user._id); }} 
                                     title={muteStatus[user._id] ? "Unmute" : "Mute"}
@@ -948,11 +992,11 @@ function Call() {
                     </div>
 
                     {/* --- Desktop-Only Sidebar --- */}
-                    {/* --- UPDATED: Added padding and new height --- */}
                     <div 
                         className="col-lg-4 d-none d-lg-flex flex-column" 
                         style={{
-                            height: 'calc(100vh - 56px)', 
+                            /* --- MODIFIED: Use 100dvh --- */
+                            height: 'calc(100dvh - 56px)', 
                             gap: '1.5rem', 
                             padding: '1.5rem',
                             overflowY: 'auto'
