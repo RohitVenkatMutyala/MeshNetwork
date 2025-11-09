@@ -161,8 +161,7 @@ function Call() {
     const [stream, setStream] = useState(null);
     const [muteStatus, setMuteStatus] = useState({});
     const [isVideoOn, setIsVideoOn] = useState(true);
-    const [facingMode, setFacingMode] = useState('user'); 
-    const [hasMultipleCameras, setHasMultipleCameras] = useState(false); 
+    // --- REMOVED facingMode and hasMultipleCameras ---
     const peersRef = useRef({});
     const audioContainerRef = useRef(null);
     const remoteVideoRef = useRef(null);
@@ -360,8 +359,8 @@ function Call() {
 
     // --- Handler Functions ---
 
-    // --- MODIFIED: getQualityStream logic simplified ---
-    const getQualityStream = async (facingMode, quality, requestVideo) => {
+    // --- MODIFIED: getQualityStream simplified (no facingMode) ---
+    const getQualityStream = async (quality, requestVideo) => {
         const qualityLevels = ['high', 'medium', 'low'];
         // Start trying from the requested quality level down
         const levelsToTry = qualityLevels.slice(qualityLevels.indexOf(quality));
@@ -373,7 +372,7 @@ function Call() {
                 ...QUALITY_PROFILES[level],
                 video: {
                     ...QUALITY_PROFILES[level].video,
-                    facingMode: facingMode
+                    facingMode: 'user' // --- Hardcoded to 'user' ---
                 }
             }));
         }
@@ -398,17 +397,9 @@ function Call() {
     const handleAcceptCall = async () => {
         try {
             // Use the quality from state, request video by default
-            const userStream = await getQualityStream('user', videoQuality, true);
-            setFacingMode('user');
+            const userStream = await getQualityStream(videoQuality, true);
+            // --- REMOVED setFacingMode and camera check logic ---
             
-            // Check for multiple cameras non-blockingly
-            navigator.mediaDevices.enumerateDevices().then(devices => {
-                const videoDevices = devices.filter(d => d.kind === 'videoinput');
-                if (videoDevices.length > 1) {
-                    setHasMultipleCameras(true);
-                }
-            }).catch(console.error);
-
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${user._id}`]: false
             });
@@ -453,7 +444,7 @@ function Call() {
         try {
             // Get a new stream (video only) at the new quality
             // --- FIX: Always request video, even if isVideoOn is false ---
-            const newTrackStream = await getQualityStream(facingMode, newQuality, true);
+            const newTrackStream = await getQualityStream(newQuality, true);
             
             if (!newTrackStream.getVideoTracks().length) {
                 // We wanted video but couldn't get it
@@ -496,57 +487,7 @@ function Call() {
     };
 
 
-    // --- MODIFIED: Camera Swap logic fixed and uses quality state ---
-    const handleSwapCamera = async () => {
-        if (!stream || !hasMultipleCameras) return;
-
-        const oldVideoTrack = stream.getVideoTracks()[0]; // Might be undefined, that's OK
-        const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
-
-        try {
-            // Get new stream using the *current* quality setting
-            // --- FIX: Always request video, even if isVideoOn is false ---
-            const newTrackStream = await getQualityStream(newFacingMode, videoQuality, true);
-            
-            if (!newTrackStream.getVideoTracks().length) {
-                toast.error("Could not get video from other camera.");
-                return;
-            }
-            
-            const newVideoTrack = newTrackStream.getVideoTracks()[0];
-            
-            // Replace track for all peers
-            if (oldVideoTrack) {
-                for (const peerId in peersRef.current) {
-                    peersRef.current[peerId].replaceTrack(oldVideoTrack, newVideoTrack, stream);
-                }
-            }
-            
-            // Stop old track
-            if (oldVideoTrack) oldVideoTrack.stop();
-
-            // Update local stream in-place
-            if (oldVideoTrack) stream.removeTrack(oldVideoTrack);
-            stream.addTrack(newVideoTrack);
-            
-            // --- THE FIX ---
-            // Force the <video> element to refresh by resetting srcObject
-            if (localVideoRef.current) {
-                localVideoRef.current.srcObject = null; // Unset it
-                localVideoRef.current.srcObject = stream; // Re-set it
-            }
-            // --- END FIX ---
-
-            setFacingMode(newFacingMode);
-            newVideoTrack.enabled = isVideoOn; 
-
-        } catch (err) {
-            toast.error("Could not swap camera.");
-            console.error("Error swapping camera: ", err);
-        }
-    };
-    // --- End Modified Function ---
-
+    // --- REMOVED handleSwapCamera FUNCTION ---
 
     const handleToggleMute = async (targetUserId) => {
         const isSelf = targetUserId === user._id;
@@ -790,11 +731,10 @@ function Call() {
     // RENDER: Active Call UI
     return (
         <>
-            {/* --- MODIFIED: Navbar is still here! --- */}
-            <Navbar />
+            {/* --- MODIFIED: Navbar is **REMOVED** from active call --- */}
             
             <div className="chat-page-container">
-                {/* --- MODIFIED: Added placeholder CSS, fixed mobile panel --- */}
+                {/* --- MODIFIED: Adjusted CSS for no-navbar --- */}
                 <style jsx>{`
                     /* --- 1. General Page & Layout Styles --- */
                     :root {
@@ -808,7 +748,7 @@ function Call() {
                     .chat-page-container {
                         background-color: var(--dark-bg-primary);
                         color: var(--text-primary);
-                        min-height: calc(100dvh - 56px); /* 56px is navbar height */
+                        min-height: 100dvh; /* --- MODIFIED: Full height --- */
                         padding: 0;
                     }
                     
@@ -833,7 +773,7 @@ function Call() {
                     .video-panel-container {
                         position: relative;
                         width: 100%;
-                        height: calc(100dvh - 56px); /* Full height minus navbar */
+                        height: 100dvh; /* --- MODIFIED: Full height --- */
                         background-color: #000;
                         overflow: hidden;
                         cursor: pointer; 
@@ -1035,8 +975,14 @@ function Call() {
                     @media (min-width: 992px) { 
                         .chat-page-container {
                             padding: 0; 
+                            min-height: 100dvh; /* --- MODIFIED --- */
                         }
-                        
+                        .video-panel-container {
+                            height: 100dvh; /* --- MODIFIED --- */
+                        }
+                        .desktop-sidebar {
+                            height: 100dvh; /* --- MODIFIED --- */
+                        }
                         .call-controls .btn {
                             width: 50px;
                             height: 50px;
@@ -1158,7 +1104,7 @@ function Call() {
                                     ref={localVideoRef}
                                     className="local-video-element"
                                     style={{ 
-                                        transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)',
+                                        transform: 'scaleX(-1)', // --- MODIFIED: Hardcoded mirror ---
                                         opacity: isVideoOn ? 1 : 0 // Hide video element
                                     }}
                                     autoPlay
@@ -1206,16 +1152,7 @@ function Call() {
                                 {/* --- END FIX --- */}
 
 
-                                {/* --- CAMERA SWAP BUTTON --- */}
-                                {hasMultipleCameras && (
-                                    <button
-                                        className="btn btn-secondary rounded-circle" 
-                                        onClick={(e) => { e.stopPropagation(); handleSwapCamera(); }} 
-                                        title="Swap Camera"
-                                    >
-                                        <i className="bi bi-arrow-repeat"></i>
-                                    </button>
-                                )}
+                                {/* --- REMOVED: CAMERA SWAP BUTTON --- */}
 
                                 <button
                                     className={`btn rounded-circle ${isVideoOn ? 'btn-secondary' : 'btn-danger'}`} 
@@ -1283,9 +1220,9 @@ function Call() {
 
                     {/* --- Desktop-Only Sidebar --- */}
                     <div 
-                        className="col-lg-4 d-none d-lg-flex flex-column" 
+                        className="col-lg-4 d-none d-lg-flex flex-column desktop-sidebar" // <-- Added class
                         style={{
-                            height: 'calc(100dvh - 56px)', 
+                            height: '100dvh', // --- MODIFIED: Full height ---
                             gap: '1.5rem', 
                             padding: '1.5rem',
                             overflowY: 'auto'
