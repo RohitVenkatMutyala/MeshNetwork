@@ -107,21 +107,17 @@ function Navbar() {
                     --bs-dropdown-link-hover-bg: #34495e;
                      --bs-dropdown-border-color: var(--nav-dark-border);
                 }
-
-                .navbar-brand-custom {
-                    background: linear-gradient(135deg, #f12711 0%, #f5af19 30%, #ff6b6b 70%, #ee5a52 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    font-size: 1.75rem; /* Slightly smaller for new name */
-                    font-weight: 800;
-                    letter-spacing: -0.8px;
-                    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                }
-                
+.navbar-brand-custom {
+    /* The 3 gradient lines that were here are now removed */
+    font-size: 1.75rem; /* Slightly smaller for new name */
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
                 .navbar-brand-custom:hover {
                     transform: scale(1.05);
                 }
@@ -172,11 +168,11 @@ function Navbar() {
 
             <nav className={`navbar navbar-expand-lg sticky-top shadow-sm navbar-custom theme-${theme}`}>
                 <div className="container-fluid px-4">
-                   {/* <img
+                   <img
                         src={logo} 
                         alt="NETWORK.RANDOMAN Logo"
                         className={`logo-image ${theme === 'dark' ? 'logo-dark-theme' : ''}`}
-                    /> */}
+                    /> 
                     <Link to={user ? "/new-call" : "/new-call"} className="navbar-brand-custom py-2">
                         NETWORK
                     </Link>
