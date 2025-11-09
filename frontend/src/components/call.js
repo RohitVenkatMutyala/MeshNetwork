@@ -332,6 +332,7 @@ function Call() {
     };
 
     // --- NEW: Rewritten handleSwapCamera function ---
+// --- NEW: Rewritten handleSwapCamera function (FIXED) ---
     const handleSwapCamera = async () => {
         if (!stream || !stream.getVideoTracks().length || !hasMultipleCameras) return;
 
@@ -339,10 +340,14 @@ function Call() {
         const audioTrack = stream.getAudioTracks()[0];
         const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
 
+        // --- FIX: Declare here for access in catch block ---
+        let newVideoTrackStream = null; 
+
         try {
             // 1. Get ONLY the new video stream
             // We only need the video track, audio track is preserved
-            const newVideoTrackStream = await navigator.mediaDevices.getUserMedia({
+            // --- FIX: Assign to existing variable ---
+            newVideoTrackStream = await navigator.mediaDevices.getUserMedia({
                 video: { 
                     facingMode: newFacingMode,
                     width: { ideal: 1920, max: 1920 },
@@ -377,11 +382,14 @@ function Call() {
         } catch (err) {
             toast.error("Could not swap camera.");
             console.error("Error swapping camera: ", err);
+            
+            // --- FIX: Now safely accessible ---
             // Stop the new track if it exists and we failed
             const newTrack = newVideoTrackStream?.getVideoTracks()[0];
             if (newTrack) newTrack.stop();
         }
     };
+    // --- End New Function ---
     // --- End New Function ---
 
 
