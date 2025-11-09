@@ -57,7 +57,11 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
     const handleDragStart = (e) => {
         if (unlocked) return;
         setIsDragging(true);
-        if (sliderRef.current) sliderRef.current.style.transition = 'none'; // Disable transition while dragging
+        if (sliderRef.current) {
+            sliderRef.current.style.transition = 'none'; // Disable transition while dragging
+            // --- NEW: Stop animation on drag ---
+            sliderRef.current.style.animation = 'none';
+        }
     };
 
     const handleDragMove = (e) => {
@@ -92,7 +96,11 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
             // Snap back to start
             setIsDragging(false);
             setSliderLeft(0);
-            if (sliderRef.current) sliderRef.current.style.transition = 'left 0.3s ease-out';
+            if (sliderRef.current) {
+                sliderRef.current.style.transition = 'left 0.3s ease-out';
+                // --- NEW: Re-start animation ---
+                sliderRef.current.style.animation = 'vibrate 0.5s ease-in-out infinite 1.5s';
+            }
         }
     };
 
@@ -166,6 +174,8 @@ function Call() {
     // --- Draggable PiP State ---
     const [isPipDragging, setIsPipDragging] = useState(false);
     const pipOffsetRef = useRef({ x: 0, y: 0 });
+    // --- NEW: Ref for PiP wrapper ---
+    const pipWrapperRef = useRef(null);
 
 
     // Auto-scroll chat
@@ -456,15 +466,17 @@ function Call() {
             const newVideoTrack = newTrackStream.getVideoTracks()[0];
             
             // Replace the track in all peer connections
-            for (const peerId in peersRef.current) {
-                peersRef.current[peerId].replaceTrack(oldVideoTrack, newVideoTrack, stream);
+            if(oldVideoTrack) {
+                for (const peerId in peersRef.current) {
+                    peersRef.current[peerId].replaceTrack(oldVideoTrack, newVideoTrack, stream);
+                }
             }
             
             // Stop the old track to release the camera
             if (oldVideoTrack) oldVideoTrack.stop();
             
             // Update the local stream object in-place
-            stream.removeTrack(oldVideoTrack);
+            if (oldVideoTrack) stream.removeTrack(oldVideoTrack);
             stream.addTrack(newVideoTrack);
 
             // Force the <video> element to refresh
@@ -567,39 +579,39 @@ function Call() {
         setNewMessage('');
     };
 
-    // --- PiP Drag Handlers (using localVideoRef) ---
+    // --- PiP Drag Handlers (MODIFIED to use pipWrapperRef) ---
     const handlePipMouseDown = (e) => {
-        if (!localVideoRef.current) return;
+        if (!pipWrapperRef.current) return;
         setIsPipDragging(true);
         pipOffsetRef.current = {
-            x: e.clientX - localVideoRef.current.getBoundingClientRect().left,
-            y: e.clientY - localVideoRef.current.getBoundingClientRect().top,
+            x: e.clientX - pipWrapperRef.current.getBoundingClientRect().left,
+            y: e.clientY - pipWrapperRef.current.getBoundingClientRect().top,
         };
-        localVideoRef.current.style.cursor = 'grabbing';
+        pipWrapperRef.current.style.cursor = 'grabbing';
     };
 
     const handlePipMouseUp = () => {
         setIsPipDragging(false);
-        if (localVideoRef.current) {
-            localVideoRef.current.style.cursor = 'move';
+        if (pipWrapperRef.current) {
+            pipWrapperRef.current.style.cursor = 'move';
         }
     };
 
     const handlePipMouseMove = (e) => {
-        if (!isPipDragging || !localVideoRef.current || !localVideoRef.current.parentElement) return; 
+        if (!isPipDragging || !pipWrapperRef.current || !pipWrapperRef.current.parentElement) return; 
         
-        const parentRect = localVideoRef.current.parentElement.getBoundingClientRect();
+        const parentRect = pipWrapperRef.current.parentElement.getBoundingClientRect();
         let newX = e.clientX - parentRect.left - pipOffsetRef.current.x;
         let newY = e.clientY - parentRect.top - pipOffsetRef.current.y;
 
         // Constrain to parent
-        newX = Math.max(0, Math.min(newX, parentRect.width - localVideoRef.current.offsetWidth));
-        newY = Math.max(0, Math.min(newY, parentRect.height - localVideoRef.current.offsetHeight));
+        newX = Math.max(0, Math.min(newX, parentRect.width - pipWrapperRef.current.offsetWidth));
+        newY = Math.max(0, Math.min(newY, parentRect.height - pipWrapperRef.current.offsetHeight));
 
-        localVideoRef.current.style.left = `${newX}px`;
-        localVideoRef.current.style.top = `${newY}px`;
-        localVideoRef.current.style.bottom = 'auto';
-        localVideoRef.current.style.right = 'auto';
+        pipWrapperRef.current.style.left = `${newX}px`;
+        pipWrapperRef.current.style.top = `${newY}px`;
+        pipWrapperRef.current.style.bottom = 'auto';
+        pipWrapperRef.current.style.right = 'auto';
     };
 
 
@@ -633,7 +645,7 @@ function Call() {
         return (
             <>
                 <Navbar />
-                {/* --- MODIFIED: Added CSS for new SlideToActionButton --- */}
+                {/* --- MODIFIED: Added vibration animation --- */}
                 <style jsx>{`
                     .joining-screen {
                         background-color: #2b2b2b;
@@ -712,9 +724,13 @@ function Call() {
                         cursor: grab;
                         z-index: 2;
                         border: 2px solid transparent;
+                        /* --- NEW: Vibrate Animation --- */
+                        animation: vibrate 0.5s ease-in-out infinite;
+                        animation-delay: 1.5s;
                     }
                     .slider-thumb:active {
                         cursor: grabbing;
+                        animation: none; /* --- NEW: Stop animation on drag --- */
                     }
                     .slider-thumb.accept-color {
                         background-color: #28a745;
@@ -725,6 +741,15 @@ function Call() {
                         border-color: #e76573;
                     }
                     /* --- End Slider CSS --- */
+
+                    /* --- NEW: Vibrate Keyframes --- */
+                    @keyframes vibrate {
+                        0%, 100% { transform: translateX(0); }
+                        20% { transform: translateX(-2px); }
+                        40% { transform: translateX(2px); }
+                        60% { transform: translateX(-2px); }
+                        80% { transform: translateX(2px); }
+                    }
 
 
                     @keyframes slide-shine {
@@ -765,10 +790,11 @@ function Call() {
     // RENDER: Active Call UI
     return (
         <>
-        <Navbar />
+            {/* --- MODIFIED: Navbar is still here! --- */}
+            <Navbar />
             
             <div className="chat-page-container">
-                {/* --- MODIFIED: Added .quality-menu CSS --- */}
+                {/* --- MODIFIED: Added placeholder CSS, fixed mobile panel --- */}
                 <style jsx>{`
                     /* --- 1. General Page & Layout Styles --- */
                     :root {
@@ -819,19 +845,19 @@ function Call() {
                     }
                     
                     /* --- Draggable Self-View (PiP) --- */
-                    .local-video-pip {
+                    .local-video-pip { /* This is now the wrapper */
                         position: absolute;
                         bottom: 1rem;
                         right: 1rem;
                         width: 150px;
                         height: 150px;
                         border-radius: 50%;
-                        object-fit: cover;
                         border: 2px solid var(--border-color);
                         z-index: 10;
                         cursor: move;
                         transition: box-shadow 0.2s ease, opacity 0.3s ease;
-                        background: #222; /* Placeholder color */
+                        background: #333; /* Background for placeholder */
+                        overflow: hidden; /* --- NEW: To keep icon inside --- */
                     }
                     .local-video-pip:not([style*="left"]) { 
                          bottom: 1rem;
@@ -844,6 +870,34 @@ function Call() {
                         box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.3);
                         cursor: grabbing;
                     }
+
+                    /* --- NEW: PiP Inner Video Element --- */
+                    .local-video-element {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                        border-radius: 50%;
+                        transition: opacity 0.2s ease;
+                        position: relative;
+                        z-index: 2; /* On top of placeholder */
+                    }
+
+                    /* --- NEW: PiP Camera-Off Placeholder --- */
+                    .local-video-placeholder {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: #fff;
+                        font-size: 3rem;
+                        border-radius: 50%;
+                        z-index: 1; /* Below the video element */
+                    }
+
 
                     .call-controls {
                         position: absolute;
@@ -920,18 +974,18 @@ function Call() {
                     /* --- End Quality Menu CSS --- */
 
                     
-                    /* --- 4. MOBILE OVERLAY PANELS (WhatsApp-like) --- */
+                    /* --- 4. MOBILE OVERLAY PANELS (MODIFIED) --- */
                     .mobile-panel {
                         position: fixed;
-                        top: 0;
+                        top: 0; /* --- MODIFIED: Start at top --- */
                         left: 0;
                         width: 100%;
                         height: 100dvh;
                         background-color: var(--dark-bg-primary);
-                        z-index: 100;
+                        z-index: 1050; /* --- MODIFIED: Above navbar (1030) --- */
                         display: flex;
                         flex-direction: column;
-                        padding-top: 56px; /* Space for navbar */
+                        padding-top: 0; /* --- MODIFIED: Remove old padding --- */
                     }
                     .mobile-panel-header {
                         display: flex;
@@ -941,6 +995,8 @@ function Call() {
                         border-bottom: 1px solid var(--border-color);
                         background-color: var(--dark-bg-secondary);
                         flex-shrink: 0;
+                        /* --- NEW: Add safe-area padding for notch/island --- */
+                        padding-top: calc(1rem + env(safe-area-inset-top));
                     }
                     .mobile-panel-header h5 { margin: 0; }
                     .mobile-panel-body {
@@ -970,6 +1026,8 @@ function Call() {
                         border-top: 1px solid var(--border-color);
                         background-color: var(--dark-bg-secondary);
                         flex-shrink: 0;
+                        /* --- NEW: Add safe-area padding for home bar --- */
+                        padding-bottom: calc(1rem + env(safe-area-inset-bottom));
                     }
 
 
@@ -1086,20 +1144,34 @@ function Call() {
                                 controls={false}
                             />
                             
-                            {/* --- Self-View (PiP) --- */}
-                            <video
-                                ref={localVideoRef} 
-                                className="local-video-pip"
-                                style={{ 
-                                    opacity: stream ? 1 : 0,
-                                    transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)'
-                                }}
-                                autoPlay
-                                playsInline
-                                muted
+                            {/* --- MODIFIED: Self-View (PiP) Wrapper --- */}
+                            <div
+                                ref={pipWrapperRef}
+                                className="local-video-pip" 
+                                style={{ opacity: stream ? 1 : 0 }}
                                 onMouseDown={handlePipMouseDown}
-                                onClick={(e) => e.stopPropagation()} 
-                            />
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseUp={handlePipMouseUp}
+                                onMouseLeave={handlePipMouseUp}
+                            >
+                                <video
+                                    ref={localVideoRef}
+                                    className="local-video-element"
+                                    style={{ 
+                                        transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)',
+                                        opacity: isVideoOn ? 1 : 0 // Hide video element
+                                    }}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                />
+                                {/* --- NEW: Camera-Off Placeholder --- */}
+                                {!isVideoOn && (
+                                    <div className="local-video-placeholder">
+                                        <i className="bi bi-camera-video-off-fill"></i>
+                                    </div>
+                                )}
+                            </div>
                             
                             
                             {/* --- Call Controls --- */}
@@ -1268,7 +1340,7 @@ function Call() {
                                     <div ref={chatMessagesEndRef} />
                                 </div>
                                 <form onSubmit={handleSendMessage} className="chat-form">
-                                    <div className="d-flex align-items:center">
+                                    <div className="d-flex align-items-center">
                                         <input
                                             type="text"
                                             className="form-control chat-input"
