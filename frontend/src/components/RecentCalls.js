@@ -25,6 +25,9 @@ function RecentCalls({ searchTerm }) {
     const dailyCallLimit = 32;
     const navigate = useNavigate();
 
+    // --- NEW: State to manage the delete confirmation modal ---
+    const [deleteTarget, setDeleteTarget] = useState(null); // { id, name }
+
     // Function to send email when re-calling
     const sendInvitationEmails = async (callId, callDescription, invitedEmail) => {
         if (!invitedEmail) return;
@@ -109,25 +112,29 @@ function RecentCalls({ searchTerm }) {
         }
     };
 
-    // --- NEW ---: Function to delete a contact/call
-    const handleDelete = async (callId, displayName) => {
-        // Show confirmation prompt
-        if (!window.confirm(`Are you sure you want to delete ${displayName} from your recent calls? This is permanent.`)) {
-            return;
-        }
+    // --- MODIFIED ---: This function now *opens* the confirmation modal
+    const promptForDelete = (callId, displayName) => {
+        setDeleteTarget({ id: callId, name: displayName });
+    };
 
-        setIsDeleting(callId);
-        const callDocRef = doc(db, 'calls', callId);
+    // --- NEW ---: This function runs the actual deletion
+    const confirmDelete = async () => {
+        if (!deleteTarget) return;
+
+        const { id, name } = deleteTarget;
+
+        setIsDeleting(id);
+        const callDocRef = doc(db, 'calls', id);
 
         try {
             await deleteDoc(callDocRef);
-            toast.success('Contact deleted.');
-            // The onSnapshot listener in Effect 1 will automatically update the UI
+            toast.success(`'${name}' deleted.`);
         } catch (error) {
             console.error("Error deleting call:", error);
             toast.error("Could not delete the contact.");
         } finally {
             setIsDeleting(null); // Reset deleting state
+            setDeleteTarget(null); // Close the modal
         }
     };
 
@@ -247,7 +254,7 @@ function RecentCalls({ searchTerm }) {
 
     return (
         <>
-            {/* --- MODIFIED: Global styles for parent search bar --- */}
+            {/* --- NEW: Global styles for parent search bar --- */}
             <style jsx global>{`
                 /* Target the search input in the parent */
                 .form-control[placeholder="Search recent calls..."] {
@@ -263,7 +270,7 @@ function RecentCalls({ searchTerm }) {
                     height: 48px;
                 }
                 /* Target the add button */
-                .btn-primary.btn-sm { 
+                .btn-primary.btn-sm { /* --- MODIFIED: Target .btn-sm --- */
                     background-color: #4A69BD; /* Professional blue */
                     border-color: #4A69BD;
                     border-radius: 12px !important;
@@ -279,6 +286,7 @@ function RecentCalls({ searchTerm }) {
             
             {/* --- MODIFIED: Component-specific styles --- */}
             <style jsx>{`
+            
                 .recent-calls-list {
                     max-height: 60vh;
                     overflow-y: auto;
@@ -355,8 +363,6 @@ function RecentCalls({ searchTerm }) {
                     align-items: center;
                     gap: 0.4rem; 
                 }
-
-                /* --- REMOVED .call-rejoin-link styles --- */
 
                 .call-button {
                     background: none;
@@ -455,9 +461,78 @@ function RecentCalls({ searchTerm }) {
                         padding: 0 0.75rem 0.75rem 0.75rem;
                     }
                 }
+
+                /* --- NEW: Delete Modal Styles --- */
+                .delete-modal-overlay {
+                    position: absolute; /* Changed from fixed to cover parent card */
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.6);
+                    backdrop-filter: blur(5px);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 100;
+                    border-radius: 0.5rem; /* Match parent card border */
+                }
+                .delete-modal-card {
+                    background: var(--bs-body-bg);
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    width: 90%;
+                    max-width: 400px;
+                    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+                }
+                .delete-modal-title {
+                    font-weight: 600;
+                    font-size: 1.25rem;
+                    color: var(--bs-body-color);
+                    margin-bottom: 0.5rem;
+                }
+                .delete-modal-body {
+                    color: var(--bs-secondary-color);
+                    margin-bottom: 1.5rem;
+                }
+                .delete-modal-body strong {
+                    color: var(--bs-body-color);
+                }
+                .delete-modal-actions {
+                    display: flex;
+                    gap: 0.75rem;
+                    justify-content: flex-end;
+                }
             `}</style>
             
-            {/* --- MODIFIED: Removed container wrapper --- */}
+            {/* --- NEW: Delete Confirmation Modal --- */}
+            {deleteTarget && (
+                <div className="delete-modal-overlay" onClick={() => setDeleteTarget(null)}>
+                    <div className="delete-modal-card" onClick={(e) => e.stopPropagation()}>
+                        <h5 className="delete-modal-title">Delete Contact?</h5>
+                        <p className="delete-modal-body">
+                            Are you sure you want to delete <strong>{deleteTarget.name}</strong> from your recents? This cannot be undone.
+                        </p>
+                        <div className="delete-modal-actions">
+                            <button 
+                                className="btn btn-secondary" 
+                                onClick={() => setDeleteTarget(null)}
+                                disabled={isDeleting === deleteTarget.id}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                className="btn btn-danger" 
+                                onClick={confirmDelete}
+                                disabled={isDeleting === deleteTarget.id}
+                            >
+                                {isDeleting === deleteTarget.id ? 'Deleting...' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="call-count-display">
                 Today's Calls: <strong>{dailyCallCount} / {dailyCallLimit}</strong>
             </div>
@@ -525,11 +600,11 @@ function RecentCalls({ searchTerm }) {
                                         )}
                                     </button>
 
-                                    {/* 3. The "delete" button */}
+                                    {/* --- MODIFIED: onClick now opens modal --- */}
                                     <button 
                                         className="call-button call-delete-button" 
                                         title={`Delete ${displayName}`}
-                                        onClick={() => handleDelete(call.id, displayName)}
+                                        onClick={() => promptForDelete(call.id, displayName)}
                                         disabled={isDeleting === call.id || isCalling === call.id}
                                     >
                                         {isDeleting === call.id ? (
