@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import {
     doc, onSnapshot, updateDoc, collection, addDoc, query,
-    orderBy, serverTimestamp, deleteDoc, deleteField
+    orderBy, serverTimestamp, deleteDoc, deleteField, arrayUnion
 } from 'firebase/firestore';
 import { toast } from 'react-toastify';
 import Peer from 'simple-peer';
@@ -17,6 +17,7 @@ import SharingComponent from './SharingComponent';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import Navbar from './navbar';
+import emailjs from '@emailjs/browser';
 
 // --- NEW: Quality Definitions ---
 const QUALITY_PROFILES = {
@@ -43,6 +44,52 @@ const QUALITY_PROFILES = {
     }
 };
 
+// --- NEW: RemoteVideo Component ---
+// This component handles rendering the remote streams in the grid
+const RemoteVideo = ({ peer, name, videoFit }) => {
+    const videoRef = useRef(null);
+    const [isMuted, setIsMuted] = useState(false);
+
+    useEffect(() => {
+        if (peer && videoRef.current) {
+            videoRef.current.srcObject = peer.stream;
+
+            // Check for audio tracks to determine mute state
+            const audioTracks = peer.stream.getAudioTracks();
+            if (audioTracks.length > 0) {
+                setIsMuted(!audioTracks[0].enabled);
+                
+                // Listen for mute/unmute events on the track
+                const track = audioTracks[0];
+                const handleMute = () => setIsMuted(true);
+                const handleUnmute = () => setIsMuted(false);
+                track.addEventListener('mute', handleMute);
+                track.addEventListener('unmute', handleUnmute);
+                return () => {
+                    track.removeEventListener('mute', handleMute);
+                    track.removeEventListener('unmute', handleUnmute);
+                };
+            }
+        }
+    }, [peer, peer.stream]);
+
+    return (
+        <div className="video-tile">
+            <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="remote-video-element"
+                style={{ objectFit: videoFit }}
+            />
+            <div className="video-label">
+                {isMuted && <i className="bi bi-mic-mute-fill me-2 text-danger"></i>}
+                {name || '...'}
+            </div>
+        </div>
+    );
+};
+
 // --- NEW: SlideToActionButton Component ---
 // This is a self-contained component for the "slide-to-action" button
 function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType }) {
@@ -59,7 +106,6 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
         setIsDragging(true);
         if (sliderRef.current) {
             sliderRef.current.style.transition = 'none'; // Disable transition while dragging
-            // --- NEW: Stop animation on drag ---
             sliderRef.current.style.animation = 'none';
         }
     };
@@ -75,13 +121,11 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
         
         let newLeft = currentX - startX - (sliderRect.width / 2);
         
-        // Constrain
         const maxLeft = containerRect.width - sliderRect.width - 2; // -2 for borders
         newLeft = Math.max(0, Math.min(newLeft, maxLeft));
         
         setSliderLeft(newLeft);
 
-        // Check for unlock
         if (newLeft > maxLeft * 0.9) { // 90% threshold
             setUnlocked(true);
             setIsDragging(false);
@@ -93,12 +137,10 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
 
     const handleDragEnd = () => {
         if (isDragging && !unlocked) {
-            // Snap back to start
             setIsDragging(false);
             setSliderLeft(0);
             if (sliderRef.current) {
                 sliderRef.current.style.transition = 'left 0.3s ease-out';
-                // --- NEW: Re-start animation ---
                 sliderRef.current.style.animation = 'vibrate 0.5s ease-in-out infinite 1.5s';
             }
         }
@@ -145,7 +187,6 @@ function Call() {
     // -- Call State --
     const [callState, setCallState] = useState('loading');
     const [callData, setCallData] = useState(null);
-    const [activeUsers, setActiveUsers] = useState([]);
     const [callOwnerId, setCallOwnerId] = useState(null);
     
     // --- UI State ---
@@ -153,31 +194,28 @@ function Call() {
     const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [areControlsVisible, setAreControlsVisible] = useState(true);
-    // --- NEW: Quality Menu State ---
     const [isQualityMenuOpen, setIsQualityMenuOpen] = useState(false);
+    const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+    const [inviteEmails, setInviteEmails] = useState('');
+    const [isInviting, setIsInviting] = useState(false);
 
 
     // --- Voice/Video Chat State ---
     const [stream, setStream] = useState(null);
     const [muteStatus, setMuteStatus] = useState({});
     const [isVideoOn, setIsVideoOn] = useState(true);
-    // --- REMOVED facingMode and hasMultipleCameras ---
     const peersRef = useRef({});
     const audioContainerRef = useRef(null);
-    const remoteVideoRef = useRef(null);
-    const localVideoRef = useRef(null); // Ref for PiP video
+    const localVideoRef = useRef(null); 
     const chatMessagesEndRef = useRef(null);
-    // --- NEW: Quality State ---
-    const [videoQuality, setVideoQuality] = useState('high'); // 'low', 'medium', 'high'
-    // --- NEW: Video Fit State ---
-    const [videoFit, setVideoFit] = useState('cover'); // 'cover' or 'contain'
+    const [videoQuality, setVideoQuality] = useState('high'); 
+    const [videoFit, setVideoFit] = useState('cover'); 
     
-    // --- Draggable PiP State ---
-    const [isPipDragging, setIsPipDragging] = useState(false);
-    const pipOffsetRef = useRef({ x: 0, y: 0 });
-    // --- NEW: Ref for PiP wrapper ---
-    const pipWrapperRef = useRef(null);
-
+    // --- MODIFIED: Renamed states for clarity ---
+    const [participants, setParticipants] = useState([]); // Users *in* the call
+    const [waitingUsers, setWaitingUsers] = useState([]); // Users *waiting* to join
+    const [remoteStreams, setRemoteStreams] = useState([]); // Remote streams
+    
 
     // Auto-scroll chat
     useEffect(() => {
@@ -186,22 +224,27 @@ function Call() {
 
     // Main useEffect to handle call data and user presence
     useEffect(() => {
-        if (!callId || !user) {
-            setCallState(callId ? 'loading' : 'denied');
+        // --- NEW: Auth Check ---
+        if (user === false) { // Auth loaded, user not logged in
+            toast.error("You must be logged in to join a call.");
+            navigate('/login', { replace: true });
+            return;
+        }
+        if (!callId || !user) { // Auth still loading
+            setCallState('loading');
             return;
         }
 
         const callDocRef = doc(db, 'calls', callId);
 
         const updatePresence = () => {
-            updateDoc(callDocRef, {
-                [`activeParticipants.${user._id}`]: {
-                    name: `${user.firstname} ${user.lastname}`,
-                    lastSeen: serverTimestamp()
-                }
-            }).catch(console.error);
+            // Only update presence if user is in `activeParticipants`
+            if (participants.find(p => p.id === user._id)) {
+                updateDoc(callDocRef, {
+                    [`activeParticipants.${user._id}.lastSeen`]: serverTimestamp()
+                }).catch(console.error);
+            }
         };
-        updatePresence(); 
         heartbeatIntervalRef.current = setInterval(updatePresence, 30000);
 
         const unsubscribeCall = onSnapshot(callDocRef, (docSnap) => {
@@ -222,30 +265,43 @@ function Call() {
                 return;
             }
 
+            // --- NEW: Separate lists for participants and waiting ---
             const participantsMap = data.activeParticipants || {};
-            const oneMinuteAgo = Date.now() - 60000;
-
-            const currentUsers = Object.entries(participantsMap)
-                .filter(([_, userData]) => userData.lastSeen && userData.lastSeen.toDate().getTime() > oneMinuteAgo)
+            const currentParticipants = Object.entries(participantsMap)
                 .map(([userId, userData]) => ({
                     id: userId,
                     name: userData.name,
                 }));
+            setParticipants(currentParticipants);
 
-            setActiveUsers(currentUsers);
+            const waitingMap = data.waitingRoom || {};
+            const currentWaiting = Object.entries(waitingMap)
+                .map(([userId, userData]) => ({
+                    id: userId,
+                    name: userData.name,
+                }));
+            setWaitingUsers(currentWaiting);
+            // --- End NEW ---
+
             setMuteStatus(data.muteStatus || {});
 
-            // --- MODIFIED: Refresh Fix ---
+            // --- MODIFIED: Refresh/Join Logic ---
             if (callState === 'loading') {
                 const alreadyJoined = sessionStorage.getItem(`call_joined_${callId}`) === 'true';
-                
-                if (alreadyJoined) {
-                    // User was already in this call, so skip 'joining' and go straight to 'active'
-                    // We will get the media in a separate useEffect
-                    setCallState('active');
+                const isUserInCall = !!participantsMap[user._id];
+
+                if (alreadyJoined || isUserInCall) {
+                    setCallState('active'); // Go straight to call
+                } else if (isOwner) {
+                    setCallState('joining'); // Owner sees join screen
                 } else {
-                    // User is new to this call, show them the joining screen
-                    setCallState('joining');
+                    // New user, add to waiting room
+                    setCallState('waiting');
+                    updateDoc(callDocRef, {
+                        [`waitingRoom.${user._id}`]: {
+                            name: `${user.firstname} ${user.lastname}`
+                        }
+                    }).catch(err => toast.error("Could not join waiting room."));
                 }
             }
         }, (error) => {
@@ -259,89 +315,170 @@ function Call() {
         return () => {
             clearInterval(heartbeatIntervalRef.current); 
             if (user) {
+                // Remove user from all possible maps on exit
                 updateDoc(doc(db, 'calls', callId), {
-                    [`activeParticipants.${user._id}`]: deleteField()
+                    [`activeParticipants.${user._id}`]: deleteField(),
+                    [`waitingRoom.${user._id}`]: deleteField()
                 }).catch(console.error);
             }
             if (stream) { stream.getTracks().forEach(track => track.stop()); }
-            Object.values(peersRef.current).forEach(peer => peer.destroy());
+            Object.values(peersRef.current).forEach(p => p.destroy());
+            peersRef.current = {};
             unsubscribeCall();
             unsubscribeMessages();
         };
-    }, [callId, user]); // --- MODIFIED: Removed callState from dependency array ---
+    }, [callId, user, navigate]); // --- MODIFIED ---
 
-    // useEffect for WebRTC connections
+    
+    // --- NEW: Stable participant ID string ---
+    const participantIDs = JSON.stringify(participants.map(p => p.id).sort());
+
+    // --- MODIFIED: WebRTC Group Call Logic (Star Topology) ---
     useEffect(() => {
         if (!stream || callState !== 'active' || !user) return;
 
         const signalingColRef = collection(db, 'calls', callId, 'signaling');
-
-        const createPeer = (recipientId, senderId, stream) => {
-            const peer = new Peer({ initiator: true, trickle: false, stream });
-            peer.on('signal', signal => addDoc(signalingColRef, { recipientId, senderId, signal }));
-            peer.on('stream', remoteStream => {
-                if (remoteVideoRef.current) {
-                    remoteVideoRef.current.srcObject = remoteStream;
-                }
-                if (audioContainerRef.current) {
-                    let audio = document.getElementById(`audio-${recipientId}`);
-                    if (!audio) {
-                        audio = document.createElement('audio'); audio.id = `audio-${recipientId}`;
-                        audio.autoplay = true; audioContainerRef.current.appendChild(audio);
-                    }
-                    audio.srcObject = remoteStream;
-                }
+        const isOwner = user._id === callOwnerId;
+        
+        // --- NEW: Helper to add stream to state ---
+        const addStream = (userId, stream) => {
+            setRemoteStreams(prev => {
+                if (prev.find(s => s.id === userId)) return prev;
+                return [...prev, { id: userId, stream }];
             });
-            peer.on('close', () => { 
-                const audioElem = document.getElementById(`audio-${recipientId}`); 
-                if (audioElem) audioElem.remove();
-                if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-            });
-            return peer;
         };
 
-        const addPeer = (incoming, recipientId, stream) => {
-            const peer = new Peer({ initiator: false, trickle: false, stream });
-            peer.on('signal', signal => addDoc(signalingColRef, { recipientId: incoming.senderId, senderId: recipientId, signal }));
-            peer.on('stream', remoteStream => {
-                 if (remoteVideoRef.current) {
-                    remoteVideoRef.current.srcObject = remoteStream;
-                }
-                if (audioContainerRef.current) {
-                    let audio = document.getElementById(`audio-${incoming.senderId}`);
-                    if (!audio) {
-                        audio = document.createElement('audio'); audio.id = `audio-${incoming.senderId}`;
-                        audio.autoplay = true; audioContainerRef.current.appendChild(audio);
-                    }
-                    audio.srcObject = remoteStream;
-                }
-            });
-            peer.on('close', () => { 
-                const audioElem = document.getElementById(`audio-${incoming.senderId}`); 
-                if (audioElem) audioElem.remove();
-                if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-            });
-            peer.signal(incoming.signal);
-            return peer;
+        // --- NEW: Helper to remove stream from state ---
+        const removeStream = (userId) => {
+            setRemoteStreams(prev => prev.filter(s => s.id !== userId));
         };
+        
+        // --- 1. OWNER LOGIC ---
+        if (isOwner) {
+            // Check for new participants who need a connection
+            participants.forEach(p => {
+                if (p.id !== user._id && !peersRef.current[p.id]) {
+                    console.log(`OWNER: Creating peer for ${p.name}`);
+                    const peer = new Peer({ initiator: true, stream: stream });
+                    
+                    // Add existing streams for the new user
+                    remoteStreams.forEach(rs => peer.addStream(rs.stream));
+                    
+                    peer.on('signal', signal => {
+                        addDoc(signalingColRef, { recipientId: p.id, senderId: user._id, signal });
+                    });
+                    
+                    peer.on('stream', remoteStream => {
+                        console.log(`OWNER: Got stream from ${p.name}`);
+                        addStream(p.id, remoteStream);
+                        // Relay this new stream to all *other* peers
+                        Object.entries(peersRef.current).forEach(([peerId, otherPeer]) => {
+                            if (peerId !== p.id) {
+                                otherPeer.addStream(remoteStream);
+                            }
+                        });
+                    });
+                    
+                    peer.on('close', () => {
+                        removeStream(p.id);
+                        delete peersRef.current[p.id];
+                    });
+                    
+                    peer.on('error', (err) => console.error(`Peer error (Owner to ${p.id}):`, err));
+                    
+                    peersRef.current[p.id] = peer;
+                }
+            });
+        } 
+        // --- 2. CLIENT LOGIC ---
+        else if (!isOwner) {
+            // Client only connects to the OWNER
+            if (!peersRef.current[callOwnerId] && participants.find(p => p.id === callOwnerId)) {
+                console.log("CLIENT: Connecting to Owner");
+                const peer = new Peer({ initiator: false, stream: stream });
 
-        activeUsers.forEach(p => { if (p.id !== user._id && !peersRef.current[p.id]) { peersRef.current[p.id] = createPeer(p.id, user._id, stream); } });
-        Object.keys(peersRef.current).forEach(peerId => { if (!activeUsers.find(p => p.id === peerId)) { peersRef.current[peerId].destroy(); delete peersRef.current[peerId]; } });
+                peer.on('signal', signal => {
+                    addDoc(signalingColRef, { recipientId: callOwnerId, senderId: user._id, signal });
+                });
 
+                // This will fire multiple times: once for owner, once for each other client
+                peer.on('stream', remoteStream => {
+                    console.log("CLIENT: Received a stream");
+                    // We don't know who this stream is from, but we can add it
+                    // A more robust solution would pass metadata, but this works for video/audio
+                    addStream(remoteStream.id, remoteStream); 
+                });
+
+                peer.on('close', () => {
+                    removeStream(callOwnerId);
+                    delete peersRef.current[callOwnerId];
+                });
+                
+                peer.on('error', (err) => console.error(`Peer error (Client to Owner):`, err));
+                
+                peersRef.current[callOwnerId] = peer;
+            }
+        }
+        
+        // --- 3. UNIVERSAL SIGNALING LISTENER ---
         const unsubscribeSignaling = onSnapshot(query(signalingColRef), snapshot => {
             snapshot.docChanges().forEach(change => {
-                if (change.type === "added") {
-                    const data = change.doc.data();
-                    if (data.recipientId === user._id) {
-                        const peer = peersRef.current[data.senderId];
-                        if (peer) { peer.signal(data.signal); } else { peersRef.current[data.senderId] = addPeer(data, user._id, stream); }
+                const data = change.doc.data();
+                if (change.type === "added" && data.recipientId === user._id) {
+                    const peer = peersRef.current[data.senderId];
+                    if (peer) {
+                        peer.signal(data.signal);
+                        deleteDoc(change.doc.ref);
+                    } else if (isOwner && !peer) {
+                        // This is an answer from a client, create the peer
+                        console.log(`OWNER: Got signal from new client ${data.senderId}`);
+                        const peer = new Peer({ initiator: false, stream: stream });
+                        
+                        remoteStreams.forEach(rs => peer.addStream(rs.stream));
+                        
+                        peer.on('signal', signal => {
+                            addDoc(signalingColRef, { recipientId: data.senderId, senderId: user._id, signal });
+                        });
+                        peer.on('stream', remoteStream => {
+                            console.log(`OWNER: Got stream from ${data.senderId}`);
+                            addStream(data.senderId, remoteStream);
+                            Object.entries(peersRef.current).forEach(([peerId, otherPeer]) => {
+                                if (peerId !== data.senderId) {
+                                    otherPeer.addStream(remoteStream);
+                                }
+                            });
+                        });
+                        peer.on('close', () => {
+                            removeStream(data.senderId);
+                            delete peersRef.current[data.senderId];
+                        });
+                        peer.on('error', (err) => console.error(`Peer error (Owner to ${data.senderId}):`, err));
+                        
+                        peer.signal(data.signal);
+                        peersRef.current[data.senderId] = peer;
                         deleteDoc(change.doc.ref);
                     }
                 }
             });
         });
-        return () => unsubscribeSignaling();
-    }, [stream, activeUsers, callState, callId, user]);
+        
+        // --- 4. CLEANUP LOGIC ---
+        // Clean up peers for users who have left
+        Object.keys(peersRef.current).forEach(peerId => { 
+            if (!participants.find(p => p.id === peerId)) {
+                console.log(`Destroying peer for ${peerId}`);
+                if (peersRef.current[peerId]) {
+                    peersRef.current[peerId].destroy();
+                }
+                delete peersRef.current[peerId];
+                removeStream(peerId);
+            }
+        });
+
+        return () => {
+             unsubscribeSignaling();
+        };
+    }, [stream, callState, user, callId, callOwnerId, participantIDs]); // --- MODIFIED: Use stable participantIDs
     
     // Mute Status UseEffect
     useEffect(() => {
@@ -431,10 +568,15 @@ function Call() {
         try {
             // Use the quality from state, request video by default
             const userStream = await getQualityStream(videoQuality, true);
-            // --- REMOVED setFacingMode and camera check logic ---
             
+            // Add user to active participants
             await updateDoc(doc(db, 'calls', callId), { 
-                [`muteStatus.${user._id}`]: false
+                [`muteStatus.${user._id}`]: false,
+                [`activeParticipants.${user._id}`]: {
+                    name: `${user.firstname} ${user.lastname}`,
+                    lastSeen: serverTimestamp()
+                },
+                [`waitingRoom.${user._id}`]: deleteField() // Remove from waiting room
             });
 
             setStream(userStream); 
@@ -446,6 +588,24 @@ function Call() {
 
         } catch (err) {
             toast.error("Could not access camera/microphone.");
+            console.error(err);
+        }
+    };
+    
+    // --- NEW: Owner allows a user ---
+    const handleAllowUser = async (userId, name) => {
+        try {
+            await updateDoc(doc(db, 'calls', callId), {
+                [`waitingRoom.${userId}`]: deleteField(),
+                [`activeParticipants.${userId}`]: {
+                    name: name,
+                    lastSeen: serverTimestamp()
+                },
+                [`muteStatus.${userId}`]: false
+            });
+            toast.success(`Allowed ${name} to join.`);
+        } catch (err) {
+            toast.error(`Failed to allow ${name}.`);
             console.error(err);
         }
     };
@@ -533,24 +693,30 @@ function Call() {
 
     // --- REMOVED handleSwapCamera FUNCTION ---
 
+    // --- MODIFIED: Mute logic updated ---
     const handleToggleMute = async (targetUserId) => {
         const isSelf = targetUserId === user._id;
 
         if (isSelf) {
+            // Users can always mute themselves
             const currentMuteState = muteStatus[targetUserId] ?? false;
             const newMuteState = !currentMuteState;
             await updateDoc(doc(db, 'calls', callId), { 
                 [`muteStatus.${targetUserId}`]: newMuteState 
             });
         } else {
+            // Only the owner can mute/unmute others
             const isTrueOwner = user && user._id === callOwnerId;
             if (isTrueOwner) {
+                const currentMuteState = muteStatus[targetUserId] ?? false;
+                const newMuteState = !currentMuteState;
                 await updateDoc(doc(db, 'calls', callId), { 
-                    [`muteStatus.${targetUserId}`]: true 
+                    [`muteStatus.${targetUserId}`]: newMuteState 
                 });
-                toast.success("Muted participant");
+                const targetName = participants.find(u => u.id === targetUserId)?.name || 'Participant';
+                toast.success(newMuteState ? `Muted ${targetName}` : `Unmuted ${targetName}`);
             } else {
-                toast.error("You can only mute yourself.");
+                toast.error("Only the call owner can mute/unmute others.");
             }
         }
     };
@@ -562,6 +728,63 @@ function Call() {
         setIsQualityMenuOpen(false);
     };
 
+    // --- NEW: Send Invites Handler ---
+    const handleSendInvites = async (e) => {
+        e.preventDefault();
+        if (!inviteEmails) {
+            toast.warn("Please enter at least one email.");
+            return;
+        }
+        setIsInviting(true);
+        
+        const emails = inviteEmails.split(',').map(email => email.trim()).filter(email => email);
+        if (emails.length === 0) {
+            toast.warn("No valid emails found.");
+            setIsInviting(false);
+            return;
+        }
+        
+        const callLink = `${window.location.origin}/call/${callId}`;
+        const emailjsPublicKey = '3WEPhBvkjCwXVYBJ-';
+        const serviceID = 'service_6ar5bgj';
+        const templateID = 'template_w4ydq8a';
+
+        try {
+            // 1. Update permissions in Firestore
+            const callDocRef = doc(db, 'calls', callId);
+            await updateDoc(callDocRef, {
+                allowedEmails: arrayUnion(...emails)
+            });
+
+            // 2. Send email to each new user
+            let successCount = 0;
+            for (const email of emails) {
+                const templateParams = {
+                    from_name: `${user.firstname} ${user.lastname}`,
+                    to_email: email,
+                    session_description: callData?.description || "a video call",
+                    session_link: callLink,
+                };
+                try {
+                    await emailjs.send(serviceID, templateID, templateParams, emailjsPublicKey);
+                    successCount++;
+                } catch (err) {
+                    console.error(`Failed to send invite to ${email}:`, err);
+                }
+            }
+            
+            toast.success(`Sent ${successCount} invite(s)!`);
+            setIsInviteModalOpen(false);
+            setInviteEmails('');
+
+        } catch (error) {
+            console.error("Error sending invites:", error);
+            toast.error("Could not update call permissions.");
+        } finally {
+            setIsInviting(false);
+        }
+    };
+
     const formatTimestamp = (timestamp) => !timestamp ? '' : timestamp.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
     const handleSendMessage = async (e) => {
@@ -571,50 +794,7 @@ function Call() {
         setNewMessage('');
     };
 
-    // --- NEW: Helper to get clientX/Y from touch or mouse ---
-    const getClient = (e) => ({
-        x: e.touches ? e.touches[0].clientX : e.clientX,
-        y: e.touches ? e.touches[0].clientY : e.clientY,
-    });
-
-    // --- MODIFIED: PiP Drag Handlers for Touch + Mouse ---
-    const handlePipDragStart = (e) => {
-        if (!pipWrapperRef.current) return;
-        setIsPipDragging(true);
-        const { x, y } = getClient(e); // Use helper
-        pipOffsetRef.current = {
-            x: x - pipWrapperRef.current.getBoundingClientRect().left,
-            y: y - pipWrapperRef.current.getBoundingClientRect().top,
-        };
-        pipWrapperRef.current.style.cursor = 'grabbing';
-    };
-
-    const handlePipDragEnd = () => {
-        setIsPipDragging(false);
-        if (pipWrapperRef.current) {
-            pipWrapperRef.current.style.cursor = 'move';
-        }
-    };
-
-    const handlePipDragMove = (e) => {
-        if (!isPipDragging || !pipWrapperRef.current || !pipWrapperRef.current.parentElement) return; 
-        
-        const { x, y } = getClient(e); // Use helper
-        const parentRect = pipWrapperRef.current.parentElement.getBoundingClientRect();
-        let newX = x - parentRect.left - pipOffsetRef.current.x;
-        let newY = y - parentRect.top - pipOffsetRef.current.y;
-
-        // Constrain to parent
-        newX = Math.max(0, Math.min(newX, parentRect.width - pipWrapperRef.current.offsetWidth));
-        newY = Math.max(0, Math.min(newY, parentRect.height - pipWrapperRef.current.offsetHeight));
-
-        pipWrapperRef.current.style.left = `${newX}px`;
-        pipWrapperRef.current.style.top = `${newY}px`;
-        pipWrapperRef.current.style.bottom = 'auto';
-        pipWrapperRef.current.style.right = 'auto';
-    };
-    // --- END PiP Handler Modifications ---
-
+    // --- REMOVED PiP Drag Handlers ---
 
     // --- Render Functions ---
 
@@ -638,6 +818,21 @@ function Call() {
                     <div className="alert alert-danger"><b>Access Denied.</b> This call may not exist or you may not have permission to join.</div>
                 </div>
             </>
+        );
+    }
+
+    // --- NEW: Waiting Room Screen ---
+    if (callState === 'waiting') {
+        return (
+             <div className="d-flex justify-content-center align-items-center" style={{ height: '100dvh', backgroundColor: '#12121c' }}>
+                <div className="text-center">
+                    <div className="spinner-border text-primary mb-3" style={{ width: '3rem', height: '3rem' }} role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <h4 className="text-white">Waiting for the host to let you in...</h4>
+                    <p className="text-secondary">Call: {callData?.description || callId}</p>
+                </div>
+            </div>
         );
     }
     
@@ -839,68 +1034,65 @@ function Call() {
                         cursor: pointer; 
                         padding: 0.5rem; /* --- MODIFIED: Responsive padding --- */
                     }
-                    .remote-video {
-                        width: 100%;
-                        height: 100%;
-                        /* object-fit is now a style property */
-                        border-radius: 12px; /* --- NEW: Rounded corners --- */
-                        background-color: #000; /* --- NEW: Black background for video --- */
-                        transition: object-fit 0.3s ease;
-                    }
                     
-                    /* --- Draggable Self-View (PiP) --- */
-                    .local-video-pip { /* This is now the wrapper */
-                        position: absolute;
-                        bottom: 1rem;
-                        right: 1rem;
-                        width: 150px;
-                        height: 150px;
-                        border-radius: 50%;
-                        border: 2px solid var(--border-color);
-                        z-index: 10;
-                        cursor: move;
-                        transition: box-shadow 0.2s ease, opacity 0.3s ease;
-                        background: #333; /* Background for placeholder */
-                        overflow: hidden; /* --- NEW: To keep icon inside --- */
-                    }
-                    /* --- MODIFIED: Adjust PiP position for new padding --- */
-                    .local-video-pip:not([style*="left"]) { 
-                         bottom: 1.5rem; /* 1rem + 0.5rem padding */
-                         right: 1.5rem; /* 1rem + 0.5rem padding */
-                    }
-                    .local-video-pip[style*="opacity: 0"] {
-                         display: none;
-                    }
-                    .local-video-pip:active {
-                        box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.3);
-                        cursor: grabbing;
-                    }
-
-                    /* --- NEW: PiP Inner Video Element --- */
-                    .local-video-element {
+                    /* --- NEW: Video Grid Layout --- */
+                    .video-grid-container {
+                        display: grid;
+                        gap: 0.5rem;
                         width: 100%;
                         height: 100%;
-                        object-fit: cover;
-                        border-radius: 50%;
-                        transition: opacity 0.2s ease;
+                        /* Dynamic grid based on participant count */
+                    }
+                    /* Classes to be added dynamically */
+                    .grid-1 { grid-template-columns: 1fr; }
+                    .grid-2 { grid-template-columns: 1fr 1fr; }
+                    .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+                    .grid-5, .grid-6 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+                    .grid-7, .grid-8, .grid-9 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
+                    
+                    .video-tile {
                         position: relative;
-                        z-index: 2; /* On top of placeholder */
-                    }
-
-                    /* --- NEW: PiP Camera-Off Placeholder --- */
-                    .local-video-placeholder {
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100%;
+                        background: #000;
+                        border-radius: 12px;
+                        overflow: hidden;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        color: #fff;
-                        font-size: 3rem;
-                        border-radius: 50%;
-                        z-index: 1; /* Below the video element */
+                    }
+                    .remote-video-element, .local-video-element {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: ${videoFit}; /* Use state for zoom/fit */
+                        transition: object-fit 0.3s ease;
+                    }
+                    .local-video-element {
+                        transform: scaleX(-1); /* Mirror self-view */
+                    }
+                    .video-label {
+                        position: absolute;
+                        bottom: 0.5rem;
+                        left: 0.5rem;
+                        background: rgba(0,0,0,0.5);
+                        color: white;
+                        padding: 0.25rem 0.75rem;
+                        border-radius: 6px;
+                        font-size: 0.9rem;
+                        font-weight: 500;
+                        z-index: 5;
+                    }
+                    
+                    /* --- NEW: Camera-Off Placeholder --- */
+                    .video-placeholder {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 100%;
+                        height: 100%;
+                        background: #333;
+                    }
+                    .video-placeholder i {
+                        font-size: 4rem;
+                        color: #666;
                     }
 
 
@@ -1035,15 +1227,31 @@ function Call() {
                         padding-bottom: calc(1rem + env(safe-area-inset-bottom));
                     }
 
+                    /* --- NEW: Participant Card Styles --- */
+                    .participant-card-list {
+                        list-style-type: none;
+                        padding: 0;
+                        margin: 0;
+                    }
+                    .participant-card {
+                        background-color: var(--dark-bg-secondary);
+                        border: 1px solid var(--border-color);
+                        border-radius: 12px;
+                        margin-bottom: 0.75rem;
+                        padding: 1rem;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    .participant-card:last-child {
+                        margin-bottom: 0;
+                    }
+
 
                     /* --- 5. DESKTOP VIEW (PC) --- */
                     @media (min-width: 768px) {
                         .video-panel-container {
                             padding: 1.5rem; /* --- NEW: Larger padding on desktop --- */
-                        }
-                        .local-video-pip:not([style*="left"]) { 
-                            bottom: 2.5rem; /* 1rem + 1.5rem padding */
-                            right: 2.5rem; /* 1rem + 1.5rem padding */
                         }
                     }
 
@@ -1080,6 +1288,8 @@ function Call() {
                         padding: 1.5rem;
                         gap: 1.5rem;
                         background-color: var(--dark-bg-primary);
+                        /* --- NEW: Add border on left for desktop --- */
+                        border-left: 1px solid var(--border-color);
                     }
                     
                     .chat-card {
@@ -1147,7 +1357,8 @@ function Call() {
                     .send-button {
                         background: var(--accent-blue); border: none; color: white;
                         border-radius: 50%; width: 40px; height: 40px;
-                        display: flex; align-items: center; justify-content: center;
+                        display: flex; align-items: center;
+                        justify-content: center;
                         margin-left: 0.5rem; transition: background-color 0.2s ease;
                     }
                 `}</style>
@@ -1162,56 +1373,40 @@ function Call() {
                             onClick={() => {
                                 setAreControlsVisible(!areControlsVisible);
                                 setIsQualityMenuOpen(false); // Close menu when clicking bg
-                            }} 
-                            // --- MODIFIED: Added touch move handler ---
-                            onMouseMove={handlePipDragMove}
-                            onTouchMove={handlePipDragMove}
-                            // ---
-                            onMouseUp={handlePipDragEnd} 
-                            onMouseLeave={handlePipDragEnd}
-                            onTouchEnd={handlePipDragEnd}
+                            }}
                         >
-                            <video 
-                                ref={remoteVideoRef} 
-                                className="remote-video" 
-                                autoPlay 
-                                playsInline 
-                                controls={false}
-                                // --- NEW: Video Fit Style ---
-                                style={{ objectFit: videoFit }}
-                            />
-                            
-                            {/* --- MODIFIED: Self-View (PiP) Wrapper --- */}
-                            <div
-                                ref={pipWrapperRef}
-                                className="local-video-pip" 
-                                style={{ opacity: stream ? 1 : 0 }}
-                                onClick={(e) => e.stopPropagation()}
-                                // --- MODIFIED: Added all drag handlers ---
-                                onMouseDown={handlePipDragStart}
-                                onTouchStart={handlePipDragStart}
-                                onMouseUp={handlePipDragEnd}
-                                onMouseLeave={handlePipDragEnd}
-                                onTouchEnd={handlePipDragEnd}
-                                onTouchMove={handlePipDragMove}
-                            >
-                                <video
-                                    ref={localVideoRef}
-                                    className="local-video-element"
-                                    style={{ 
-                                        transform: 'scaleX(-1)', // --- MODIFIED: Hardcoded mirror ---
-                                        opacity: isVideoOn ? 1 : 0 // Hide video element
-                                    }}
-                                    autoPlay
-                                    playsInline
-                                    muted
-                                />
-                                {/* --- NEW: Camera-Off Placeholder --- */}
-                                {!isVideoOn && (
-                                    <div className="local-video-placeholder">
-                                        <i className="bi bi-camera-video-off-fill"></i>
+                            {/* --- NEW: Video Grid --- */}
+                            <div className={`video-grid-container grid-${remoteStreams.length + 1}`}>
+                                {/* Local Video Tile */}
+                                <div className="video-tile">
+                                    {stream && isVideoOn ? (
+                                        <video
+                                            ref={localVideoRef}
+                                            className="local-video-element"
+                                            autoPlay
+                                            playsInline
+                                            muted
+                                        />
+                                    ) : (
+                                        <div className="video-placeholder">
+                                            <i className="bi bi-camera-video-off-fill"></i>
+                                        </div>
+                                    )}
+                                    <div className="video-label">
+                                        {muteStatus[user?._id] && <i className="bi bi-mic-mute-fill me-2 text-danger"></i>}
+                                        You
                                     </div>
-                                )}
+                                </div>
+
+                                {/* Remote Video Tiles */}
+                                {remoteStreams.map(data => (
+                                    <RemoteVideo 
+                                        key={data.id} 
+                                        peer={data}
+                                        name={participants.find(u => u.id === data.id)?.name} 
+                                        videoFit={videoFit}
+                                    />
+                                ))}
                             </div>
                             
                             
@@ -1282,6 +1477,15 @@ function Call() {
                                 >
                                     <i className={`bi ${videoFit === 'contain' ? 'bi-fullscreen-exit' : 'bi-aspect-ratio'}`}></i>
                                 </button>
+                                
+                                {/* --- NEW: Add People Button --- */}
+                                <button
+                                    className="btn btn-primary rounded-circle"
+                                    onClick={(e) => { e.stopPropagation(); setIsInviteModalOpen(true); }}
+                                    title="Add People"
+                                >
+                                    <i className="bi bi-person-plus-fill"></i>
+                                </button>
 
                                 {/* Chat (MOBILE ONLY) */}
                                 <button
@@ -1326,15 +1530,41 @@ function Call() {
                     <div 
                         className="col-12 col-xl-4 d-xl-flex flex-column desktop-sidebar" // --- MODIFIED: col-xl-4, d-xl-flex ---
                     >
+                        {/* --- NEW: Waiting Room Card --- */}
+                        {user._id === callOwnerId && waitingUsers.length > 0 && (
+                            <div className="card shadow-sm border-warning">
+                                <div className="card-header d-flex justify-content-between text-warning">
+                                    <span>Waiting Room ({waitingUsers.length})</span>
+                                    <i className="bi bi-person-exclamation"></i>
+                                </div>
+                                <ul className="list-group list-group-flush p-3 participant-card-list" style={{maxHeight: '150px', overflowY: 'auto'}}>
+                                    {waitingUsers.map(p => (
+                                        <li key={p.id} className="participant-card">
+                                            <div>
+                                                <span className="fw-bold">{p.name}</span>
+                                            </div>
+                                            <button
+                                                className="btn btn-sm btn-success"
+                                                onClick={() => handleAllowUser(p.id, p.name)}
+                                            >
+                                                Allow
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                        
                         {/* Participants Card (Desktop) */}
                         <div className="card shadow-sm">
                             <div className="card-header d-flex justify-content-between">
-                                <span>Participants ({activeUsers.length})</span>
+                                <span>Participants ({participants.length})</span>
                                 <i className="bi bi-broadcast text-success"></i>
                             </div>
-                            <ul className="list-group list-group-flush" style={{maxHeight: '150px', overflowY: 'auto'}}>
-                                {activeUsers.map(p => (
-                                    <li key={p.id} className="list-group-item d-flex justify-content-between align-items-center">
+                            {/* --- MODIFIED: Participant Card List --- */}
+                            <ul className="list-group list-group-flush p-3 participant-card-list" style={{maxHeight: '150px', overflowY: 'auto'}}>
+                                {participants.map(p => (
+                                    <li key={p.id} className="participant-card">
                                         <div>
                                             <span className="fw-bold">{p.name}</span>
                                             {p.id === user?._id && <span className="ms-2 text-muted small">(You)</span>}
@@ -1399,13 +1629,37 @@ function Call() {
                 {isParticipantsOpen && (
                     <div className="mobile-panel d-xl-none">
                         <div className="mobile-panel-header">
-                            <h5>Participants ({activeUsers.length})</h5>
+                            <h5>Participants ({participants.length})</h5>
                             <button className="btn-close btn-close-white" onClick={() => setIsParticipantsOpen(false)}></button>
                         </div>
                         <div className="mobile-panel-body">
-                            <ul className="list-group list-group-flush">
-                                {activeUsers.map(p => (
-                                    <li key={p.id} className="list-group-item d-flex justify-content-between align-items-center">
+                            {/* --- NEW: Waiting Room (Mobile) --- */}
+                            {user._id === callOwnerId && waitingUsers.length > 0 && (
+                                <div className="mb-4">
+                                    <h6 className="text-warning">Waiting Room ({waitingUsers.length})</h6>
+                                    <ul className="participant-card-list">
+                                        {waitingUsers.map(p => (
+                                            <li key={p.id} className="participant-card">
+                                                <div>
+                                                    <span className="fw-bold">{p.name}</span>
+                                                </div>
+                                                <button
+                                                    className="btn btn-sm btn-success"
+                                                    onClick={() => handleAllowUser(p.id, p.name)}
+                                                >
+                                                    Allow
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* --- MODIFIED: Participant Card List --- */}
+                            <h6 className="text-light">In The Call</h6>
+                            <ul className="participant-card-list">
+                                {participants.map(p => (
+                                    <li key={p.id} className="participant-card">
                                         <div>
                                             <span className="fw-bold">{p.name}</span>
                                             {p.id === user?._id && <span className="ms-2 text-muted small">(You)</span>}
@@ -1475,6 +1729,46 @@ function Call() {
                                 </div>
                             </form>
                         </div>
+                    </div>
+                )}
+                
+                {/* --- NEW: Invite People Modal --- */}
+                {isInviteModalOpen && (
+                     <div className="mobile-panel">
+                        <div className="mobile-panel-header">
+                            <h5>Invite People</h5>
+                            <button className="btn-close btn-close-white" onClick={() => setIsInviteModalOpen(false)}></button>
+                        </div>
+                        <form className="mobile-panel-body" onSubmit={handleSendInvites}>
+                            <p className="text-secondary mb-3">
+                                Add more people to this call. Enter emails separated by commas.
+                            </p>
+                            <div className="form-floating mb-3">
+                                <textarea
+                                    className="form-control"
+                                    id="inviteEmails"
+                                    placeholder="Enter emails"
+                                    style={{ height: '150px' }}
+                                    value={inviteEmails}
+                                    onChange={(e) => setInviteEmails(e.target.value)}
+                                />
+                                <label htmlFor="inviteEmails">Emails (comma-separated)</label>
+                            </div>
+                            <button 
+                                type="submit" 
+                                className="btn btn-primary w-100"
+                                disabled={isInviting}
+                            >
+                                {isInviting ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        Sending Invites...
+                                    </>
+                                ) : (
+                                    'Send Invites'
+                                )}
+                            </button>
+                        </form>
                     </div>
                 )}
             </div>
