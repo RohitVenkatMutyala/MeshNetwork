@@ -765,9 +765,9 @@ function Call() {
         }
 
         const callLink = `${window.location.origin}/call/${callId}`;
-        const emailjsPublicKey = '3WEPhBvkjCwXVYBJ-';
-        const serviceID = 'service_6ar5bgj';
-        const templateID = 'template_w4ydq8a';
+        const emailjsPublicKey = 'Cd-NUUSJ5dW3GJMo0';
+        const serviceID = 'service_y8qops6';
+        const templateID = 'template_apzjekq';
 
         try {
             // 1. Update permissions in Firestore
