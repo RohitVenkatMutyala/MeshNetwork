@@ -31,7 +31,7 @@ function SharingComponent() {
         <div className="card users-card shadow-lg mb-4">
             <div className="card-header users-header d-flex align-items-center">
                 <i className="bi bi-share-fill me-2"></i>
-                <h5 className="mb-0">Share Session</h5>
+                <h5 className="mb-0">Share Call</h5>
             </div>
             <div className="card-body">
             
