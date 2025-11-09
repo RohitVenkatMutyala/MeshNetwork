@@ -44,8 +44,8 @@ function Call() {
     const [stream, setStream] = useState(null);
     const [muteStatus, setMuteStatus] = useState({});
     const [isVideoOn, setIsVideoOn] = useState(true);
-    const [facingMode, setFacingMode] = useState('user'); // <-- NEW: 'user' (front) or 'environment' (back)
-    const [hasMultipleCameras, setHasMultipleCameras] = useState(false); // <-- NEW: To show/hide swap button
+    const [facingMode, setFacingMode] = useState('user'); 
+    const [hasMultipleCameras, setHasMultipleCameras] = useState(false); 
     const peersRef = useRef({});
     const audioContainerRef = useRef(null);
     const remoteVideoRef = useRef(null);
@@ -246,21 +246,26 @@ function Call() {
 
    const handleAcceptCall = async () => {
         try {
-            // <-- MODIFIED: Be explicit about 'user' (front) camera
+            // <-- MODIFIED: Increase video quality
+            const videoConstraints = {
+                facingMode: 'user',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            };
+
             const userStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'user' }, 
+                video: videoConstraints, 
                 audio: true 
             });
-            setFacingMode('user'); // <-- NEW: Set initial state
+            setFacingMode('user');
             
-            // <-- NEW: Check for multiple cameras non-blockingly
+            // Check for multiple cameras non-blockingly
             navigator.mediaDevices.enumerateDevices().then(devices => {
                 const videoDevices = devices.filter(d => d.kind === 'videoinput');
                 if (videoDevices.length > 1) {
                     setHasMultipleCameras(true);
                 }
             }).catch(console.error);
-            // --- End New Block ---
 
             // First, perform the async database operation
             await updateDoc(doc(db, 'calls', callId), { 
@@ -268,13 +273,27 @@ function Call() {
             });
 
             // NOW, set all state updates together.
-            // React will batch these into a single render.
             setStream(userStream); 
             setIsVideoOn(true);
             setCallState('active'); // This makes the <video> element appear
         } catch (err) {
-            toast.error("Could not access camera/microphone. Please check permissions.");
-            console.error(err);
+            // Fallback to lower resolution if 720p fails
+            if (err.name === "OverconstrainedError" || err.name === "ConstraintNotSatisfiedError") {
+                try {
+                    const userStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
+                    setFacingMode('user');
+                    await updateDoc(doc(db, 'calls', callId), { [`muteStatus.${user._id}`]: false });
+                    setStream(userStream);
+                    setIsVideoOn(true);
+                    setCallState('active');
+                } catch (fallbackErr) {
+                    toast.error("Could not access camera/microphone.");
+                    console.error(fallbackErr);
+                }
+            } else {
+                toast.error("Could not access camera/microphone.");
+                console.error(err);
+            }
         }
     };
 
@@ -298,19 +317,21 @@ function Call() {
         setIsVideoOn(newVideoState);
     };
 
-    // --- NEW: Camera Swap Function ---
-  // --- NEW: Camera Swap Function ---
+    // --- Camera Swap Function ---
     const handleSwapCamera = async () => {
-        // Ensure stream exists, has a video track, and there are multiple cameras
         if (!stream || !stream.getVideoTracks().length || !hasMultipleCameras) return;
 
         const oldVideoTrack = stream.getVideoTracks()[0];
         const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
 
         try {
-            // 1. Get ONLY the new video stream
+            // 1. Get ONLY the new video stream with higher quality
             const newVideoStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: newFacingMode }
+                video: { 
+                    facingMode: newFacingMode,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
             });
             const newVideoTrack = newVideoStream.getVideoTracks()[0];
 
@@ -327,8 +348,7 @@ function Call() {
             oldVideoTrack.stop();
 
             // 5. --- THE FIX ---
-            // Force the <video> element to refresh, as some
-            // browsers don't auto-update on track changes.
+            // Force the <video> element to refresh
             if (localVideoRef.current) {
                 localVideoRef.current.srcObject = null; // Unset it
                 localVideoRef.current.srcObject = stream; // Re-set it
@@ -337,7 +357,6 @@ function Call() {
 
             // 6. Update state
             setFacingMode(newFacingMode);
-            // Manually set the new track's enabled status to match UI state
             newVideoTrack.enabled = isVideoOn; 
 
         } catch (err) {
@@ -345,7 +364,6 @@ function Call() {
             console.error("Error swapping camera: ", err);
         }
     };
-    // --- End New Function ---
     // --- End New Function ---
 
 
@@ -633,10 +651,9 @@ function Call() {
                         cursor: move;
                         transition: box-shadow 0.2s ease, opacity 0.3s ease;
                         background: #222; /* Placeholder color */
-                        
                     }
                     /* --- MODIFIED: Hide if no stream --- */
-                    .local-video-pip:not([style*="left"]) { /* A bit of a hack: if no 'left' style, it's not dragged */
+                    .local-video-pip:not([style*="left"]) { 
                          bottom: 1rem;
                          right: 1rem;
                     }
@@ -655,9 +672,9 @@ function Call() {
                         transform: translateX(-50%);
                         background-color: rgba(0, 0, 0, 0.7);
                         border-radius: 50px;
-                        padding: 0.5rem;
+                        padding: 0.75rem; /* <-- UPDATED */
                         display: flex;
-                        gap: 0.5rem;
+                        gap: 0.75rem; /* <-- UPDATED */
                         z-index: 20;
                         transition: opacity 0.3s ease; 
                     }
@@ -666,13 +683,13 @@ function Call() {
                         pointer-events: none;
                     }
                     .call-controls .btn {
-                        width: 45px;
-                        height: 45px;
-                        font-size: 1.1rem;
+                        width: 48px; /* <-- UPDATED */
+                        height: 48px; /* <-- UPDATED */
+                        font-size: 1.2rem; /* <-- UPDATED */
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        margin: 0 0.25rem;
+                        margin: 0; /* <-- UPDATED */
                     }
                     
                     /* --- 4. MOBILE OVERLAY PANELS (WhatsApp-like) --- */
@@ -731,12 +748,10 @@ function Call() {
                     /* --- 5. DESKTOP VIEW (PC) --- */
                     @media (min-width: 992px) { 
                         .chat-page-container {
-                            padding: 1.5rem 0;
+                            padding: 0; /* <-- UPDATED: Remove padding */
                         }
                         .video-panel-container {
-                            height: 80vh;
-                            border-radius: 8px;
-                            border: 1px solid var(--border-color);
+                            /* <-- UPDATED: Removed height: 80vh and border-radius: 8px */
                         }
                         
                         .call-controls .btn {
@@ -823,7 +838,8 @@ function Call() {
                     }
                 `}</style>
 
-                <div className="row g-3 h-100">
+                {/* --- UPDATED: g-0 (no gutters) --- */}
+                <div className="row g-0 h-100">
 
                     {/* --- Video Column --- */}
                     <div className="col-12 col-lg-8 d-flex flex-column">
@@ -861,10 +877,11 @@ function Call() {
                             {/* --- Call Controls --- */}
                             <div className={`call-controls ${!areControlsVisible ? 'hidden' : ''}`}>
                                 
-                                {/* --- NEW CAMERA SWAP BUTTON --- */}
+                                {/* --- CAMERA SWAP BUTTON --- */}
                                 {hasMultipleCameras && (
                                     <button
-                                        className="btn btn-light rounded-circle" 
+                                        // <-- UPDATED: Color changed to btn-secondary
+                                        className="btn btn-secondary rounded-circle" 
                                         onClick={(e) => { e.stopPropagation(); handleSwapCamera(); }} 
                                         title="Swap Camera"
                                     >
@@ -874,7 +891,8 @@ function Call() {
                                 {/* --- END NEW BUTTON --- */}
 
                                 <button
-                                    className={`btn rounded-circle ${isVideoOn ? 'btn-light' : 'btn-danger'}`} 
+                                    // <-- UPDATED: Color changed to btn-secondary
+                                    className={`btn rounded-circle ${isVideoOn ? 'btn-secondary' : 'btn-danger'}`} 
                                     onClick={(e) => { e.stopPropagation(); handleToggleVideo(); }} 
                                     title={isVideoOn ? "Turn off camera" : "Turn on camera"}
                                 >
@@ -882,7 +900,8 @@ function Call() {
                                 </button>
                                 
                                 <button
-                                    className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-danger' : 'btn-light'}`} 
+                                    // <-- UPDATED: Color changed to btn-secondary
+                                    className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-danger' : 'btn-secondary'}`} 
                                     onClick={(e) => { e.stopPropagation(); handleToggleMute(user._id); }} 
                                     title={muteStatus[user._id] ? "Unmute" : "Mute"}
                                 >
@@ -928,8 +947,17 @@ function Call() {
                         </div>
                     </div>
 
-                    {/* --- Desktop-Only Sidebar (d-none d-lg-flex) --- */}
-                    <div className="col-lg-4 d-none d-lg-flex flex-column h-100" style={{maxHeight: '80vh', gap: '1.5rem'}}>
+                    {/* --- Desktop-Only Sidebar --- */}
+                    {/* --- UPDATED: Added padding and new height --- */}
+                    <div 
+                        className="col-lg-4 d-none d-lg-flex flex-column" 
+                        style={{
+                            height: 'calc(100vh - 56px)', 
+                            gap: '1.5rem', 
+                            padding: '1.5rem',
+                            overflowY: 'auto'
+                        }}
+                    >
                         {/* Participants Card (Desktop) */}
                         <div className="card shadow-sm">
                             <div className="card-header d-flex justify-content-between">
