@@ -9,7 +9,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import {
     doc, onSnapshot, updateDoc, collection, addDoc, query,
-    orderBy, serverTimestamp, deleteDoc, deleteField, arrayUnion
+    orderBy, serverTimestamp, deleteDoc, deleteField
 } from 'firebase/firestore';
 import { toast } from 'react-toastify';
 import Peer from 'simple-peer';
@@ -17,7 +17,6 @@ import SharingComponent from './SharingComponent';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import Navbar from './navbar';
-import emailjs from '@emailjs/browser'; // --- NEW: Added for inviting ---
 
 // --- NEW: Quality Definitions ---
 const QUALITY_PROFILES = {
@@ -44,51 +43,6 @@ const QUALITY_PROFILES = {
     }
 };
 
-// --- NEW: RemoteVideo Component ---
-// This component handles rendering the remote streams in the grid
-const RemoteVideo = ({ peer, name }) => {
-    const videoRef = useRef(null);
-    const [isMuted, setIsMuted] = useState(false);
-
-    useEffect(() => {
-        if (peer && videoRef.current) {
-            videoRef.current.srcObject = peer.stream;
-
-            // Check for audio tracks to determine mute state
-            const audioTracks = peer.stream.getAudioTracks();
-            if (audioTracks.length > 0) {
-                setIsMuted(!audioTracks[0].enabled);
-                
-                // Listen for mute/unmute events on the track
-                const track = audioTracks[0];
-                const handleMute = () => setIsMuted(true);
-                const handleUnmute = () => setIsMuted(false);
-                track.addEventListener('mute', handleMute);
-                track.addEventListener('unmute', handleUnmute);
-                return () => {
-                    track.removeEventListener('mute', handleMute);
-                    track.removeEventListener('unmute', handleUnmute);
-                };
-            }
-        }
-    }, [peer, peer.stream]);
-
-    return (
-        <div className="video-tile">
-            <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="remote-video-element"
-            />
-            <div className="video-label">
-                {isMuted && <i className="bi bi-mic-mute-fill me-2 text-danger"></i>}
-                {name || peer.userId}
-            </div>
-        </div>
-    );
-};
-
 // --- NEW: SlideToActionButton Component ---
 // This is a self-contained component for the "slide-to-action" button
 function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType }) {
@@ -105,6 +59,7 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
         setIsDragging(true);
         if (sliderRef.current) {
             sliderRef.current.style.transition = 'none'; // Disable transition while dragging
+            // --- NEW: Stop animation on drag ---
             sliderRef.current.style.animation = 'none';
         }
     };
@@ -120,11 +75,13 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
         
         let newLeft = currentX - startX - (sliderRect.width / 2);
         
+        // Constrain
         const maxLeft = containerRect.width - sliderRect.width - 2; // -2 for borders
         newLeft = Math.max(0, Math.min(newLeft, maxLeft));
         
         setSliderLeft(newLeft);
 
+        // Check for unlock
         if (newLeft > maxLeft * 0.9) { // 90% threshold
             setUnlocked(true);
             setIsDragging(false);
@@ -136,10 +93,12 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
 
     const handleDragEnd = () => {
         if (isDragging && !unlocked) {
+            // Snap back to start
             setIsDragging(false);
             setSliderLeft(0);
             if (sliderRef.current) {
                 sliderRef.current.style.transition = 'left 0.3s ease-out';
+                // --- NEW: Re-start animation ---
                 sliderRef.current.style.animation = 'vibrate 0.5s ease-in-out infinite 1.5s';
             }
         }
@@ -194,26 +153,30 @@ function Call() {
     const [isParticipantsOpen, setIsParticipantsOpen] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [areControlsVisible, setAreControlsVisible] = useState(true);
+    // --- NEW: Quality Menu State ---
     const [isQualityMenuOpen, setIsQualityMenuOpen] = useState(false);
-    // --- NEW: Invite Modal State ---
-    const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-    const [inviteEmails, setInviteEmails] = useState('');
-    const [isInviting, setIsInviting] = useState(false);
 
 
     // --- Voice/Video Chat State ---
     const [stream, setStream] = useState(null);
     const [muteStatus, setMuteStatus] = useState({});
     const [isVideoOn, setIsVideoOn] = useState(true);
+    // --- REMOVED facingMode and hasMultipleCameras ---
     const peersRef = useRef({});
     const audioContainerRef = useRef(null);
-    const localVideoRef = useRef(null); 
+    const remoteVideoRef = useRef(null);
+    const localVideoRef = useRef(null); // Ref for PiP video
     const chatMessagesEndRef = useRef(null);
-    const [videoQuality, setVideoQuality] = useState('high'); 
-    const [videoFit, setVideoFit] = useState('cover'); 
+    // --- NEW: Quality State ---
+    const [videoQuality, setVideoQuality] = useState('high'); // 'low', 'medium', 'high'
+    // --- NEW: Video Fit State ---
+    const [videoFit, setVideoFit] = useState('cover'); // 'cover' or 'contain'
     
-    // --- NEW: State for peer streams ---
-    const [peers, setPeers] = useState([]); // Stores { userId, stream, peer }
+    // --- Draggable PiP State ---
+    const [isPipDragging, setIsPipDragging] = useState(false);
+    const pipOffsetRef = useRef({ x: 0, y: 0 });
+    // --- NEW: Ref for PiP wrapper ---
+    const pipWrapperRef = useRef(null);
 
 
     // Auto-scroll chat
@@ -252,7 +215,6 @@ function Call() {
             setCallOwnerId(data.ownerId);
 
             const isOwner = user && data.ownerId === user._id;
-            // --- MODIFIED: Allow anyone in allowedEmails to join ---
             const hasAccess = (user && data.allowedEmails?.includes(user.email)) || isOwner;
 
             if (!hasAccess) {
@@ -278,8 +240,11 @@ function Call() {
                 const alreadyJoined = sessionStorage.getItem(`call_joined_${callId}`) === 'true';
                 
                 if (alreadyJoined) {
+                    // User was already in this call, so skip 'joining' and go straight to 'active'
+                    // We will get the media in a separate useEffect
                     setCallState('active');
                 } else {
+                    // User is new to this call, show them the joining screen
                     setCallState('joining');
                 }
             }
@@ -299,101 +264,69 @@ function Call() {
                 }).catch(console.error);
             }
             if (stream) { stream.getTracks().forEach(track => track.stop()); }
-            Object.values(peersRef.current).forEach(p => p.destroy());
-            peersRef.current = {};
+            Object.values(peersRef.current).forEach(peer => peer.destroy());
             unsubscribeCall();
             unsubscribeMessages();
         };
-    }, [callId, user]); 
+    }, [callId, user]); // --- MODIFIED: Removed callState from dependency array ---
 
-    // --- MODIFIED: WebRTC Group Call Logic ---
+    // useEffect for WebRTC connections
     useEffect(() => {
         if (!stream || callState !== 'active' || !user) return;
 
         const signalingColRef = collection(db, 'calls', callId, 'signaling');
 
-        // --- NEW: Helper to add stream to state ---
-        const addPeerStream = (userId, stream, peer) => {
-            setPeers(prevPeers => {
-                // Avoid duplicates
-                if (prevPeers.find(p => p.userId === userId)) return prevPeers;
-                return [...prevPeers, { userId, stream, peer }];
-            });
-        };
-
-        // --- NEW: Helper to remove stream from state ---
-        const removePeerStream = (userId) => {
-            setPeers(prevPeers => prevPeers.filter(p => p.userId !== userId));
-        };
-
-        // --- MODIFIED: createPeer function ---
         const createPeer = (recipientId, senderId, stream) => {
             const peer = new Peer({ initiator: true, trickle: false, stream });
-            
-            peer.on('signal', signal => {
-                addDoc(signalingColRef, { recipientId, senderId, signal });
-            });
-
+            peer.on('signal', signal => addDoc(signalingColRef, { recipientId, senderId, signal }));
             peer.on('stream', remoteStream => {
-                addPeerStream(recipientId, remoteStream, peer);
+                if (remoteVideoRef.current) {
+                    remoteVideoRef.current.srcObject = remoteStream;
+                }
+                if (audioContainerRef.current) {
+                    let audio = document.getElementById(`audio-${recipientId}`);
+                    if (!audio) {
+                        audio = document.createElement('audio'); audio.id = `audio-${recipientId}`;
+                        audio.autoplay = true; audioContainerRef.current.appendChild(audio);
+                    }
+                    audio.srcObject = remoteStream;
+                }
             });
-
             peer.on('close', () => { 
-                removePeerStream(recipientId);
+                const audioElem = document.getElementById(`audio-${recipientId}`); 
+                if (audioElem) audioElem.remove();
+                if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
             });
-            
-            peer.on('error', (err) => {
-                console.error(`Peer error (to ${recipientId}):`, err);
-                removePeerStream(recipientId);
-            });
-
-            peersRef.current[recipientId] = peer;
+            return peer;
         };
 
-        // --- MODIFIED: addPeer function ---
         const addPeer = (incoming, recipientId, stream) => {
             const peer = new Peer({ initiator: false, trickle: false, stream });
-            
-            peer.on('signal', signal => {
-                addDoc(signalingColRef, { recipientId: incoming.senderId, senderId: recipientId, signal });
-            });
-            
+            peer.on('signal', signal => addDoc(signalingColRef, { recipientId: incoming.senderId, senderId: recipientId, signal }));
             peer.on('stream', remoteStream => {
-                addPeerStream(incoming.senderId, remoteStream, peer);
+                 if (remoteVideoRef.current) {
+                    remoteVideoRef.current.srcObject = remoteStream;
+                }
+                if (audioContainerRef.current) {
+                    let audio = document.getElementById(`audio-${incoming.senderId}`);
+                    if (!audio) {
+                        audio = document.createElement('audio'); audio.id = `audio-${incoming.senderId}`;
+                        audio.autoplay = true; audioContainerRef.current.appendChild(audio);
+                    }
+                    audio.srcObject = remoteStream;
+                }
             });
-            
             peer.on('close', () => { 
-                removePeerStream(incoming.senderId);
+                const audioElem = document.getElementById(`audio-${incoming.senderId}`); 
+                if (audioElem) audioElem.remove();
+                if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
             });
-            
-            peer.on('error', (err) => {
-                console.error(`Peer error (from ${incoming.senderId}):`, err);
-                removePeerStream(incoming.senderId);
-            });
-
             peer.signal(incoming.signal);
-            peersRef.current[incoming.senderId] = peer;
+            return peer;
         };
 
-        // --- MODIFIED: Logic to connect to all users ---
-        activeUsers.forEach(p => { 
-            if (p.id !== user._id && !peersRef.current[p.id]) {
-                console.log(`Creating peer for ${p.name}`);
-                createPeer(p.id, user._id, stream);
-            }
-        });
-
-        // --- MODIFIED: Logic to remove disconnected users ---
-        Object.keys(peersRef.current).forEach(peerId => { 
-            if (!activeUsers.find(p => p.id === peerId)) {
-                console.log(`Destroying peer for ${peerId}`);
-                if (peersRef.current[peerId]) {
-                    peersRef.current[peerId].destroy();
-                }
-                delete peersRef.current[peerId];
-                removePeerStream(peerId);
-            }
-        });
+        activeUsers.forEach(p => { if (p.id !== user._id && !peersRef.current[p.id]) { peersRef.current[p.id] = createPeer(p.id, user._id, stream); } });
+        Object.keys(peersRef.current).forEach(peerId => { if (!activeUsers.find(p => p.id === peerId)) { peersRef.current[peerId].destroy(); delete peersRef.current[peerId]; } });
 
         const unsubscribeSignaling = onSnapshot(query(signalingColRef), snapshot => {
             snapshot.docChanges().forEach(change => {
@@ -401,25 +334,14 @@ function Call() {
                     const data = change.doc.data();
                     if (data.recipientId === user._id) {
                         const peer = peersRef.current[data.senderId];
-                        if (peer) {
-                            peer.signal(data.signal);
-                        } else {
-                            addPeer(data, user._id, stream);
-                        }
-                        deleteDoc(change.doc.ref); // Signal consumed, delete it
+                        if (peer) { peer.signal(data.signal); } else { peersRef.current[data.senderId] = addPeer(data, user._id, stream); }
+                        deleteDoc(change.doc.ref);
                     }
                 }
             });
         });
-
-        return () => {
-             unsubscribeSignaling();
-             // Clean up peers on stream change
-             Object.values(peersRef.current).forEach(peer => peer.destroy());
-             peersRef.current = {};
-             setPeers([]);
-        };
-    }, [stream, activeUsers, callState, callId, user]); // Re-run when stream or users change
+        return () => unsubscribeSignaling();
+    }, [stream, activeUsers, callState, callId, user]);
     
     // Mute Status UseEffect
     useEffect(() => {
@@ -640,63 +562,6 @@ function Call() {
         setIsQualityMenuOpen(false);
     };
 
-    // --- NEW: Send Invites Handler ---
-    const handleSendInvites = async (e) => {
-        e.preventDefault();
-        if (!inviteEmails) {
-            toast.warn("Please enter at least one email.");
-            return;
-        }
-        setIsInviting(true);
-        
-        const emails = inviteEmails.split(',').map(email => email.trim()).filter(email => email);
-        if (emails.length === 0) {
-            toast.warn("No valid emails found.");
-            setIsInviting(false);
-            return;
-        }
-        
-        const callLink = `${window.location.origin}/call/${callId}`;
-        const emailjsPublicKey = '3WEPhBvkjCwXVYBJ-';
-        const serviceID = 'service_6ar5bgj';
-        const templateID = 'template_w4ydq8a';
-
-        try {
-            // 1. Update permissions in Firestore
-            const callDocRef = doc(db, 'calls', callId);
-            await updateDoc(callDocRef, {
-                allowedEmails: arrayUnion(...emails)
-            });
-
-            // 2. Send email to each new user
-            let successCount = 0;
-            for (const email of emails) {
-                const templateParams = {
-                    from_name: `${user.firstname} ${user.lastname}`,
-                    to_email: email,
-                    session_description: callData?.description || "a video call",
-                    session_link: callLink,
-                };
-                try {
-                    await emailjs.send(serviceID, templateID, templateParams, emailjsPublicKey);
-                    successCount++;
-                } catch (err) {
-                    console.error(`Failed to send invite to ${email}:`, err);
-                }
-            }
-            
-            toast.success(`Sent ${successCount} invite(s)!`);
-            setIsInviteModalOpen(false);
-            setInviteEmails('');
-
-        } catch (error) {
-            console.error("Error sending invites:", error);
-            toast.error("Could not update call permissions.");
-        } finally {
-            setIsInviting(false);
-        }
-    };
-
     const formatTimestamp = (timestamp) => !timestamp ? '' : timestamp.toDate().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
     const handleSendMessage = async (e) => {
@@ -706,7 +571,50 @@ function Call() {
         setNewMessage('');
     };
 
-    // --- REMOVED PiP Drag Handlers ---
+    // --- NEW: Helper to get clientX/Y from touch or mouse ---
+    const getClient = (e) => ({
+        x: e.touches ? e.touches[0].clientX : e.clientX,
+        y: e.touches ? e.touches[0].clientY : e.clientY,
+    });
+
+    // --- MODIFIED: PiP Drag Handlers for Touch + Mouse ---
+    const handlePipDragStart = (e) => {
+        if (!pipWrapperRef.current) return;
+        setIsPipDragging(true);
+        const { x, y } = getClient(e); // Use helper
+        pipOffsetRef.current = {
+            x: x - pipWrapperRef.current.getBoundingClientRect().left,
+            y: y - pipWrapperRef.current.getBoundingClientRect().top,
+        };
+        pipWrapperRef.current.style.cursor = 'grabbing';
+    };
+
+    const handlePipDragEnd = () => {
+        setIsPipDragging(false);
+        if (pipWrapperRef.current) {
+            pipWrapperRef.current.style.cursor = 'move';
+        }
+    };
+
+    const handlePipDragMove = (e) => {
+        if (!isPipDragging || !pipWrapperRef.current || !pipWrapperRef.current.parentElement) return; 
+        
+        const { x, y } = getClient(e); // Use helper
+        const parentRect = pipWrapperRef.current.parentElement.getBoundingClientRect();
+        let newX = x - parentRect.left - pipOffsetRef.current.x;
+        let newY = y - parentRect.top - pipOffsetRef.current.y;
+
+        // Constrain to parent
+        newX = Math.max(0, Math.min(newX, parentRect.width - pipWrapperRef.current.offsetWidth));
+        newY = Math.max(0, Math.min(newY, parentRect.height - pipWrapperRef.current.offsetHeight));
+
+        pipWrapperRef.current.style.left = `${newX}px`;
+        pipWrapperRef.current.style.top = `${newY}px`;
+        pipWrapperRef.current.style.bottom = 'auto';
+        pipWrapperRef.current.style.right = 'auto';
+    };
+    // --- END PiP Handler Modifications ---
+
 
     // --- Render Functions ---
 
@@ -931,65 +839,68 @@ function Call() {
                         cursor: pointer; 
                         padding: 0.5rem; /* --- MODIFIED: Responsive padding --- */
                     }
-                    
-                    /* --- NEW: Video Grid Layout --- */
-                    .video-grid-container {
-                        display: grid;
-                        gap: 0.5rem;
+                    .remote-video {
                         width: 100%;
                         height: 100%;
-                        /* Dynamic grid based on participant count */
-                    }
-                    /* Classes to be added dynamically */
-                    .grid-1 { grid-template-columns: 1fr; }
-                    .grid-2 { grid-template-columns: 1fr 1fr; }
-                    .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-                    .grid-5, .grid-6 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
-                    .grid-7, .grid-8, .grid-9 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
-                    
-                    .video-tile {
-                        position: relative;
-                        background: #000;
-                        border-radius: 12px;
-                        overflow: hidden;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                    }
-                    .remote-video-element, .local-video-element {
-                        width: 100%;
-                        height: 100%;
-                        object-fit: ${videoFit}; /* Use state for zoom/fit */
+                        /* object-fit is now a style property */
+                        border-radius: 12px; /* --- NEW: Rounded corners --- */
+                        background-color: #000; /* --- NEW: Black background for video --- */
                         transition: object-fit 0.3s ease;
                     }
-                    .local-video-element {
-                        transform: scaleX(-1); /* Mirror self-view */
-                    }
-                    .video-label {
-                        position: absolute;
-                        bottom: 0.5rem;
-                        left: 0.5rem;
-                        background: rgba(0,0,0,0.5);
-                        color: white;
-                        padding: 0.25rem 0.75rem;
-                        border-radius: 6px;
-                        font-size: 0.9rem;
-                        font-weight: 500;
-                        z-index: 5;
-                    }
                     
-                    /* --- NEW: Camera-Off Placeholder --- */
-                    .video-placeholder {
+                    /* --- Draggable Self-View (PiP) --- */
+                    .local-video-pip { /* This is now the wrapper */
+                        position: absolute;
+                        bottom: 1rem;
+                        right: 1rem;
+                        width: 150px;
+                        height: 150px;
+                        border-radius: 50%;
+                        border: 2px solid var(--border-color);
+                        z-index: 10;
+                        cursor: move;
+                        transition: box-shadow 0.2s ease, opacity 0.3s ease;
+                        background: #333; /* Background for placeholder */
+                        overflow: hidden; /* --- NEW: To keep icon inside --- */
+                    }
+                    /* --- MODIFIED: Adjust PiP position for new padding --- */
+                    .local-video-pip:not([style*="left"]) { 
+                         bottom: 1.5rem; /* 1rem + 0.5rem padding */
+                         right: 1.5rem; /* 1rem + 0.5rem padding */
+                    }
+                    .local-video-pip[style*="opacity: 0"] {
+                         display: none;
+                    }
+                    .local-video-pip:active {
+                        box-shadow: 0 0 15px 5px rgba(255, 255, 255, 0.3);
+                        cursor: grabbing;
+                    }
+
+                    /* --- NEW: PiP Inner Video Element --- */
+                    .local-video-element {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                        border-radius: 50%;
+                        transition: opacity 0.2s ease;
+                        position: relative;
+                        z-index: 2; /* On top of placeholder */
+                    }
+
+                    /* --- NEW: PiP Camera-Off Placeholder --- */
+                    .local-video-placeholder {
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        width: 100%;
-                        height: 100%;
-                        background: #333;
-                    }
-                    .video-placeholder i {
-                        font-size: 4rem;
-                        color: #666;
+                        color: #fff;
+                        font-size: 3rem;
+                        border-radius: 50%;
+                        z-index: 1; /* Below the video element */
                     }
 
 
@@ -1130,6 +1041,10 @@ function Call() {
                         .video-panel-container {
                             padding: 1.5rem; /* --- NEW: Larger padding on desktop --- */
                         }
+                        .local-video-pip:not([style*="left"]) { 
+                            bottom: 2.5rem; /* 1rem + 1.5rem padding */
+                            right: 2.5rem; /* 1rem + 1.5rem padding */
+                        }
                     }
 
                     /* --- MODIFIED: Changed 992px to 1200px (lg to xl) --- */
@@ -1165,8 +1080,6 @@ function Call() {
                         padding: 1.5rem;
                         gap: 1.5rem;
                         background-color: var(--dark-bg-primary);
-                        /* --- NEW: Add border on left for desktop --- */
-                        border-left: 1px solid var(--border-color);
                     }
                     
                     .chat-card {
@@ -1249,39 +1162,56 @@ function Call() {
                             onClick={() => {
                                 setAreControlsVisible(!areControlsVisible);
                                 setIsQualityMenuOpen(false); // Close menu when clicking bg
-                            }}
+                            }} 
+                            // --- MODIFIED: Added touch move handler ---
+                            onMouseMove={handlePipDragMove}
+                            onTouchMove={handlePipDragMove}
+                            // ---
+                            onMouseUp={handlePipDragEnd} 
+                            onMouseLeave={handlePipDragEnd}
+                            onTouchEnd={handlePipDragEnd}
                         >
-                            {/* --- NEW: Video Grid --- */}
-                            <div className={`video-grid-container grid-${peers.length + 1}`}>
-                                {/* Local Video Tile */}
-                                <div className="video-tile">
-                                    {stream && isVideoOn ? (
-                                        <video
-                                            ref={localVideoRef}
-                                            className="local-video-element"
-                                            autoPlay
-                                            playsInline
-                                            muted
-                                        />
-                                    ) : (
-                                        <div className="video-placeholder">
-                                            <i className="bi bi-camera-video-off-fill"></i>
-                                        </div>
-                                    )}
-                                    <div className="video-label">
-                                        {muteStatus[user?._id] && <i className="bi bi-mic-mute-fill me-2 text-danger"></i>}
-                                        You
+                            <video 
+                                ref={remoteVideoRef} 
+                                className="remote-video" 
+                                autoPlay 
+                                playsInline 
+                                controls={false}
+                                // --- NEW: Video Fit Style ---
+                                style={{ objectFit: videoFit }}
+                            />
+                            
+                            {/* --- MODIFIED: Self-View (PiP) Wrapper --- */}
+                            <div
+                                ref={pipWrapperRef}
+                                className="local-video-pip" 
+                                style={{ opacity: stream ? 1 : 0 }}
+                                onClick={(e) => e.stopPropagation()}
+                                // --- MODIFIED: Added all drag handlers ---
+                                onMouseDown={handlePipDragStart}
+                                onTouchStart={handlePipDragStart}
+                                onMouseUp={handlePipDragEnd}
+                                onMouseLeave={handlePipDragEnd}
+                                onTouchEnd={handlePipDragEnd}
+                                onTouchMove={handlePipDragMove}
+                            >
+                                <video
+                                    ref={localVideoRef}
+                                    className="local-video-element"
+                                    style={{ 
+                                        transform: 'scaleX(-1)', // --- MODIFIED: Hardcoded mirror ---
+                                        opacity: isVideoOn ? 1 : 0 // Hide video element
+                                    }}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                />
+                                {/* --- NEW: Camera-Off Placeholder --- */}
+                                {!isVideoOn && (
+                                    <div className="local-video-placeholder">
+                                        <i className="bi bi-camera-video-off-fill"></i>
                                     </div>
-                                </div>
-
-                                {/* Remote Video Tiles */}
-                                {peers.map(peer => (
-                                    <RemoteVideo 
-                                        key={peer.userId} 
-                                        peer={peer}
-                                        name={activeUsers.find(u => u.id === peer.userId)?.name} 
-                                    />
-                                ))}
+                                )}
                             </div>
                             
                             
@@ -1351,15 +1281,6 @@ function Call() {
                                     title={videoFit === 'cover' ? "Fit video to screen" : "Fill screen with video"}
                                 >
                                     <i className={`bi ${videoFit === 'contain' ? 'bi-fullscreen-exit' : 'bi-aspect-ratio'}`}></i>
-                                </button>
-                                
-                                {/* --- NEW: Add People Button --- */}
-                                <button
-                                    className="btn btn-primary rounded-circle"
-                                    onClick={(e) => { e.stopPropagation(); setIsInviteModalOpen(true); }}
-                                    title="Add People"
-                                >
-                                    <i className="bi bi-person-plus-fill"></i>
                                 </button>
 
                                 {/* Chat (MOBILE ONLY) */}
@@ -1554,46 +1475,6 @@ function Call() {
                                 </div>
                             </form>
                         </div>
-                    </div>
-                )}
-                
-                {/* --- NEW: Invite People Modal --- */}
-                {isInviteModalOpen && (
-                     <div className="mobile-panel">
-                        <div className="mobile-panel-header">
-                            <h5>Invite People</h5>
-                            <button className="btn-close btn-close-white" onClick={() => setIsInviteModalOpen(false)}></button>
-                        </div>
-                        <form className="mobile-panel-body" onSubmit={handleSendInvites}>
-                            <p className="text-secondary mb-3">
-                                Add more people to this call. Enter emails separated by commas.
-                            </p>
-                            <div className="form-floating mb-3">
-                                <textarea
-                                    className="form-control"
-                                    id="inviteEmails"
-                                    placeholder="Enter emails"
-                                    style={{ height: '150px' }}
-                                    value={inviteEmails}
-                                    onChange={(e) => setInviteEmails(e.target.value)}
-                                />
-                                <label htmlFor="inviteEmails">Emails (comma-separated)</label>
-                            </div>
-                            <button 
-                                type="submit" 
-                                className="btn btn-primary w-100"
-                                disabled={isInviting}
-                            >
-                                {isInviting ? (
-                                    <>
-                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                        Sending Invites...
-                                    </>
-                                ) : (
-                                    'Send Invites'
-                                )}
-                            </button>
-                        </form>
                     </div>
                 )}
             </div>
