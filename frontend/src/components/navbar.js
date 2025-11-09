@@ -117,6 +117,7 @@ function Navbar() {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    text-decoration: none;
 }
                 .navbar-brand-custom:hover {
                     transform: scale(1.05);
