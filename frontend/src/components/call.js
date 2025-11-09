@@ -415,6 +415,7 @@ function Call() {
 
     // --- MODIFIED: Routing Fix ---
     const handleDeclineCall = () => {
+        // Replace the current history item ("/call/:callId") with "/new-call"
         navigate('/new-call', { replace: true }); 
     };
     
@@ -426,6 +427,7 @@ function Call() {
         setStream(null); 
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
+        // Replace the current history item ("/call/:callId") with "/new-call"
         navigate('/new-call', { replace: true });
     };
 
@@ -522,30 +524,38 @@ function Call() {
         setNewMessage('');
     };
 
-    // --- PiP Drag Handlers (MODIFIED to use pipWrapperRef) ---
-    const handlePipMouseDown = (e) => {
+    // --- NEW: Helper to get clientX/Y from touch or mouse ---
+    const getClient = (e) => ({
+        x: e.touches ? e.touches[0].clientX : e.clientX,
+        y: e.touches ? e.touches[0].clientY : e.clientY,
+    });
+
+    // --- MODIFIED: PiP Drag Handlers for Touch + Mouse ---
+    const handlePipDragStart = (e) => {
         if (!pipWrapperRef.current) return;
         setIsPipDragging(true);
+        const { x, y } = getClient(e); // Use helper
         pipOffsetRef.current = {
-            x: e.clientX - pipWrapperRef.current.getBoundingClientRect().left,
-            y: e.clientY - pipWrapperRef.current.getBoundingClientRect().top,
+            x: x - pipWrapperRef.current.getBoundingClientRect().left,
+            y: y - pipWrapperRef.current.getBoundingClientRect().top,
         };
         pipWrapperRef.current.style.cursor = 'grabbing';
     };
 
-    const handlePipMouseUp = () => {
+    const handlePipDragEnd = () => {
         setIsPipDragging(false);
         if (pipWrapperRef.current) {
             pipWrapperRef.current.style.cursor = 'move';
         }
     };
 
-    const handlePipMouseMove = (e) => {
+    const handlePipDragMove = (e) => {
         if (!isPipDragging || !pipWrapperRef.current || !pipWrapperRef.current.parentElement) return; 
         
+        const { x, y } = getClient(e); // Use helper
         const parentRect = pipWrapperRef.current.parentElement.getBoundingClientRect();
-        let newX = e.clientX - parentRect.left - pipOffsetRef.current.x;
-        let newY = e.clientY - parentRect.top - pipOffsetRef.current.y;
+        let newX = x - parentRect.left - pipOffsetRef.current.x;
+        let newY = y - parentRect.top - pipOffsetRef.current.y;
 
         // Constrain to parent
         newX = Math.max(0, Math.min(newX, parentRect.width - pipWrapperRef.current.offsetWidth));
@@ -556,6 +566,7 @@ function Call() {
         pipWrapperRef.current.style.bottom = 'auto';
         pipWrapperRef.current.style.right = 'auto';
     };
+    // --- END PiP Handler Modifications ---
 
 
     // --- Render Functions ---
@@ -1084,9 +1095,11 @@ function Call() {
                                 setAreControlsVisible(!areControlsVisible);
                                 setIsQualityMenuOpen(false); // Close menu when clicking bg
                             }} 
-                            onMouseMove={handlePipMouseMove} 
-                            onMouseUp={handlePipMouseUp} 
-                            onMouseLeave={handlePipMouseUp} 
+                            onMouseMove={handlePipDragMove} 
+                            onMouseUp={handlePipDragEnd} 
+                            onMouseLeave={handlePipDragEnd}
+                            onTouchMove={handlePipDragMove}
+                            onTouchEnd={handlePipDragEnd}
                         >
                             <video 
                                 ref={remoteVideoRef} 
@@ -1101,10 +1114,13 @@ function Call() {
                                 ref={pipWrapperRef}
                                 className="local-video-pip" 
                                 style={{ opacity: stream ? 1 : 0 }}
-                                onMouseDown={handlePipMouseDown}
+                                onMouseDown={handlePipDragStart}
                                 onClick={(e) => e.stopPropagation()}
-                                onMouseUp={handlePipMouseUp}
-                                onMouseLeave={handlePipMouseUp}
+                                onMouseUp={handlePipDragEnd}
+                                onMouseLeave={handlePipDragEnd}
+                                onTouchStart={handlePipDragStart}
+                                onTouchMove={handlePipDragMove}
+                                onTouchEnd={handlePipDragEnd}
                             >
                                 <video
                                     ref={localVideoRef}
