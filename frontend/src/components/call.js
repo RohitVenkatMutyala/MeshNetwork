@@ -299,6 +299,7 @@ function Call() {
     };
 
     // --- NEW: Camera Swap Function ---
+  // --- NEW: Camera Swap Function ---
     const handleSwapCamera = async () => {
         // Ensure stream exists, has a video track, and there are multiple cameras
         if (!stream || !stream.getVideoTracks().length || !hasMultipleCameras) return;
@@ -315,19 +316,26 @@ function Call() {
 
             // 2. Replace the track in all peer connections
             Object.values(peersRef.current).forEach(peer => {
-                // `replaceTrack` is a simple-peer method
                 peer.replaceTrack(oldVideoTrack, newVideoTrack, stream);
             });
 
             // 3. Update the *local* stream object in-place
-            // This will make the localVideoRef update automatically
             stream.removeTrack(oldVideoTrack);
             stream.addTrack(newVideoTrack);
             
             // 4. Stop the old track
             oldVideoTrack.stop();
 
-            // 5. Update state
+            // 5. --- THE FIX ---
+            // Force the <video> element to refresh, as some
+            // browsers don't auto-update on track changes.
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = null; // Unset it
+                localVideoRef.current.srcObject = stream; // Re-set it
+            }
+            // --- END FIX ---
+
+            // 6. Update state
             setFacingMode(newFacingMode);
             // Manually set the new track's enabled status to match UI state
             newVideoTrack.enabled = isVideoOn; 
@@ -337,6 +345,7 @@ function Call() {
             console.error("Error swapping camera: ", err);
         }
     };
+    // --- End New Function ---
     // --- End New Function ---
 
 
@@ -624,7 +633,7 @@ function Call() {
                         cursor: move;
                         transition: box-shadow 0.2s ease, opacity 0.3s ease;
                         background: #222; /* Placeholder color */
-                        transform: scaleX(-1); /* <-- NEW: Flip front camera for mirror effect */
+                        
                     }
                     /* --- MODIFIED: Hide if no stream --- */
                     .local-video-pip:not([style*="left"]) { /* A bit of a hack: if no 'left' style, it's not dragged */
@@ -837,7 +846,7 @@ function Call() {
                             <video
                                 ref={localVideoRef} 
                                 className="local-video-pip"
-                                // <-- MODIFIED: Add/remove mirror effect based on camera
+                                // <-- MODIFIED: Add conditional transform for mirror effect
                                 style={{ 
                                     opacity: stream ? 1 : 0,
                                     transform: facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)'
