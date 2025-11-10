@@ -216,7 +216,6 @@ function Call() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [fullscreenPeer, setFullscreenPeer] = useState(null);
-    // --- NEW: Fullscreen Chat Overlay State ---
     const [isChatOverlayVisible, setIsChatOverlayVisible] = useState(true);
 
 
@@ -768,6 +767,14 @@ function Call() {
 
     // --- NEW: Screen Sharing Handlers ---
     const handleStopScreenShare = () => {
+        // --- NEW: Close focus view if it's showing the local share ---
+        setFullscreenPeer(prev => {
+            if (prev && prev.id === 'local_screen_share') {
+                return null;
+            }
+            return prev;
+        });
+
         if (!cameraTrackRef.current || !screenStreamRef.current) {
             // This can happen if the user clicks "stop" before the stream is ready
             setIsScreenSharing(false);
@@ -1617,7 +1624,6 @@ function Call() {
                         position: absolute;
                         top: 1.5rem;
                         right: 1.5rem;
-                        /* --- MODIFIED: Higher z-index --- */
                         z-index: 1063; 
                         font-size: 1.5rem;
                         color: white;
@@ -1664,6 +1670,7 @@ function Call() {
                         right: 0;
                         bottom: 0;
                         width: 350px;
+                        max-width: 90%; /* For mobile */
                         background: rgba(18, 18, 28, 0.85); /* Use var(--dark-bg-primary) with opacity */
                         backdrop-filter: blur(5px);
                         z-index: 1062;
@@ -1986,6 +1993,24 @@ function Call() {
                                 >
                                     <i className={`bi ${isScreenSharing ? 'bi-stop-circle-fill' : 'bi-display-fill'}`}></i>
                                 </button>
+                                
+                                {/* --- NEW: View Own Screen Share Button --- */}
+                                {isScreenSharing && (
+                                    <button
+                                        className="btn rounded-circle btn-primary"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setFullscreenPeer({
+                                                id: 'local_screen_share',
+                                                stream: screenStreamRef.current,
+                                                userId: user._id
+                                            });
+                                        }}
+                                        title="View your shared screen"
+                                    >
+                                        <i className="bi bi-person-video3"></i>
+                                    </button>
+                                )}
 
                                 {/* --- NEW: Quality Settings Button --- */}
                                 <button
@@ -2058,7 +2083,6 @@ function Call() {
                                 >
                                     <i className="bi bi-share-fill"></i>
                                 </button>
-
 
                                 {/* Hangup Button */}
                                 <button
@@ -2370,7 +2394,6 @@ function Call() {
                             <i className="bi bi-x-lg"></i>
                         </button>
 
-                        {/* --- NEW: Chat Toggle Button --- */}
                         <button
                             className="fullscreen-chat-toggle-btn"
                             onClick={(e) => {
@@ -2389,8 +2412,10 @@ function Call() {
                             style={{ filter: videoFilter }}
                         />
                         <div className="video-label">
-                            {/* Find the name from the participants list */}
-                            {participants.find(u => u.id === fullscreenPeer.id)?.name}
+                            {/* --- MODIFIED: Handle local screen share name --- */}
+                            {fullscreenPeer.id === 'local_screen_share'
+                                ? (user ? `${user.firstname} ${user.lastname} (Your Screen)` : 'Your Screen')
+                                : (participants.find(u => u.id === fullscreenPeer.id)?.name || '...')}
                         </div>
 
                         {/* --- NEW: Chat Overlay --- */}
