@@ -190,7 +190,7 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
 
 
 function Call() {
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const { callId } = useParams();
     const navigate = useNavigate();
 
@@ -271,16 +271,27 @@ function Call() {
     // Main useEffect to handle call data and user presence
     useEffect(() => {
         // --- NEW: Auth Check ---
-        if (user === false) { // Auth loaded, user not logged in
+        // --- MODIFIED: Auth Check ---
+        if (loading) {
+            // Auth is still being checked, show the loading screen
+            setCallState('loading');
+            return;
+        }
+
+        // If loading is finished AND user is still null, they are logged out
+        if (!user) {
             toast.error("You must be logged in to join a call.");
             navigate('/login', { replace: true });
             return;
         }
-        if (!callId || !user) { // Auth still loading
-            setCallState('loading');
+
+        // If loading is finished AND we have a user, but no callId
+        if (!callId) {
+            setCallState('denied'); // No call ID to load
             return;
         }
-        // --- End Auth Check ---
+            // --- End Auth Check ---
+           
 
         const callDocRef = doc(db, 'calls', callId);
 
