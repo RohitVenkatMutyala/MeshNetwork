@@ -60,7 +60,8 @@ const VIDEO_FILTERS = [
 
 // --- NEW: RemoteVideo Component ---
 // This component handles rendering the remote streams in the grid
-const RemoteVideo = ({ peer, name, videoFit, videoFilter }) => {
+// --- MODIFIED: Added onDoubleClick prop ---
+const RemoteVideo = ({ peer, name, videoFit, videoFilter, onDoubleClick }) => {
     const videoRef = useRef(null);
     const [isMuted, setIsMuted] = useState(false);
 
@@ -88,7 +89,8 @@ const RemoteVideo = ({ peer, name, videoFit, videoFilter }) => {
     }, [peer, peer.stream]);
 
     return (
-        <div className="video-tile">
+        // --- MODIFIED: Added onDoubleClick handler ---
+        <div className="video-tile" onDoubleClick={onDoubleClick}>
             <video
                 ref={videoRef}
                 autoPlay
@@ -215,6 +217,10 @@ function Call() {
     const [isInviting, setIsInviting] = useState(false);
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    // --- NEW: Screen Share State ---
+    const [isScreenSharing, setIsScreenSharing] = useState(false);
+    // --- NEW: Double-click Fullscreen State ---
+    const [fullscreenPeer, setFullscreenPeer] = useState(null);
 
 
     // --- Voice/Video Chat State ---
@@ -229,6 +235,12 @@ function Call() {
     const [videoQuality, setVideoQuality] = useState('high');
     const [videoFit, setVideoFit] = useState('cover');
     const [videoFilter, setVideoFilter] = useState('none');
+
+    // --- NEW: Refs for Screen Sharing ---
+    const screenStreamRef = useRef(null);
+    const cameraTrackRef = useRef(null);
+    const micTrackRef = useRef(null);
+
 
     // --- MODIFIED: Renamed states for clarity ---
     const [participants, setParticipants] = useState([]); // Users *in* the call
@@ -599,7 +611,18 @@ function Call() {
                     e.preventDefault();
                     handleToggleFullscreen();
                     break;
+                // --- NEW: Screen Share Shortcut ---
+                case 'S':
+                case 's':
+                    e.preventDefault();
+                    handleToggleScreenShare();
+                    break;
                 case 'Escape':
+                    // --- MODIFIED: Handle fullscreen peer first ---
+                    if (fullscreenPeer) {
+                        setFullscreenPeer(null);
+                        return;
+                    }
                     // Close all modals
                     setIsInviteModalOpen(false);
                     setIsFilterModalOpen(false);
@@ -617,8 +640,8 @@ function Call() {
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
         };
-        // Re-bind the listener if any of these key states/handlers change
-    }, [user, stream, isVideoOn, muteStatus, isFullscreen, callState, callOwnerId, participants, callId, navigate]);
+        // --- MODIFIED: Added new dependencies ---
+    }, [user, stream, isVideoOn, muteStatus, isFullscreen, callState, callOwnerId, participants, callId, navigate, isScreenSharing, fullscreenPeer]);
 
 
     // --- Handler Functions ---
@@ -716,6 +739,10 @@ function Call() {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
+        // --- NEW: Stop screen share on hangup ---
+        if (screenStreamRef.current) {
+            screenStreamRef.current.getTracks().forEach(track => track.stop());
+        }
         setStream(null);
         Object.values(peersRef.current).forEach(peer => peer.destroy());
         peersRef.current = {};
@@ -745,6 +772,94 @@ function Call() {
         const newVideoState = !isVideoOn;
         setIsVideoOn(newVideoState);
     };
+
+    // --- NEW: Screen Sharing Handlers ---
+    const handleStopScreenShare = () => {
+        if (!cameraTrackRef.current || !screenStreamRef.current) {
+            // This can happen if the user clicks "stop" before the stream is ready
+            setIsScreenSharing(false);
+            return;
+        }
+
+        const screenVideoTrack = screenStreamRef.current.getVideoTracks()[0];
+        const screenAudioTrack = screenStreamRef.current.getAudioTracks()[0];
+
+        // Replace tracks on all peers
+        for (const peerId in peersRef.current) {
+            const peer = peersRef.current[peerId];
+            if (peer) {
+                peer.replaceTrack(screenVideoTrack, cameraTrackRef.current, stream);
+                if (screenAudioTrack && micTrackRef.current) {
+                    peer.replaceTrack(screenAudioTrack, micTrackRef.current, stream);
+                }
+            }
+        }
+
+        // Stop the screen share stream tracks
+        screenStreamRef.current.getTracks().forEach(track => track.stop());
+
+        // Clear refs and state
+        screenStreamRef.current = null;
+        cameraTrackRef.current = null;
+        micTrackRef.current = null;
+        setIsScreenSharing(false);
+    };
+
+    const handleToggleScreenShare = async () => {
+        if (isScreenSharing) {
+            handleStopScreenShare();
+            return;
+        }
+
+        if (!stream) {
+            toast.error("You must be in the call to share your screen.");
+            return;
+        }
+
+        try {
+            const screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: true // Request system audio
+            });
+
+            screenStreamRef.current = screenStream;
+            const screenVideoTrack = screenStream.getVideoTracks()[0];
+            const screenAudioTrack = screenStream.getAudioTracks()[0]; // Might be null
+
+            // Store original tracks
+            cameraTrackRef.current = stream.getVideoTracks()[0];
+            micTrackRef.current = stream.getAudioTracks()[0];
+
+            // Replace tracks on all peers
+            for (const peerId in peersRef.current) {
+                const peer = peersRef.current[peerId];
+                if (peer) {
+                    peer.replaceTrack(cameraTrackRef.current, screenVideoTrack, stream);
+                    if (screenAudioTrack) {
+                        peer.replaceTrack(micTrackRef.current, screenAudioTrack, stream);
+                    }
+                }
+            }
+
+            // Listen for the browser's "Stop sharing" button
+            screenVideoTrack.onended = () => {
+                handleStopScreenShare();
+            };
+
+            setIsScreenSharing(true);
+
+        } catch (err) {
+            console.error("Screen share error:", err);
+            toast.error("Could not start screen share.");
+            // Ensure state is reset if it fails
+            if (screenStreamRef.current) {
+                screenStreamRef.current.getTracks().forEach(track => track.stop());
+                screenStreamRef.current = null;
+            }
+            setIsScreenSharing(false);
+        }
+    };
+
 
     // --- MODIFIED: Function to change video quality during the call ---
     const handleChangeVideoQuality = async (newQuality) => {
@@ -1213,6 +1328,7 @@ function Call() {
                         display: flex;
                         align-items: center;
                         justify-content: center;
+                        cursor: pointer; /* --- NEW: Indicate clickable --- */
                     }
                     .remote-video-element, .local-video-element {
                         width: 100%;
@@ -1486,6 +1602,46 @@ function Call() {
                         margin-bottom: 0;
                     }
 
+                    /* --- NEW: Fullscreen Modal Styles --- */
+                    .fullscreen-video-modal {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: #000;
+                        z-index: 1060;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    .fullscreen-video-modal video {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: contain;
+                    }
+                    .fullscreen-close-btn {
+                        position: absolute;
+                        top: 1.5rem;
+                        right: 1.5rem;
+                        z-index: 1061;
+                        font-size: 1.5rem;
+                        color: white;
+                        background: rgba(0, 0, 0, 0.4);
+                        border: none;
+                        border-radius: 50%;
+                        width: 44px;
+                        height: 44px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        line-height: 1;
+                    }
+                    /* --- Re-use video-label for fullscreen modal --- */
+                    .fullscreen-video-modal .video-label {
+                        z-index: 1061;
+                    }
+
 
                     /* --- 5. DESKTOP VIEW (PC) --- */
                     @media (min-width: 768px) {
@@ -1520,6 +1676,11 @@ function Call() {
                             padding: 0.5rem 1rem;
                             gap: 1rem;
                             flex-wrap: nowrap;
+                        }
+                        .fullscreen-close-btn {
+                            font-size: 2rem;
+                            width: 50px;
+                            height: 50px;
                         }
                     }
 
@@ -1637,6 +1798,8 @@ function Call() {
                                         name={participants.find(u => u.id === data.id)?.name}
                                         videoFit={videoFit}
                                         videoFilter={videoFilter} // --- NEW: Apply filter ---
+                                        // --- NEW: Pass double click handler ---
+                                        onDoubleClick={() => setFullscreenPeer(data)}
                                     />
                                 ))}
                             </div>
@@ -1754,6 +1917,15 @@ function Call() {
                                 >
                                     <i className={`bi ${muteStatus[user?._id] ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
                                 </button>
+                                
+                                {/* --- NEW: Screen Share Button --- */}
+                                <button
+                                    className={`btn rounded-circle ${isScreenSharing ? 'btn-success' : 'btn-secondary'}`}
+                                    onClick={(e) => { e.stopPropagation(); handleToggleScreenShare(); }}
+                                    title={isScreenSharing ? "Stop sharing (S)" : "Share screen (S)"}
+                                >
+                                    <i className={`bi ${isScreenSharing ? 'bi-stop-circle-fill' : 'bi-display-fill'}`}></i>
+                                </button>
 
                                 {/* --- NEW: Quality Settings Button --- */}
                                 <button
@@ -1770,7 +1942,6 @@ function Call() {
                                     onClick={handleToggleVideoFit}
                                     title={videoFit === 'cover' ? "Fit video to screen" : "Fill screen with video"}
                                 >
-                                    {/* --- MODIFIED: Using new icons --- */}
                                     <i className={`bi ${videoFit === 'contain' ? 'bi-arrows-angle-contract' : 'bi-arrows-angle-expand'}`}></i>
                                 </button>
 
@@ -2122,6 +2293,26 @@ function Call() {
                                     )}
                                 </button>
                             </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- NEW: Fullscreen Video Modal --- */}
+                {fullscreenPeer && (
+                    <div className="fullscreen-video-modal" onClick={() => setFullscreenPeer(null)}>
+                        <button className="fullscreen-close-btn" onClick={() => setFullscreenPeer(null)}>
+                            <i className="bi bi-x-lg"></i>
+                        </button>
+                        <video
+                            // Set the srcObject directly using a ref callback
+                            ref={ref => { if (ref) ref.srcObject = fullscreenPeer.stream; }}
+                            autoPlay
+                            playsInline
+                            style={{ filter: videoFilter }}
+                        />
+                        <div className="video-label">
+                            {/* Find the name from the participants list */}
+                            {participants.find(u => u.id === fullscreenPeer.id)?.name}
                         </div>
                     </div>
                 )}
