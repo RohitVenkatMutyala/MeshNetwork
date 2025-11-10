@@ -254,7 +254,14 @@ function Call() {
         participantsRef.current = participants;
     }, [participants]);
 
-
+    // --- NEW: Stable Ref Callback for Fullscreen Video ---
+    // This creates a stable function that only changes when fullscreenPeer changes.
+    // This stops the video from re-attaching its stream on every chat keystroke.
+    const fullscreenVideoRef = useCallback((node) => {
+        if (node && fullscreenPeer && fullscreenPeer.stream) {
+            node.srcObject = fullscreenPeer.stream;
+        }
+    }, [fullscreenPeer]); // Dependency on fullscreenPeer is correct
     // Auto-scroll chat
     useEffect(() => {
         chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -585,7 +592,7 @@ function Call() {
                 handleHangUp();
                 return;
             }
-            
+
             // Don't trigger on other Shift/Ctrl/Alt presses
             if (e.shiftKey || e.ctrlKey || e.altKey) {
                 return;
@@ -1985,7 +1992,7 @@ function Call() {
                                 >
                                     <i className={`bi ${muteStatus[user?._id] ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
                                 </button>
-                                
+
                                 <button
                                     className={`btn rounded-circle ${isScreenSharing ? 'btn-success' : 'btn-secondary'}`}
                                     onClick={(e) => { e.stopPropagation(); handleToggleScreenShare(); }}
@@ -1993,7 +2000,7 @@ function Call() {
                                 >
                                     <i className={`bi ${isScreenSharing ? 'bi-stop-circle-fill' : 'bi-display-fill'}`}></i>
                                 </button>
-                                
+
                                 {/* --- NEW: View Own Screen Share Button --- */}
                                 {isScreenSharing && (
                                     <button
@@ -2383,6 +2390,7 @@ function Call() {
                 )}
 
                 {/* --- MODIFIED: Fullscreen Video Modal with Chat Overlay --- */}
+                {/* --- MODIFIED: Fullscreen Video Modal with Chat Overlay --- */}
                 {fullscreenPeer && (
                     <div className="fullscreen-video-modal" onClick={(e) => {
                         // Only close if clicking the modal backdrop, not the chat
@@ -2405,8 +2413,10 @@ function Call() {
                         </button>
 
                         <video
-                            // Set the srcObject directly using a ref callback
-                            ref={ref => { if (ref) ref.srcObject = fullscreenPeer.stream; }}
+                            // --- THIS IS THE FIX ---
+                            // Use the new stable ref callback
+                            ref={fullscreenVideoRef}
+                            // --- END FIX ---
                             autoPlay
                             playsInline
                             style={{ filter: videoFilter }}
@@ -2440,7 +2450,7 @@ function Call() {
                                 <div ref={chatMessagesEndRef} />
                             </div>
                             <form onSubmit={handleSendMessage} className="fullscreen-chat-form">
-                                <div className="d-flex align-items: center">
+                                <div className="d-flex align-items-center">
                                     <input
                                         type="text"
                                         className="form-control chat-input"
