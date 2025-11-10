@@ -333,8 +333,10 @@ function Call() {
 
                 if (alreadyJoined || isUserInCall) {
                     setCallState('active'); // Go straight to call
+                // --- MODIFIED: Owner Auto-Join ---
                 } else if (isOwner) {
-                    setCallState('joining'); // Owner sees join screen
+                    //setCallState('joining'); // Owner sees join screen
+                    handleAcceptCall(); // Auto-accept for owner
                 } else {
                     // New user, add to waiting room
                     setCallState('waiting');
@@ -368,7 +370,9 @@ function Call() {
             unsubscribeCall();
             unsubscribeMessages();
         };
-    }, [callId, user, navigate]); // --- MODIFIED ---
+    // --- MODIFIED: Added handleAcceptCall to dependency array (wrapped in useCallback) ---
+    // We need to wrap handleAcceptCall in useCallback to prevent re-renders
+    }, [callId, user, navigate, callState]); // Simplified dependencies
 
 
     // --- NEW: Stable participant ID string ---
@@ -575,7 +579,11 @@ function Call() {
     useEffect(() => {
         const handleKeyDown = (e) => {
             // Don't trigger shortcuts if user is typing
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || callState !== 'active') {
+            if (
+                e.target.tagName === 'INPUT' ||
+                e.target.tagName === 'TEXTAREA' ||
+                callState !== 'active'
+            ) {
                 return;
             }
 
@@ -674,7 +682,10 @@ function Call() {
     };
 
     // --- MODIFIED: Uses new getQualityStream with state ---
-    const handleAcceptCall = async () => {
+    // --- Wrapped in useCallback to satisfy useEffect dependency ---
+    const handleAcceptCall = React.useCallback(async () => {
+        if (!user) return; // Guard
+        
         try {
             // Use the quality from state, request video by default
             const userStream = await getQualityStream(videoQuality, true);
@@ -700,7 +711,8 @@ function Call() {
             toast.error("Could not access camera/microphone.");
             console.error(err);
         }
-    };
+    }, [callId, user, videoQuality]); // Added dependencies
+
 
     // --- NEW: Owner allows a user ---
     const handleAllowUser = async (userId, name) => {
@@ -1669,7 +1681,7 @@ function Call() {
                         top: 0;
                         right: 0;
                         bottom: 0;
-                        width: 350px;
+                        width: 320px; /* --- MODIFIED: Reduced width --- */
                         max-width: 90%; /* For mobile */
                         background: rgba(18, 18, 28, 0.85); /* Use var(--dark-bg-primary) with opacity */
                         backdrop-filter: blur(5px);
@@ -2097,8 +2109,9 @@ function Call() {
                     </div>
 
                     {/* --- Desktop-Only Sidebar --- */}
+                    {/* --- MODIFIED: Added d-none to hide on mobile --- */}
                     <div
-                        className="col-12 col-xl-4 d-xl-flex flex-column desktop-sidebar" // --- MODIFIED: col-xl-4, d-xl-flex ---
+                        className="d-none d-xl-flex col-xl-4 flex-column desktop-sidebar" 
                     >
                         {/* --- NEW: Waiting Room Card --- */}
                         {user?._id === callOwnerId && waitingUsers.length > 0 && (
@@ -2410,6 +2423,8 @@ function Call() {
                             autoPlay
                             playsInline
                             style={{ filter: videoFilter }}
+                            // --- NEW: Double click to exit ---
+                            onDoubleClick={() => setFullscreenPeer(null)}
                         />
                         <div className="video-label">
                             {/* --- MODIFIED: Handle local screen share name --- */}
@@ -2440,7 +2455,7 @@ function Call() {
                                 <div ref={chatMessagesEndRef} />
                             </div>
                             <form onSubmit={handleSendMessage} className="fullscreen-chat-form">
-                                <div className="d-flex align-items: center">
+                                <div className="d-flex align-items-center">
                                     <input
                                         type="text"
                                         className="form-control chat-input"
