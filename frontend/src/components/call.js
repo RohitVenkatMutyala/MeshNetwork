@@ -60,7 +60,6 @@ const VIDEO_FILTERS = [
 
 // --- NEW: RemoteVideo Component ---
 // This component handles rendering the remote streams in the grid
-// --- MODIFIED: Added onDoubleClick prop ---
 const RemoteVideo = ({ peer, name, videoFit, videoFilter, onDoubleClick }) => {
     const videoRef = useRef(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -89,14 +88,12 @@ const RemoteVideo = ({ peer, name, videoFit, videoFilter, onDoubleClick }) => {
     }, [peer, peer.stream]);
 
     return (
-        // --- MODIFIED: Added onDoubleClick handler ---
         <div className="video-tile" onDoubleClick={onDoubleClick}>
             <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 className="remote-video-element"
-                // --- MODIFIED: Apply filter prop ---
                 style={{ objectFit: videoFit, filter: videoFilter }}
             />
             <div className="video-label">
@@ -217,10 +214,10 @@ function Call() {
     const [isInviting, setIsInviting] = useState(false);
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    // --- NEW: Screen Share State ---
     const [isScreenSharing, setIsScreenSharing] = useState(false);
-    // --- NEW: Double-click Fullscreen State ---
     const [fullscreenPeer, setFullscreenPeer] = useState(null);
+    // --- NEW: Fullscreen Chat Overlay State ---
+    const [isChatOverlayVisible, setIsChatOverlayVisible] = useState(true);
 
 
     // --- Voice/Video Chat State ---
@@ -611,14 +608,12 @@ function Call() {
                     e.preventDefault();
                     handleToggleFullscreen();
                     break;
-                // --- NEW: Screen Share Shortcut ---
                 case 'S':
                 case 's':
                     e.preventDefault();
                     handleToggleScreenShare();
                     break;
                 case 'Escape':
-                    // --- MODIFIED: Handle fullscreen peer first ---
                     if (fullscreenPeer) {
                         setFullscreenPeer(null);
                         return;
@@ -640,7 +635,6 @@ function Call() {
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
         };
-        // --- MODIFIED: Added new dependencies ---
     }, [user, stream, isVideoOn, muteStatus, isFullscreen, callState, callOwnerId, participants, callId, navigate, isScreenSharing, fullscreenPeer]);
 
 
@@ -739,7 +733,6 @@ function Call() {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
-        // --- NEW: Stop screen share on hangup ---
         if (screenStreamRef.current) {
             screenStreamRef.current.getTracks().forEach(track => track.stop());
         }
@@ -1624,7 +1617,8 @@ function Call() {
                         position: absolute;
                         top: 1.5rem;
                         right: 1.5rem;
-                        z-index: 1061;
+                        /* --- MODIFIED: Higher z-index --- */
+                        z-index: 1063; 
                         font-size: 1.5rem;
                         color: white;
                         background: rgba(0, 0, 0, 0.4);
@@ -1636,10 +1630,73 @@ function Call() {
                         align-items: center;
                         justify-content: center;
                         line-height: 1;
+                        cursor: pointer;
                     }
                     /* --- Re-use video-label for fullscreen modal --- */
                     .fullscreen-video-modal .video-label {
                         z-index: 1061;
+                    }
+                    
+                    /* --- NEW: Fullscreen Chat Toggle Button --- */
+                    .fullscreen-chat-toggle-btn {
+                        position: absolute;
+                        top: 1.5rem;
+                        right: 5rem; /* Next to the close button */
+                        z-index: 1063;
+                        font-size: 1.2rem; /* a bit smaller */
+                        color: white;
+                        background: rgba(0, 0, 0, 0.4);
+                        border: none;
+                        border-radius: 50%;
+                        width: 44px;
+                        height: 44px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        line-height: 1;
+                        cursor: pointer;
+                    }
+
+                    /* --- NEW: Fullscreen Chat Overlay --- */
+                    .fullscreen-chat-overlay {
+                        position: absolute;
+                        top: 0;
+                        right: 0;
+                        bottom: 0;
+                        width: 350px;
+                        background: rgba(18, 18, 28, 0.85); /* Use var(--dark-bg-primary) with opacity */
+                        backdrop-filter: blur(5px);
+                        z-index: 1062;
+                        display: flex;
+                        flex-direction: column;
+                        transform: ${isChatOverlayVisible ? 'translateX(0)' : 'translateX(100%)'};
+                        transition: transform 0.3s ease;
+                        border-left: 1px solid var(--border-color);
+                    }
+                    .fullscreen-chat-header {
+                        padding: 1rem;
+                        padding-top: calc(1.5rem + env(safe-area-inset-top));
+                        font-weight: 600;
+                        border-bottom: 1px solid var(--border-color);
+                        flex-shrink: 0;
+                        color: var(--text-primary);
+                    }
+                    .fullscreen-chat-messages {
+                        flex-grow: 1;
+                        overflow-y: auto;
+                        padding: 1rem;
+                    }
+                    /* Re-use scrollbar styles */
+                    .fullscreen-chat-messages::-webkit-scrollbar { width: 8px; }
+                    .fullscreen-chat-messages::-webkit-scrollbar-track { background: var(--dark-bg-secondary); }
+                    .fullscreen-chat-messages::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; border: 2px solid var(--dark-bg-secondary); }
+
+                    .fullscreen-chat-form {
+                        padding: 1rem;
+                        padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+                        border-top: 1px solid var(--border-color);
+                        background: rgba(18, 18, 28, 0.5);
+                        flex-shrink: 0;
                     }
 
 
@@ -1681,6 +1738,11 @@ function Call() {
                             font-size: 2rem;
                             width: 50px;
                             height: 50px;
+                        }
+                        .fullscreen-chat-toggle-btn {
+                            width: 50px;
+                            height: 50px;
+                            right: 6rem;
                         }
                     }
 
@@ -1797,8 +1859,7 @@ function Call() {
                                         peer={data}
                                         name={participants.find(u => u.id === data.id)?.name}
                                         videoFit={videoFit}
-                                        videoFilter={videoFilter} // --- NEW: Apply filter ---
-                                        // --- NEW: Pass double click handler ---
+                                        videoFilter={videoFilter}
                                         onDoubleClick={() => setFullscreenPeer(data)}
                                     />
                                 ))}
@@ -1918,7 +1979,6 @@ function Call() {
                                     <i className={`bi ${muteStatus[user?._id] ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
                                 </button>
                                 
-                                {/* --- NEW: Screen Share Button --- */}
                                 <button
                                     className={`btn rounded-circle ${isScreenSharing ? 'btn-success' : 'btn-secondary'}`}
                                     onClick={(e) => { e.stopPropagation(); handleToggleScreenShare(); }}
@@ -1999,6 +2059,7 @@ function Call() {
                                     <i className="bi bi-share-fill"></i>
                                 </button>
 
+TEST
                                 {/* Hangup Button */}
                                 <button
                                     className="btn btn-danger rounded-circle"
@@ -2297,12 +2358,29 @@ function Call() {
                     </div>
                 )}
 
-                {/* --- NEW: Fullscreen Video Modal --- */}
+                {/* --- MODIFIED: Fullscreen Video Modal with Chat Overlay --- */}
                 {fullscreenPeer && (
-                    <div className="fullscreen-video-modal" onClick={() => setFullscreenPeer(null)}>
+                    <div className="fullscreen-video-modal" onClick={(e) => {
+                        // Only close if clicking the modal backdrop, not the chat
+                        if (e.target === e.currentTarget) {
+                            setFullscreenPeer(null);
+                        }
+                    }}>
                         <button className="fullscreen-close-btn" onClick={() => setFullscreenPeer(null)}>
                             <i className="bi bi-x-lg"></i>
                         </button>
+
+                        {/* --- NEW: Chat Toggle Button --- */}
+                        <button
+                            className="fullscreen-chat-toggle-btn"
+                            onClick={(e) => {
+                                e.stopPropagation(); // Don't close modal
+                                setIsChatOverlayVisible(!isChatOverlayVisible);
+                            }}
+                        >
+                            <i className={isChatOverlayVisible ? "bi bi-chat-dots-fill" : "bi bi-chat-dots"}></i>
+                        </button>
+
                         <video
                             // Set the srcObject directly using a ref callback
                             ref={ref => { if (ref) ref.srcObject = fullscreenPeer.stream; }}
@@ -2313,6 +2391,43 @@ function Call() {
                         <div className="video-label">
                             {/* Find the name from the participants list */}
                             {participants.find(u => u.id === fullscreenPeer.id)?.name}
+                        </div>
+
+                        {/* --- NEW: Chat Overlay --- */}
+                        <div
+                            className="fullscreen-chat-overlay"
+                            onClick={(e) => e.stopPropagation()} // Prevent modal from closing
+                        >
+                            <div className="fullscreen-chat-header">
+                                Chat
+                            </div>
+                            <div className="fullscreen-chat-messages">
+                                {/* Re-use chat message logic */}
+                                {messages.map(msg => (
+                                    <div key={msg.id} className={`chat-message ${msg.senderId === user?._id ? 'own-message' : 'other-message'}`}>
+                                        <div className="message-header">
+                                            <span className="message-sender">{msg.senderName}</span>
+                                            <span className="message-timestamp">{formatTimestamp(msg.timestamp)}</span>
+                                        </div>
+                                        <div className="message-bubble">{msg.text}</div>
+                                    </div>
+                                ))}
+                                <div ref={chatMessagesEndRef} />
+                            </div>
+                            <form onSubmit={handleSendMessage} className="fullscreen-chat-form">
+                                <div className="d-flex align-items: center">
+                                    <input
+                                        type="text"
+                                        className="form-control chat-input"
+                                        placeholder="Type a message..."
+                                        value={newMessage}
+                                        onChange={(e) => setNewMessage(e.target.value)}
+                                    />
+                                    <button className="send-button flex-shrink-0" type="submit" disabled={!newMessage.trim()}>
+                                        <i className="bi bi-send-fill"></i>
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 )}
