@@ -387,7 +387,7 @@ function Call() {
             unsubscribeCall();
             unsubscribeMessages();
         };
-    }, [callId, user, navigate]); // --- MODIFIED ---
+    },[callId, user, navigate, loading]); // --- MODIFIED ---
 
 
     // --- NEW: Stable participant ID string ---
