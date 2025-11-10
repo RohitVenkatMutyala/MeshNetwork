@@ -136,7 +136,7 @@ function LoginForm() {
                         Welcome to Network
                       </h1>
                       <p className="text-muted mb-4">
-                        Secure, 1-on-1 video calls powered by a
+                        Secure, 1-on-n video calls powered by a
                         peer-to-peer network.
                       </p>
 
