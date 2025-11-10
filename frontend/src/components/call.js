@@ -1,3 +1,19 @@
+// ---
+// --- CRITICAL FIX FOR: "process.nextTick is not a function" ---
+// ---
+// This polyfill MUST be at the very top of the file, before any imports,
+// to satisfy the 'import/first' linting rule and prevent runtime errors.
+if (typeof window.process === 'undefined') {
+  window.process = {};
+}
+if (typeof window.process.nextTick === 'undefined') {
+  window.process.nextTick = function (callback) {
+    setTimeout(callback, 0);
+  };
+}
+// --- END CRITICAL FIX ---
+
+
 import React, {
     useState,
     useEffect,
@@ -214,6 +230,10 @@ function Call() {
     const [inviteEmails, setInviteEmails] = useState('');
     const [isInviting, setIsInviting] = useState(false);
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+    
+    // --- NEW: Fullscreen State ---
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const videoPanelRef = useRef(null); // Ref for the main video container
 
 
     // --- Voice/Video Chat State ---
@@ -249,6 +269,16 @@ function Call() {
     useEffect(() => {
         chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
+
+    // --- NEW: Fullscreen API Listener ---
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
 
     // Main useEffect to handle call data and user presence
     useEffect(() => {
@@ -470,6 +500,7 @@ function Call() {
                         // Destroy any old peer and create a new one.
                         if (existingPeer) {
                             console.log(`Destroying stale peer for ${data.senderId} to accept new offer.`);
+                            existingPeer.removeAllListeners(); // <-- The critical fix
                             existingPeer.destroy();
                         }
 
@@ -748,6 +779,21 @@ function Call() {
         setIsQualityMenuOpen(false);
     };
 
+    // --- NEW: Fullscreen Toggle ---
+    const handleToggleFullscreen = (e) => {
+        e.stopPropagation();
+        if (!videoPanelRef.current) return;
+
+        if (!document.fullscreenElement) {
+            videoPanelRef.current.requestFullscreen().catch(err => {
+                toast.error("Could not enter fullscreen mode.");
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    };
+
+
     // --- NEW: Send Invites Handler ---
     const handleSendInvites = async (e) => {
         e.preventDefault();
@@ -765,9 +811,9 @@ function Call() {
         }
 
         const callLink = `${window.location.origin}/call/${callId}`;
-        const emailjsPublicKey = 'Cd-NUUSJ5dW3GJMo0';
-        const serviceID = 'service_y8qops6';
-        const templateID = 'template_apzjekq';
+        const emailjsPublicKey = '3WEPhBvkjCwXVYBJ-';
+        const serviceID = 'service_6ar5bgj';
+        const templateID = 'template_w4ydq8a';
 
         try {
             // 1. Update permissions in Firestore
@@ -1097,6 +1143,9 @@ function Call() {
                         overflow: hidden;
                         cursor: pointer; 
                         padding: 0.5rem; /* --- MODIFIED: Responsive padding --- */
+                        
+                        /* --- NEW: Style for when fullscreen --- */
+                        background-color: #000; /* Black background in fullscreen */
                     }
                     
                     /* --- NEW: Video Grid Layout --- */
@@ -1149,20 +1198,20 @@ function Call() {
                         z-index: 5;
                     }
                     
-                    /* --- RE-ADDED: Draggable Self-View (PiP) --- */
+                    /* --- MODIFIED: Draggable Self-View (Rounded Square) --- */
                     .local-video-pip { /* This is now the wrapper */
                         position: absolute;
                         bottom: 1rem;
                         right: 1rem;
-                        width: 130px; /* --- MODIFIED: Slightly smaller --- */
+                        width: 130px; 
                         height: 130px;
-                        border-radius: 50%;
+                        border-radius: 12px; /* --- MODIFIED: From 50% to 12px --- */
                         border: 2px solid var(--border-color);
                         z-index: 10;
                         cursor: move;
                         transition: box-shadow 0.2s ease, opacity 0.3s ease;
                         background: #333; /* Background for placeholder */
-                        overflow: hidden; /* --- NEW: To keep icon inside --- */
+                        overflow: hidden; 
                     }
                     /* --- MODIFIED: Adjust PiP position for new padding --- */
                     .local-video-pip:not([style*="left"]) { 
@@ -1177,7 +1226,7 @@ function Call() {
                         cursor: grabbing;
                     }
 
-                    /* --- RE-ADDED: PiP Camera-Off Placeholder --- */
+                    /* --- MODIFIED: PiP Camera-Off Placeholder (Rounded Square) --- */
                     .local-video-placeholder {
                         position: absolute;
                         top: 0;
@@ -1189,7 +1238,7 @@ function Call() {
                         justify-content: center;
                         color: #fff;
                         font-size: 3rem;
-                        border-radius: 50%;
+                        border-radius: 12px; /* --- MODIFIED: From 50% to 12px --- */
                         z-index: 1; /* Below the video element */
                     }
 
@@ -1521,6 +1570,7 @@ function Call() {
                     {/* --- MODIFIED: Responsive column --- */}
                     <div className="col-12 col-xl-8 d-flex flex-column">
                         <div
+                            ref={videoPanelRef} // --- NEW: Added ref for fullscreen ---
                             className="video-panel-container shadow-sm"
                             onClick={() => {
                                 setAreControlsVisible(!areControlsVisible);
@@ -1554,7 +1604,10 @@ function Call() {
                             <div
                                 ref={pipWrapperRef}
                                 className="local-video-pip"
-                                style={{ opacity: stream ? 1 : 0 }}
+                                style={{ 
+                                    opacity: areControlsVisible && stream ? 1 : 0, // --- MODIFIED: Hide with controls ---
+                                    pointerEvents: areControlsVisible ? 'auto' : 'none' // --- NEW ---
+                                }}
                                 onClick={(e) => e.stopPropagation()}
                                 // --- MODIFIED: Added all drag handlers ---
                                 onMouseDown={handlePipDragStart}
@@ -1672,13 +1725,22 @@ function Call() {
                                     <i className="bi bi-gear-fill"></i>
                                 </button>
 
+                                {/* --- NEW: Fullscreen Button --- */}
+                                <button
+                                    className={`btn rounded-circle btn-secondary`}
+                                    onClick={handleToggleFullscreen}
+                                    title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                                >
+                                    <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`}></i>
+                                </button>
+                                
                                 {/* --- NEW: Video Fit Toggle Button --- */}
                                 <button
                                     className={`btn rounded-circle ${videoFit === 'contain' ? 'btn-primary' : 'btn-secondary'}`}
                                     onClick={handleToggleVideoFit}
                                     title={videoFit === 'cover' ? "Fit video to screen" : "Fill screen with video"}
                                 >
-                                    <i className={`bi ${videoFit === 'contain' ? 'bi-fullscreen-exit' : 'bi-aspect-ratio'}`}></i>
+                                    <i className={`bi ${videoFit === 'contain' ? 'bi-aspect-ratio' : 'bi-fullscreen-exit'}`}></i>
                                 </button>
 
                                 {/* --- NEW: Filter Button --- */}
@@ -1798,18 +1860,18 @@ function Call() {
                         </div>
 
                         {/* Share Card (Desktop) */}
-                        {/* <div><SharingComponent sessionId={callId} /></div> */}
+                        <div><SharingComponent sessionId={callId} /></div>
 
                         {/* Chat Card (Desktop) */}
                         <div className="card shadow-sm flex-grow-1 chat-card">
                             <div className="card-header d-flex align-items-center">
-                                <span
-                                    className="spinner-grow spinner-grow-sm text-success me-2"
-                                    role="status"
+                                <span 
+                                    className="spinner-grow spinner-grow-sm text-success me-2" 
+                                    role="status" 
                                     aria-hidden="true"
-                                    style={{ width: '0.8rem', height: '0.8rem' }}
+                                    style={{width: '0.8rem', height: '0.8rem'}}
                                 ></span>
-                                Chat
+                                Live Chat
                             </div>
                             <div className="card-body">
                                 <div className="chat-messages-container">
@@ -1918,17 +1980,15 @@ function Call() {
                 {isChatOpen && (
                     <div className="mobile-panel mobile-chat-panel d-xl-none">
                         <div className="mobile-panel-header">
-                            {/* --- MODIFIED: Added div and spinner --- */}
                             <div className="d-flex align-items-center">
-                                <span
-                                    className="spinner-grow spinner-grow-sm text-success me-2"
-                                    role="status"
+                                <span 
+                                    className="spinner-grow spinner-grow-sm text-success me-2" 
+                                    role="status" 
                                     aria-hidden="true"
-                                    style={{ width: '0.8rem', height: '0.8rem' }}
+                                    style={{width: '0.8rem', height: '0.8rem'}}
                                 ></span>
-                                <h5> Chat</h5>
+                                <h5>Live Chat</h5>
                             </div>
-
                             <button className="btn-close btn-close-white" onClick={() => setIsChatOpen(false)}></button>
                         </div>
                         <div className="mobile-chat-body">
@@ -1945,7 +2005,7 @@ function Call() {
                                 <div ref={chatMessagesEndRef} />
                             </div>
                             <form onSubmit={handleSendMessage} className="mobile-chat-form">
-                                <div className="d-flex align-items-center">
+                                <div className="d-flex align-items: center">
                                     <input
                                         type="text"
                                         className="form-control chat-input"
@@ -1963,64 +2023,42 @@ function Call() {
                 )}
 
                 {/* --- NEW: Invite People Modal --- */}
-
                 {isInviteModalOpen && (
                     <div className="mobile-panel">
                         <div className="mobile-panel-header">
                             <h5>Invite People</h5>
                             <button className="btn-close btn-close-white" onClick={() => setIsInviteModalOpen(false)}></button>
                         </div>
-
-                        {/* --- MODIFIED: Panel body with new layout --- */}
-                        <div className="mobile-panel-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-
-
-                            {/* --- MODIFIED: Email Form (for dark theme) --- */}
-                            <form onSubmit={handleSendInvites} style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, gap: '1rem' }}>
-                                <p className="text-secondary" style={{ margin: 0 }}>
-                                    Invite with email. Add multiple separated by commas.
-                                </p>
-                                <div className="form-floating" style={{ flexGrow: 1 }}>
-                                    <textarea
-                                        className="form-control"
-                                        id="inviteEmails"
-
-                                        style={{
-                                            height: '100%',
-                                            minHeight: '120px',
-                                            backgroundColor: 'var(--dark-bg-primary)',
-                                            color: 'var(--text-primary)',
-                                            borderColor: 'var(--border-color)'
-                                        }}
-                                        value={inviteEmails}
-                                        onChange={(e) => setInviteEmails(e.target.value)} // Fixed typo from e.gex
-                                    />
-                                    <label htmlFor="inviteEmails" style={{ color: 'var(--text-secondary)' }}>Emails (comma-separated)</label>
-                                </div>
-                                <button
-                                    type="submit"
-                                    className="btn btn-primary w-100"
-                                    disabled={isInviting}
-                                    style={{
-                                        backgroundColor: 'var(--accent-blue)',
-                                        borderColor: 'var(--accent-blue)',
-                                        fontWeight: '600',
-                                        padding: '0.75rem',
-                                        borderRadius: '12px' // Matches participant card radius
-                                    }}
-                                >
-                                    {isInviting ? (
-                                        <>
-                                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                            Sending Invites...
-                                        </>
-                                    ) : (
-                                        'Send Invites'
-                                    )}
-                                </button>
-                            </form>
-                        </div>
+                        <form className="mobile-panel-body" onSubmit={handleSendInvites}>
+                            <p className="text-secondary mb-3">
+                                Add more people to this call. Enter emails separated by commas.
+                            </p>
+                            <div className="form-floating mb-3">
+                                <textarea
+                                    className="form-control"
+                                    id="inviteEmails"
+                                    placeholder="Enter emails"
+                                    style={{ height: '150px' }}
+                                    value={inviteEmails}
+                                    onChange={(e) => setInviteEmails(e.target.value)}
+                                />
+                                <label htmlFor="inviteEmails">Emails (comma-separated)</label>
+                            </div>
+                            <button
+                                type="submit"
+                                className="btn btn-primary w-100"
+                                disabled={isInviting}
+                            >
+                                {isInviting ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        Sending Invites...
+                                    </>
+                                ) : (
+                                    'Send Invites'
+                                )}
+                            </button>
+                        </form>
                     </div>
                 )}
             </div>
