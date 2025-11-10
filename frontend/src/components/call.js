@@ -2,8 +2,7 @@ import React, {
     useState,
     useEffect,
     useRef,
-    useLayoutEffect,
-    useCallback // --- NEW: Import useCallback ---
+    useLayoutEffect
 } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -1252,19 +1251,6 @@ function Call() {
         );
     }
 
-    // --- NEW: FIX FOR FLICKER ---
-    // Memoize the ref callback. This function will ONLY be re-created if
-    // the fullscreenPeer.stream changes. On all other re-renders (like
-    // typing in chat), React will use the old, memoized function,
-    // see the ref is the same, and NOT reset the srcObject.
-    const fullscreenVideoRefCallback = useCallback((node) => {
-        if (node) {
-            // This sets the stream when the video element mounts
-            // or when the stream itself changes.
-            node.srcObject = fullscreenPeer?.stream || null;
-        }
-    }, [fullscreenPeer?.stream]); // Dependency is the stream itself
-
 
     // RENDER: Active Call UI
     return (
@@ -1628,8 +1614,6 @@ function Call() {
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        /* --- NEW: Added for double-tap --- */
-                        cursor: pointer; 
                     }
                     .fullscreen-video-modal video {
                         width: 100%;
@@ -1685,8 +1669,7 @@ function Call() {
                         top: 0;
                         right: 0;
                         bottom: 0;
-                        /* --- CHANGE: Decreased chat size --- */
-                        width: 300px; 
+                        width: 350px;
                         max-width: 90%; /* For mobile */
                         background: rgba(18, 18, 28, 0.85); /* Use var(--dark-bg-primary) with opacity */
                         backdrop-filter: blur(5px);
@@ -1696,8 +1679,6 @@ function Call() {
                         transform: ${isChatOverlayVisible ? 'translateX(0)' : 'translateX(100%)'};
                         transition: transform 0.3s ease;
                         border-left: 1px solid var(--border-color);
-                        /* --- NEW: Stop double-tap from closing --- */
-                        cursor: default;
                     }
                     .fullscreen-chat-header {
                         padding: 1rem;
@@ -2117,7 +2098,7 @@ function Call() {
 
                     {/* --- Desktop-Only Sidebar --- */}
                     <div
-                        className="col-xl-4 d-none d-xl-flex flex-column desktop-sidebar" // --- FIX: Replaced col-12 with d-none
+                        className="col-12 col-xl-4 d-xl-flex flex-column desktop-sidebar" // --- MODIFIED: col-xl-4, d-xl-flex ---
                     >
                         {/* --- NEW: Waiting Room Card --- */}
                         {user?._id === callOwnerId && waitingUsers.length > 0 && (
@@ -2403,10 +2384,12 @@ function Call() {
 
                 {/* --- MODIFIED: Fullscreen Video Modal with Chat Overlay --- */}
                 {fullscreenPeer && (
-                    <div 
-                        className="fullscreen-video-modal" 
-                        onDoubleClick={() => setFullscreenPeer(null)} // <-- NEW: Double-tap/click to exit
-                    >
+                    <div className="fullscreen-video-modal" onClick={(e) => {
+                        // Only close if clicking the modal backdrop, not the chat
+                        if (e.target === e.currentTarget) {
+                            setFullscreenPeer(null);
+                        }
+                    }}>
                         <button className="fullscreen-close-btn" onClick={() => setFullscreenPeer(null)}>
                             <i className="bi bi-x-lg"></i>
                         </button>
@@ -2422,10 +2405,8 @@ function Call() {
                         </button>
 
                         <video
-                            // --- MODIFIED: This is the FIX ---
-                            // Use the stable useCallback ref instead of an inline function
-                            ref={fullscreenVideoRefCallback}
-                            // --- END FIX ---
+                            // Set the srcObject directly using a ref callback
+                            ref={ref => { if (ref) ref.srcObject = fullscreenPeer.stream; }}
                             autoPlay
                             playsInline
                             style={{ filter: videoFilter }}
@@ -2441,7 +2422,6 @@ function Call() {
                         <div
                             className="fullscreen-chat-overlay"
                             onClick={(e) => e.stopPropagation()} // Prevent modal from closing
-                            onDoubleClick={(e) => e.stopPropagation()} // <-- NEW: Prevent double-tap on chat from closing
                         >
                             <div className="fullscreen-chat-header">
                                 Chat
