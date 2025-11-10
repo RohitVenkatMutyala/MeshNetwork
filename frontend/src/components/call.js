@@ -1614,6 +1614,8 @@ function Call() {
                         display: flex;
                         align-items: center;
                         justify-content: center;
+                        /* --- NEW: Added for double-tap --- */
+                        cursor: pointer; 
                     }
                     .fullscreen-video-modal video {
                         width: 100%;
@@ -1669,7 +1671,8 @@ function Call() {
                         top: 0;
                         right: 0;
                         bottom: 0;
-                        width: 350px;
+                        /* --- CHANGE: Decreased chat size --- */
+                        width: 300px; 
                         max-width: 90%; /* For mobile */
                         background: rgba(18, 18, 28, 0.85); /* Use var(--dark-bg-primary) with opacity */
                         backdrop-filter: blur(5px);
@@ -1679,6 +1682,8 @@ function Call() {
                         transform: ${isChatOverlayVisible ? 'translateX(0)' : 'translateX(100%)'};
                         transition: transform 0.3s ease;
                         border-left: 1px solid var(--border-color);
+                        /* --- NEW: Stop double-tap from closing --- */
+                        cursor: default;
                     }
                     .fullscreen-chat-header {
                         padding: 1rem;
@@ -2098,7 +2103,7 @@ function Call() {
 
                     {/* --- Desktop-Only Sidebar --- */}
                     <div
-                        className="col-12 col-xl-4 d-xl-flex flex-column desktop-sidebar" // --- MODIFIED: col-xl-4, d-xl-flex ---
+                        className="col-xl-4 d-none d-xl-flex flex-column desktop-sidebar" // --- FIX: Replaced col-12 with d-none
                     >
                         {/* --- NEW: Waiting Room Card --- */}
                         {user?._id === callOwnerId && waitingUsers.length > 0 && (
@@ -2384,12 +2389,10 @@ function Call() {
 
                 {/* --- MODIFIED: Fullscreen Video Modal with Chat Overlay --- */}
                 {fullscreenPeer && (
-                    <div className="fullscreen-video-modal" onClick={(e) => {
-                        // Only close if clicking the modal backdrop, not the chat
-                        if (e.target === e.currentTarget) {
-                            setFullscreenPeer(null);
-                        }
-                    }}>
+                    <div 
+                        className="fullscreen-video-modal" 
+                        onDoubleClick={() => setFullscreenPeer(null)} // <-- NEW: Double-tap/click to exit
+                    >
                         <button className="fullscreen-close-btn" onClick={() => setFullscreenPeer(null)}>
                             <i className="bi bi-x-lg"></i>
                         </button>
@@ -2422,6 +2425,7 @@ function Call() {
                         <div
                             className="fullscreen-chat-overlay"
                             onClick={(e) => e.stopPropagation()} // Prevent modal from closing
+                            onDoubleClick={(e) => e.stopPropagation()} // <-- NEW: Prevent double-tap on chat from closing
                         >
                             <div className="fullscreen-chat-header">
                                 Chat
@@ -2440,7 +2444,7 @@ function Call() {
                                 <div ref={chatMessagesEndRef} />
                             </div>
                             <form onSubmit={handleSendMessage} className="fullscreen-chat-form">
-                                <div className="d-flex align-items: center">
+                                <div className="d-flex align-items-center">
                                     <input
                                         type="text"
                                         className="form-control chat-input"
