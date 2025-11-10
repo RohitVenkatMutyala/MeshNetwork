@@ -214,7 +214,6 @@ function Call() {
     const [inviteEmails, setInviteEmails] = useState('');
     const [isInviting, setIsInviting] = useState(false);
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-    // --- NEW: Fullscreen State ---
     const [isFullscreen, setIsFullscreen] = useState(false);
 
 
@@ -226,7 +225,6 @@ function Call() {
     const audioContainerRef = useRef(null);
     const localVideoRef = useRef(null);
     const chatMessagesEndRef = useRef(null);
-    // --- NEW: Fullscreen Ref ---
     const videoPanelRef = useRef(null);
     const [videoQuality, setVideoQuality] = useState('high');
     const [videoFit, setVideoFit] = useState('cover');
@@ -565,6 +563,63 @@ function Call() {
         };
     }, []);
 
+    // --- NEW: Keyboard Shortcuts Handler ---
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Don't trigger shortcuts if user is typing
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || callState !== 'active') {
+                return;
+            }
+
+            // Check for Shift key for hang up
+            if (e.shiftKey && (e.key === 'Q' || e.key === 'q')) {
+                e.preventDefault();
+                handleHangUp();
+                return;
+            }
+            
+            // Don't trigger on other Shift/Ctrl/Alt presses
+            if (e.shiftKey || e.ctrlKey || e.altKey) {
+                return;
+            }
+
+            switch (e.key) {
+                case 'V':
+                case 'v':
+                    e.preventDefault();
+                    handleToggleVideo();
+                    break;
+                case 'M':
+                case 'm':
+                    e.preventDefault();
+                    handleToggleMute(user?._id);
+                    break;
+                case 'F':
+                case 'f':
+                    e.preventDefault();
+                    handleToggleFullscreen();
+                    break;
+                case 'Escape':
+                    // Close all modals
+                    setIsInviteModalOpen(false);
+                    setIsFilterModalOpen(false);
+                    setIsQualityMenuOpen(false);
+                    setIsChatOpen(false);
+                    setIsParticipantsOpen(false);
+                    setIsShareOpen(false);
+                    break;
+                default:
+                    break;
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+        // Re-bind the listener if any of these key states/handlers change
+    }, [user, stream, isVideoOn, muteStatus, isFullscreen, callState, callOwnerId, participants, callId, navigate]);
+
 
     // --- Handler Functions ---
 
@@ -749,6 +804,7 @@ function Call() {
 
     // --- MODIFIED: Mute logic updated ---
     const handleToggleMute = async (targetUserId) => {
+        if (!targetUserId) return; // Guard against null user on init
         const isSelf = targetUserId === user._id;
 
         if (isSelf) {
@@ -1190,7 +1246,6 @@ function Call() {
                         right: 1rem;
                         width: 130px;
                         height: 130px;
-                        /* --- MODIFIED: Changed from 50% to 12px --- */
                         border-radius: 12px; 
                         border: 2px solid var(--border-color);
                         z-index: 10;
@@ -1224,7 +1279,6 @@ function Call() {
                         justify-content: center;
                         color: #fff;
                         font-size: 3rem;
-                        /* --- MODIFIED: Changed from 50% to 12px --- */
                         border-radius: 12px;
                         z-index: 1; /* Below the video element */
                     }
@@ -1421,8 +1475,9 @@ function Call() {
                         background-color: var(--dark-bg-secondary);
                         border: 1px solid var(--border-color);
                         border-radius: 12px;
-                        margin-bottom: 0.75rem;
-                        padding: 1rem;
+                        /* --- MODIFIED: Tighter list --- */
+                        margin-bottom: 0.5rem;
+                        padding: 0.75rem 1rem; 
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
@@ -1557,7 +1612,6 @@ function Call() {
                     {/* --- MODIFIED: Responsive column --- */}
                     <div className="col-12 col-xl-8 d-flex flex-column">
                         <div
-                            // --- NEW: Added ref for fullscreen ---
                             ref={videoPanelRef}
                             className="video-panel-container shadow-sm"
                             onClick={() => {
@@ -1688,17 +1742,17 @@ function Call() {
                                 <button
                                     className={`btn rounded-circle ${isVideoOn ? 'btn-secondary' : 'btn-danger'}`}
                                     onClick={(e) => { e.stopPropagation(); handleToggleVideo(); }}
-                                    title={isVideoOn ? "Turn off camera" : "Turn on camera"}
+                                    title={isVideoOn ? "Turn off camera (V)" : "Turn on camera (V)"}
                                 >
                                     <i className={`bi ${isVideoOn ? 'bi-camera-video-fill' : 'bi-camera-video-off-fill'}`}></i>
                                 </button>
 
                                 <button
-                                    className={`btn rounded-circle ${muteStatus[user._id] ? 'btn-danger' : 'btn-secondary'}`}
-                                    onClick={(e) => { e.stopPropagation(); handleToggleMute(user._id); }}
-                                    title={muteStatus[user._id] ? "Unmute" : "Mute"}
+                                    className={`btn rounded-circle ${muteStatus[user?._id] ? 'btn-danger' : 'btn-secondary'}`}
+                                    onClick={(e) => { e.stopPropagation(); handleToggleMute(user?._id); }}
+                                    title={muteStatus[user?._id] ? "Unmute (M)" : "Mute (M)"}
                                 >
-                                    <i className={`bi ${muteStatus[user._id] ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
+                                    <i className={`bi ${muteStatus[user?._id] ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
                                 </button>
 
                                 {/* --- NEW: Quality Settings Button --- */}
@@ -1710,20 +1764,21 @@ function Call() {
                                     <i className="bi bi-gear-fill"></i>
                                 </button>
 
-                                {/* --- NEW: Video Fit Toggle Button --- */}
+                                {/* --- MODIFIED: Video Fit Toggle Button --- */}
                                 <button
                                     className={`btn rounded-circle ${videoFit === 'contain' ? 'btn-primary' : 'btn-secondary'}`}
                                     onClick={handleToggleVideoFit}
                                     title={videoFit === 'cover' ? "Fit video to screen" : "Fill screen with video"}
                                 >
-                                    <i className={`bi ${videoFit === 'contain' ? 'bi-fullscreen-exit' : 'bi-aspect-ratio'}`}></i>
+                                    {/* --- MODIFIED: Using new icons --- */}
+                                    <i className={`bi ${videoFit === 'contain' ? 'bi-arrows-angle-contract' : 'bi-arrows-angle-expand'}`}></i>
                                 </button>
 
                                 {/* --- NEW: Fullscreen Button --- */}
                                 <button
                                     className={`btn rounded-circle ${isFullscreen ? 'btn-primary' : 'btn-secondary'}`}
                                     onClick={(e) => { e.stopPropagation(); handleToggleFullscreen(); }}
-                                    title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                                    title={isFullscreen ? "Exit fullscreen (F)" : "Enter fullscreen (F)"}
                                 >
                                     <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`}></i>
                                 </button>
@@ -1777,7 +1832,7 @@ function Call() {
                                 <button
                                     className="btn btn-danger rounded-circle"
                                     onClick={(e) => { e.stopPropagation(); handleHangUp(); }}
-                                    title="Hang Up"
+                                    title="Hang Up (Shift+Q)"
                                 >
                                     <i className="bi bi-telephone-fill" style={{ transform: 'rotate(135deg)' }}></i>
                                 </button>
@@ -1790,7 +1845,7 @@ function Call() {
                         className="col-12 col-xl-4 d-xl-flex flex-column desktop-sidebar" // --- MODIFIED: col-xl-4, d-xl-flex ---
                     >
                         {/* --- NEW: Waiting Room Card --- */}
-                        {user._id === callOwnerId && waitingUsers.length > 0 && (
+                        {user?._id === callOwnerId && waitingUsers.length > 0 && (
                             <div className="card shadow-sm border-warning">
                                 <div className="card-header d-flex justify-content-between text-warning">
                                     <span>Waiting Room ({waitingUsers.length})</span>
@@ -1901,7 +1956,7 @@ function Call() {
                         </div>
                         <div className="mobile-panel-body">
                             {/* --- NEW: Waiting Room (Mobile) --- */}
-                            {user._id === callOwnerId && waitingUsers.length > 0 && (
+                            {user?._id === callOwnerId && waitingUsers.length > 0 && (
                                 <div className="mb-4">
                                     <h6 className="text-warning">Waiting Room ({waitingUsers.length})</h6>
                                     <ul className="participant-card-list">
@@ -1992,7 +2047,7 @@ function Call() {
                                 <div ref={chatMessagesEndRef} />
                             </div>
                             <form onSubmit={handleSendMessage} className="mobile-chat-form">
-                                <div className="d-flex align-items: center">
+                                <div className="d-flex align-items-center">
                                     <input
                                         type="text"
                                         className="form-control chat-input"
