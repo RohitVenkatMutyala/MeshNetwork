@@ -214,6 +214,8 @@ function Call() {
     const [inviteEmails, setInviteEmails] = useState('');
     const [isInviting, setIsInviting] = useState(false);
     const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+    // --- NEW: Fullscreen State ---
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
 
     // --- Voice/Video Chat State ---
@@ -224,6 +226,8 @@ function Call() {
     const audioContainerRef = useRef(null);
     const localVideoRef = useRef(null);
     const chatMessagesEndRef = useRef(null);
+    // --- NEW: Fullscreen Ref ---
+    const videoPanelRef = useRef(null);
     const [videoQuality, setVideoQuality] = useState('high');
     const [videoFit, setVideoFit] = useState('cover');
     const [videoFilter, setVideoFilter] = useState('none');
@@ -547,6 +551,21 @@ function Call() {
     }, [callState, stream, videoQuality]); // Added dependencies
 
 
+    // --- NEW: Fullscreen Change Listener ---
+    // This syncs React state with the browser's fullscreen state (e.g., if user presses Esc)
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(document.fullscreenElement != null);
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        };
+    }, []);
+
+
     // --- Handler Functions ---
 
     // --- MODIFIED: getQualityStream simplified (no facingMode) ---
@@ -649,6 +668,21 @@ function Call() {
         sessionStorage.removeItem(`call_joined_${callId}`);
         // Replace the current history item ("/call/:callId") with "/new-call"
         navigate('/new-call', { replace: true });
+    };
+
+    // --- NEW: Fullscreen Toggle Handler ---
+    const handleToggleFullscreen = () => {
+        if (!videoPanelRef.current) return;
+
+        if (isFullscreen) {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        } else {
+            if (videoPanelRef.current.requestFullscreen) {
+                videoPanelRef.current.requestFullscreen();
+            }
+        }
     };
 
     const handleToggleVideo = () => {
@@ -1154,9 +1188,10 @@ function Call() {
                         position: absolute;
                         bottom: 1rem;
                         right: 1rem;
-                        width: 130px; /* --- MODIFIED: Slightly smaller --- */
+                        width: 130px;
                         height: 130px;
-                        border-radius: 50%;
+                        /* --- MODIFIED: Changed from 50% to 12px --- */
+                        border-radius: 12px; 
                         border: 2px solid var(--border-color);
                         z-index: 10;
                         cursor: move;
@@ -1166,8 +1201,8 @@ function Call() {
                     }
                     /* --- MODIFIED: Adjust PiP position for new padding --- */
                     .local-video-pip:not([style*="left"]) { 
-                         bottom: 1.5rem; /* 1rem + 0.5rem padding */
-                         right: 1.5rem; /* 1rem + 0.5rem padding */
+                        bottom: 1.5rem; /* 1rem + 0.5rem padding */
+                        right: 1.5rem; /* 1rem + 0.5rem padding */
                     }
                     .local-video-pip[style*="opacity: 0"] {
                          display: none;
@@ -1189,7 +1224,8 @@ function Call() {
                         justify-content: center;
                         color: #fff;
                         font-size: 3rem;
-                        border-radius: 50%;
+                        /* --- MODIFIED: Changed from 50% to 12px --- */
+                        border-radius: 12px;
                         z-index: 1; /* Below the video element */
                     }
 
@@ -1521,6 +1557,8 @@ function Call() {
                     {/* --- MODIFIED: Responsive column --- */}
                     <div className="col-12 col-xl-8 d-flex flex-column">
                         <div
+                            // --- NEW: Added ref for fullscreen ---
+                            ref={videoPanelRef}
                             className="video-panel-container shadow-sm"
                             onClick={() => {
                                 setAreControlsVisible(!areControlsVisible);
@@ -1679,6 +1717,15 @@ function Call() {
                                     title={videoFit === 'cover' ? "Fit video to screen" : "Fill screen with video"}
                                 >
                                     <i className={`bi ${videoFit === 'contain' ? 'bi-fullscreen-exit' : 'bi-aspect-ratio'}`}></i>
+                                </button>
+
+                                {/* --- NEW: Fullscreen Button --- */}
+                                <button
+                                    className={`btn rounded-circle ${isFullscreen ? 'btn-primary' : 'btn-secondary'}`}
+                                    onClick={(e) => { e.stopPropagation(); handleToggleFullscreen(); }}
+                                    title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                                >
+                                    <i className={`bi ${isFullscreen ? 'bi-fullscreen-exit' : 'bi-fullscreen'}`}></i>
                                 </button>
 
                                 {/* --- NEW: Filter Button --- */}
@@ -1945,7 +1992,7 @@ function Call() {
                                 <div ref={chatMessagesEndRef} />
                             </div>
                             <form onSubmit={handleSendMessage} className="mobile-chat-form">
-                                <div className="d-flex align-items-center">
+                                <div className="d-flex align-items: center">
                                     <input
                                         type="text"
                                         className="form-control chat-input"
