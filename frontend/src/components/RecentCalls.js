@@ -909,7 +909,7 @@ function RecentCalls({ searchTerm }) {
                                                     setShowNotificationModal(false);
                                                 }}
                                             >
-                                                Join
+                                                Tap
                                             </button>
                                         )}
                                     </div>
