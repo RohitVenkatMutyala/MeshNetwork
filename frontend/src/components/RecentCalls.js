@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig'; // Kept original import
-import { 
-    collection, query, where, orderBy, limit, onSnapshot, 
-    doc, setDoc, serverTimestamp, runTransaction, deleteDoc, 
+import {
+    collection, query, where, orderBy, limit, onSnapshot,
+    doc, setDoc, serverTimestamp, runTransaction, deleteDoc,
     updateDoc, addDoc, getDoc, writeBatch, getDocs
 } from 'firebase/firestore'; // Added writeBatch, getDocs, limit
 import { useAuth } from '../context/AuthContext'; // Kept original import
@@ -18,25 +18,25 @@ const getTodayString = () => {
 // --- NEW: Custom component for the call notification toast ---
 // This is the pop-up for a new call
 const CallNotification = ({ callerName, callId, onClose, navigate }) => {
-    
+
     const handleJoin = () => {
-      navigate(`/call/${callId}`);
-      onClose(); // This will be the toast.dismiss function
+        navigate(`/call/${callId}`);
+        onClose(); // This will be the toast.dismiss function
     };
 
     return (
-      <div className="call-notification-toast">
-        <strong className="d-block mb-2">{callerName} is calling!</strong>
-        <p className="mb-3">Do you want to join the session?</p>
-        <div className="d-flex justify-content-end gap-2">
-            <button className="btn btn-sm btn-light" onClick={onClose}>
-                Dismiss
-            </button>
-            <button className="btn btn-sm btn-success" onClick={handleJoin}>
-                Join Call
-            </button>
+        <div className="call-notification-toast">
+            <strong className="d-block mb-2">{callerName} is calling!</strong>
+            <p className="mb-3">Do you want to join the session?</p>
+            <div className="d-flex justify-content-end gap-2">
+                <button className="btn btn-sm btn-light" onClick={onClose}>
+                    Dismiss
+                </button>
+                <button className="btn btn-sm btn-success" onClick={handleJoin}>
+                    Join Call
+                </button>
+            </div>
         </div>
-      </div>
     );
 };
 
@@ -47,12 +47,12 @@ function RecentCalls({ searchTerm }) {
     const [filteredCalls, setFilteredCalls] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCalling, setIsCalling] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(null); 
+    const [isDeleting, setIsDeleting] = useState(null);
     const [dailyCallCount, setDailyCallCount] = useState(0);
     const dailyCallLimit = 32;
     const navigate = useNavigate(); // Using the hook as in your original
 
-    const [deleteTarget, setDeleteTarget] = useState(null); 
+    const [deleteTarget, setDeleteTarget] = useState(null);
 
     // --- Profile visibility state ---
     const [isOnline, setIsOnline] = useState(true);
@@ -64,16 +64,16 @@ function RecentCalls({ searchTerm }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [isNotifModalLoading, setIsNotifModalLoading] = useState(false);
-    
+
     // Function to send email when re-calling
     const sendInvitationEmails = async (callId, callDescription, invitedEmail) => {
         if (!invitedEmail) return;
-        
+
         const emailjsPublicKey = 'Cd-NUUSJ5dW3GJMo0';
         const serviceID = 'service_y8qops6';
         const templateID = 'template_apzjekq';
-        const callLink = `${window.location.origin}/call/${callId}`; 
-        
+        const callLink = `${window.location.origin}/call/${callId}`;
+
         const templateParams = {
             from_name: `${user.firstname} ${user.lastname}`,
             to_email: invitedEmail,
@@ -106,7 +106,7 @@ function RecentCalls({ searchTerm }) {
                 // ... (Transaction logic for call limit is unchanged)
                 const limitDoc = await transaction.get(limitDocRef);
                 let currentCount = 0;
-                
+
                 if (limitDoc.exists()) {
                     const data = limitDoc.data();
                     if (data.lastCallDate === today) {
@@ -134,9 +134,9 @@ function RecentCalls({ searchTerm }) {
                     muteStatus: { [user._id]: false },
                 });
 
-                transaction.set(limitDocRef, { 
-                    count: newCount, 
-                    lastCallDate: today 
+                transaction.set(limitDocRef, {
+                    count: newCount,
+                    lastCallDate: today
                 });
             });
 
@@ -180,9 +180,9 @@ function RecentCalls({ searchTerm }) {
                 callId={notification.callId}
                 onClose={() => dismissToast(toastId)} // Pass dismiss function
                 navigate={navigate} // Pass navigate function
-            />, 
-            { 
-                autoClose: false, 
+            />,
+            {
+                autoClose: false,
                 closeOnClick: false,
                 draggable: false,
                 closeButton: false, // Our component has close/decline
@@ -209,8 +209,8 @@ function RecentCalls({ searchTerm }) {
             console.error("Error deleting call:", error);
             toast.error("Could not delete the contact.");
         } finally {
-            setIsDeleting(null); 
-            setDeleteTarget(null); 
+            setIsDeleting(null);
+            setDeleteTarget(null);
         }
     };
 
@@ -220,15 +220,15 @@ function RecentCalls({ searchTerm }) {
         if (!user || !db) return;
         const newIsOnline = !isOnline;
         setIsOnline(newIsOnline);
-        const userSettingsRef = doc(db, 'users', user._id); 
+        const userSettingsRef = doc(db, 'users', user._id);
         try {
             const userDoc = await getDoc(userSettingsRef);
             const hasSeenPrompt = userDoc.exists() ? userDoc.data().hasSeenVisibilityPrompt : false;
             if (newIsOnline && !hasSeenPrompt) {
                 setShowVisibilityModal(true);
             }
-            await setDoc(userSettingsRef, { 
-                isOnline: newIsOnline 
+            await setDoc(userSettingsRef, {
+                isOnline: newIsOnline
             }, { merge: true });
         } catch (error) {
             console.error("Error updating visibility:", error);
@@ -244,8 +244,8 @@ function RecentCalls({ searchTerm }) {
         if (!user || !db) return;
         try {
             const userSettingsRef = doc(db, 'users', user._id);
-            await setDoc(userSettingsRef, { 
-                hasSeenVisibilityPrompt: true 
+            await setDoc(userSettingsRef, {
+                hasSeenVisibilityPrompt: true
             }, { merge: true });
         } catch (error) {
             console.error("Error marking visibility prompt as seen:", error);
@@ -259,14 +259,14 @@ function RecentCalls({ searchTerm }) {
 
         // 1. Fetch all notifications
         const q = query(
-            collection(db, 'notifications'), 
-            where('recipientEmail', '==', user.email), 
-            orderBy('createdAt', 'desc'), 
+            collection(db, 'notifications'),
+            where('recipientEmail', '==', user.email),
+            orderBy('createdAt', 'desc'),
             limit(50)
         );
         const querySnapshot = await getDocs(q);
         const notifs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
+
         setAllNotifications(notifs);
         setIsNotifModalLoading(false);
 
@@ -295,7 +295,7 @@ function RecentCalls({ searchTerm }) {
             collection(db, 'calls'),
             where('allowedEmails', 'array-contains', user.email),
             orderBy('createdAt', 'desc'),
-            limit(20) 
+            limit(20)
         );
         const unsubscribe = onSnapshot(callsQuery, (snapshot) => {
             const callsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -369,15 +369,15 @@ function RecentCalls({ searchTerm }) {
     useEffect(() => {
         // ... (This effect is unchanged)
         if (!user) {
-             setIsVisibilityLoading(false);
-             return;
+            setIsVisibilityLoading(false);
+            return;
         }
         setIsVisibilityLoading(true);
         const userSettingsRef = doc(db, 'users', user._id);
         const unsubscribe = onSnapshot(userSettingsRef, (doc) => {
             if (doc.exists()) {
                 const data = doc.data();
-                setIsOnline(data.isOnline ?? true); 
+                setIsOnline(data.isOnline ?? true);
             } else {
                 setIsOnline(true);
             }
@@ -407,17 +407,17 @@ function RecentCalls({ searchTerm }) {
             const batch = writeBatch(db);
             snapshot.docs.forEach((docSnap) => {
                 const notification = docSnap.data();
-                
+
                 // Show the pop-up toast
                 if (notification.type === 'call') {
                     showCallToast(notification);
                 }
-                
+
                 // Update status from 'pending' to 'unread'
                 // This stops the toast from re-appearing and adds it to the bell icon
                 batch.update(docSnap.ref, { status: 'unread' });
             });
-            
+
             // Commit all updates
             await batch.commit();
         });
@@ -534,7 +534,7 @@ function RecentCalls({ searchTerm }) {
                     color: var(--bs-secondary-color);
                 }
             `}</style>
-            
+
             {/* --- Component-specific styles --- */}
             <style jsx>{`
                 /* ... (All component styles from your original code are unchanged) ... */
@@ -809,7 +809,7 @@ function RecentCalls({ searchTerm }) {
                     padding: 1rem 1.5rem 0 1.5rem;
                 }
             `}</style>
-            
+
             {/* --- Visibility Confirmation Modal --- */}
             {showVisibilityModal && (
                 <div className="notification-modal-overlay" onClick={handleCloseVisibilityModal}>
@@ -818,14 +818,14 @@ function RecentCalls({ searchTerm }) {
                         <p className="visibility-modal-body">
                             By enabling "Profile Visibility," you are allowing other users
                             on the app to see that you are online and available.
-                            <br/><br/>
+                            <br /><br />
                             Your profile (name and email) may appear in their
                             "Online Users" list, making it easier to start a call.
                             You can turn this off at any time.
                         </p>
                         <div className="notification-modal-footer">
-                            <button 
-                                className="btn btn-primary" 
+                            <button
+                                className="btn btn-primary"
                                 onClick={handleCloseVisibilityModal}
                             >
                                 Got it
@@ -844,15 +844,15 @@ function RecentCalls({ searchTerm }) {
                             Are you sure you want to delete <strong>{deleteTarget.name}</strong> from your recents? This cannot be undone.
                         </p>
                         <div className="delete-modal-actions">
-                            <button 
-                                className="btn btn-secondary" 
+                            <button
+                                className="btn btn-secondary"
                                 onClick={() => setDeleteTarget(null)}
                                 disabled={isDeleting === deleteTarget.id}
                             >
                                 Cancel
                             </button>
-                            <button 
-                                className="btn btn-danger" 
+                            <button
+                                className="btn btn-danger"
                                 onClick={confirmDelete}
                                 disabled={isDeleting === deleteTarget.id}
                             >
@@ -881,8 +881,8 @@ function RecentCalls({ searchTerm }) {
                                 </div>
                             ) : (
                                 allNotifications.map(notif => (
-                                    <div 
-                                        key={notif.id} 
+                                    <div
+                                        key={notif.id}
                                         className={`notification-item ${notif.status}`}
                                     >
                                         <div className="notification-icon">
@@ -902,23 +902,24 @@ function RecentCalls({ searchTerm }) {
                                             </div>
                                         </div>
                                         {notif.type === 'call' && (
-                                            <button 
+                                            <button
                                                 className="btn btn-sm btn-primary ms-auto"
                                                 onClick={() => {
                                                     navigate(`/call/${notif.callId}`);
                                                     setShowNotificationModal(false);
                                                 }}
                                             >
-                                                Tap
+                                                <span style={{ color: "limegreen" }}>📞</span>
                                             </button>
+
                                         )}
                                     </div>
                                 ))
                             )}
                         </div>
                         <div className="notification-modal-footer">
-                            <button 
-                                className="btn btn-secondary" 
+                            <button
+                                className="btn btn-secondary"
                                 onClick={() => setShowNotificationModal(false)}
                             >
                                 Close
@@ -935,10 +936,10 @@ function RecentCalls({ searchTerm }) {
                     Profile Visibility
                 </label>
                 <label className="toggle-switch">
-                    <input 
-                        type="checkbox" 
+                    <input
+                        type="checkbox"
                         id="visibility-toggle"
-                        checked={isOnline} 
+                        checked={isOnline}
                         onChange={handleVisibilityToggle}
                         disabled={isVisibilityLoading}
                     />
@@ -951,8 +952,8 @@ function RecentCalls({ searchTerm }) {
                 <div>
                     Today's Calls: <strong>{dailyCallCount} / {dailyCallLimit}</strong>
                 </div>
-                <div 
-                    className="notification-bell" 
+                <div
+                    className="notification-bell"
                     title="Notifications"
                     onClick={openNotificationModal}
                 >
@@ -975,13 +976,13 @@ function RecentCalls({ searchTerm }) {
                         const isCurrentUserOwner = call.ownerId === user._id;
                         const displayName = isCurrentUserOwner ? call.recipientName : call.ownerName;
                         const displayEmail = isCurrentUserOwner ? call.recipientEmail : call.ownerEmail;
-                        
+
                         if (!displayName) return null;
 
                         return (
                             <div key={call.id} className="call-item">
-                                <div 
-                                    className="call-avatar" 
+                                <div
+                                    className="call-avatar"
                                     style={{ backgroundColor: getAvatarColor(displayName) }}
                                 >
                                     {displayName.charAt(0).toUpperCase()}
@@ -1012,8 +1013,8 @@ function RecentCalls({ searchTerm }) {
                                     </button>
 
                                     {/* 2. The "new call" button */}
-                                    <button 
-                                        className="call-button call-button-call" 
+                                    <button
+                                        className="call-button call-button-call"
                                         title={`Call ${displayName} (New Session)`}
                                         onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
                                         disabled={isCalling === call.id || dailyCallCount >= dailyCallLimit || isDeleting === call.id}
@@ -1028,8 +1029,8 @@ function RecentCalls({ searchTerm }) {
                                     </button>
 
                                     {/* 3. Delete button */}
-                                    <button 
-                                        className="call-button call-delete-button" 
+                                    <button
+                                        className="call-button call-delete-button"
                                         title={`Delete ${displayName}`}
                                         onClick={() => promptForDelete(call.id, displayName)}
                                         disabled={isDeleting === call.id || isCalling === call.id}
