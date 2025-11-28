@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig'; // Kept original import
-import { 
-    collection, query, where, orderBy, limit, onSnapshot, 
-    doc, setDoc, serverTimestamp, runTransaction, deleteDoc, 
+import {
+    collection, query, where, orderBy, limit, onSnapshot,
+    doc, setDoc, serverTimestamp, runTransaction, deleteDoc,
     updateDoc, addDoc, getDoc, writeBatch, getDocs
 } from 'firebase/firestore'; // Added writeBatch, getDocs, limit
 import { useAuth } from '../context/AuthContext'; // Kept original import
@@ -51,7 +51,7 @@ const playNotificationSound = () => {
 
         // Fade out quickly
         gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
-        
+
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.5); // Play for 0.5s
     } catch (e) {
@@ -66,25 +66,25 @@ const getTodayString = () => {
 
 // --- Custom component for the call notification toast ---
 const CallNotification = ({ callerName, callId, onClose, navigate }) => {
-    
+
     const handleJoin = () => {
-      navigate(`/call/${callId}`);
-      onClose();
+        navigate(`/call/${callId}`);
+        onClose();
     };
 
     return (
-      <div className="call-notification-toast">
-        <strong className="d-block mb-2">{callerName} is calling!</strong>
-        <p className="mb-3">Do you want to join the session?</p>
-        <div className="d-flex justify-content-end gap-2">
-            <button className="btn btn-sm btn-light" onClick={onClose}>
-                Dismiss
-            </button>
-            <button className="btn btn-sm btn-success" onClick={handleJoin}>
-                Join Call
-            </button>
+        <div className="call-notification-toast">
+            <strong className="d-block mb-2">{callerName} is calling!</strong>
+            <p className="mb-3">Do you want to join the session?</p>
+            <div className="d-flex justify-content-end gap-2">
+                <button className="btn btn-sm btn-light" onClick={onClose}>
+                    Dismiss
+                </button>
+                <button className="btn btn-sm btn-success" onClick={handleJoin}>
+                    Join Call
+                </button>
+            </div>
         </div>
-      </div>
     );
 };
 
@@ -95,12 +95,12 @@ function RecentCalls({ searchTerm }) {
     const [filteredCalls, setFilteredCalls] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCalling, setIsCalling] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(null); 
+    const [isDeleting, setIsDeleting] = useState(null);
     const [dailyCallCount, setDailyCallCount] = useState(0);
     const dailyCallLimit = 32;
     const navigate = useNavigate();
 
-    const [deleteTarget, setDeleteTarget] = useState(null); 
+    const [deleteTarget, setDeleteTarget] = useState(null);
 
     // Profile visibility state
     const [isOnline, setIsOnline] = useState(true);
@@ -112,20 +112,20 @@ function RecentCalls({ searchTerm }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [isNotifModalLoading, setIsNotifModalLoading] = useState(false);
-    const [activeChat, setActiveChat] = useState(null);
-    
+
+
     // --- NEW: Effect to initialize Audio Context on first click ---
     useEffect(() => {
         // This is required for browsers that block audio until a user interaction
         window.addEventListener('click', initAudioContext, { once: true });
-        
+
         return () => {
             // Clean up listener just in case
             window.removeEventListener('click', initAudioContext);
         };
     }, []); // Empty dependency array, runs only once on mount
 
-    
+
     // --- Helper function to show the call toast ---
     // Wrapped in useCallback to safely use in useEffect dependency array
     const showCallToast = useCallback((notification) => {
@@ -142,9 +142,9 @@ function RecentCalls({ searchTerm }) {
                 callId={notification.callId}
                 onClose={() => dismissToast(toastId)} // Pass dismiss function
                 navigate={navigate} // Pass navigate function
-            />, 
-            { 
-                autoClose: false, 
+            />,
+            {
+                autoClose: false,
                 closeOnClick: false,
                 draggable: false,
                 closeButton: false, // Our component has close/decline
@@ -162,7 +162,7 @@ function RecentCalls({ searchTerm }) {
         const emailjsPublicKey = 'Cd-NUUSJ5dW3GJMo0';
         const serviceID = 'service_y8qops6';
         const templateID = 'template_apzjekq';
-        const callLink = `${window.location.origin}/call/${callId}`; 
+        const callLink = `${window.location.origin}/call/${callId}`;
         const templateParams = {
             from_name: `${user.firstname} ${user.lastname}`,
             to_email: invitedEmail,
@@ -195,7 +195,7 @@ function RecentCalls({ searchTerm }) {
             await runTransaction(db, async (transaction) => {
                 const limitDoc = await transaction.get(limitDocRef);
                 let currentCount = 0;
-                
+
                 if (limitDoc.exists()) {
                     const data = limitDoc.data();
                     if (data.lastCallDate === today) {
@@ -220,9 +220,9 @@ function RecentCalls({ searchTerm }) {
                     permissions: { [user._id]: 'editor' },
                     muteStatus: { [user._id]: false },
                 });
-                transaction.set(limitDocRef, { 
-                    count: newCount, 
-                    lastCallDate: today 
+                transaction.set(limitDocRef, {
+                    count: newCount,
+                    lastCallDate: today
                 });
             });
 
@@ -270,8 +270,8 @@ function RecentCalls({ searchTerm }) {
             console.error("Error deleting call:", error);
             toast.error("Could not delete the contact.");
         } finally {
-            setIsDeleting(null); 
-            setDeleteTarget(null); 
+            setIsDeleting(null);
+            setDeleteTarget(null);
         }
     };
 
@@ -279,15 +279,15 @@ function RecentCalls({ searchTerm }) {
         if (!user || !db) return;
         const newIsOnline = !isOnline;
         setIsOnline(newIsOnline);
-        const userSettingsRef = doc(db, 'users', user._id); 
+        const userSettingsRef = doc(db, 'users', user._id);
         try {
             const userDoc = await getDoc(userSettingsRef);
             const hasSeenPrompt = userDoc.exists() ? userDoc.data().hasSeenVisibilityPrompt : false;
             if (newIsOnline && !hasSeenPrompt) {
                 setShowVisibilityModal(true);
             }
-            await setDoc(userSettingsRef, { 
-                isOnline: newIsOnline 
+            await setDoc(userSettingsRef, {
+                isOnline: newIsOnline
             }, { merge: true });
         } catch (error) {
             console.error("Error updating visibility:", error);
@@ -301,8 +301,8 @@ function RecentCalls({ searchTerm }) {
         if (!user || !db) return;
         try {
             const userSettingsRef = doc(db, 'users', user._id);
-            await setDoc(userSettingsRef, { 
-                hasSeenVisibilityPrompt: true 
+            await setDoc(userSettingsRef, {
+                hasSeenVisibilityPrompt: true
             }, { merge: true });
         } catch (error) {
             console.error("Error marking visibility prompt as seen:", error);
@@ -314,14 +314,14 @@ function RecentCalls({ searchTerm }) {
         setIsNotifModalLoading(true);
 
         const q = query(
-            collection(db, 'notifications'), 
-            where('recipientEmail', '==', user.email), 
-            orderBy('createdAt', 'desc'), 
+            collection(db, 'notifications'),
+            where('recipientEmail', '==', user.email),
+            orderBy('createdAt', 'desc'),
             limit(50)
         );
         const querySnapshot = await getDocs(q);
         const notifs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
+
         setAllNotifications(notifs);
         setIsNotifModalLoading(false);
 
@@ -335,17 +335,19 @@ function RecentCalls({ searchTerm }) {
             await batch.commit();
         }
     };
-   const handleOpenChat = (otherName, otherEmail) => {
+    const handleOpenChat = (otherName, otherEmail) => {
         if (!user || !otherEmail) return;
-        
-        // Sort emails to ensure both users generate the same ID (e.g. "a@test.com_b@test.com")
+
+        // Sort emails to create unique ID
         const participants = [user.email, otherEmail].sort();
         const conversationId = participants.join('_');
 
-        setActiveChat({
-            id: conversationId,
-            name: otherName,
-            collection: 'direct_chats'
+        // Navigate to the chat page, passing name via state
+        navigate(`/chat/${conversationId}`, {
+            state: {
+                recipientName: otherName,
+                collectionName: 'direct_chats'
+            }
         });
     };
     // --- All original Effects (1-4) are unchanged ---
@@ -360,7 +362,7 @@ function RecentCalls({ searchTerm }) {
             collection(db, 'calls'),
             where('allowedEmails', 'array-contains', user.email),
             orderBy('createdAt', 'desc'),
-            limit(20) 
+            limit(20)
         );
         const unsubscribe = onSnapshot(callsQuery, (snapshot) => {
             const callsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -431,15 +433,15 @@ function RecentCalls({ searchTerm }) {
     // Effect 4: Listen for visibility status
     useEffect(() => {
         if (!user) {
-             setIsVisibilityLoading(false);
-             return;
+            setIsVisibilityLoading(false);
+            return;
         }
         setIsVisibilityLoading(true);
         const userSettingsRef = doc(db, 'users', user._id);
         const unsubscribe = onSnapshot(userSettingsRef, (doc) => {
             if (doc.exists()) {
                 const data = doc.data();
-                setIsOnline(data.isOnline ?? true); 
+                setIsOnline(data.isOnline ?? true);
             } else {
                 setIsOnline(true);
             }
@@ -468,16 +470,16 @@ function RecentCalls({ searchTerm }) {
             const batch = writeBatch(db);
             snapshot.docs.forEach((docSnap) => {
                 const notification = docSnap.data();
-                
+
                 if (notification.type === 'call') {
                     // This now calls the useCallback version
                     showCallToast(notification);
                 }
-                
+
                 // Update status to 'unread' to stop toast and add to bell
                 batch.update(docSnap.ref, { status: 'unread' });
             });
-            
+
             await batch.commit();
         });
 
@@ -587,7 +589,7 @@ function RecentCalls({ searchTerm }) {
                     color: var(--bs-secondary-color);
                 }
             `}</style>
-            
+
             {/* Component styles */}
             <style jsx>{`
                 .recent-calls-list {
@@ -858,7 +860,7 @@ function RecentCalls({ searchTerm }) {
                     padding: 1rem 1.5rem 0 1.5rem;
                 }
             `}</style>
-            
+
             {/* --- Visibility Confirmation Modal --- */}
             {showVisibilityModal && (
                 <div className="notification-modal-overlay" onClick={handleCloseVisibilityModal}>
@@ -867,14 +869,14 @@ function RecentCalls({ searchTerm }) {
                         <p className="visibility-modal-body">
                             By enabling "Profile Visibility," you are allowing other users
                             on the app to see that you are online and available.
-                            <br/><br/>
+                            <br /><br />
                             Your profile (name and email) may appear in their
                             "Online Users" list, making it easier to start a call.
                             You can turn this off at any time.
                         </p>
                         <div className="notification-modal-footer">
-                            <button 
-                                className="btn btn-primary" 
+                            <button
+                                className="btn btn-primary"
                                 onClick={handleCloseVisibilityModal}
                             >
                                 Got it
@@ -893,15 +895,15 @@ function RecentCalls({ searchTerm }) {
                             Are you sure you want to delete <strong>{deleteTarget.name}</strong> from your recents? This cannot be undone.
                         </p>
                         <div className="delete-modal-actions">
-                            <button 
-                                className="btn btn-secondary" 
+                            <button
+                                className="btn btn-secondary"
                                 onClick={() => setDeleteTarget(null)}
                                 disabled={isDeleting === deleteTarget.id}
                             >
                                 Cancel
                             </button>
-                            <button 
-                                className="btn btn-danger" 
+                            <button
+                                className="btn btn-danger"
                                 onClick={confirmDelete}
                                 disabled={isDeleting === deleteTarget.id}
                             >
@@ -930,8 +932,8 @@ function RecentCalls({ searchTerm }) {
                                 </div>
                             ) : (
                                 allNotifications.map(notif => (
-                                    <div 
-                                        key={notif.id} 
+                                    <div
+                                        key={notif.id}
                                         className={`notification-item ${notif.status}`}
                                     >
                                         <div className="notification-icon">
@@ -949,17 +951,17 @@ function RecentCalls({ searchTerm }) {
                                             <div className="notification-time">
                                                 {formatTimeAgo(notif.createdAt)}
                                             </div>
-         
+
                                         </div>
                                         {notif.type === 'call' && (
-                                            <button 
+                                            <button
                                                 className="btn btn-sm btn-primary ms-auto"
                                                 onClick={() => {
                                                     navigate(`/call/${notif.callId}`);
                                                     setShowNotificationModal(false);
                                                 }}
                                             >
-                                               <span style={{ color: "limegreen" }}>📞</span>
+                                                <span style={{ color: "limegreen" }}>📞</span>
 
                                             </button>
                                         )}
@@ -968,8 +970,8 @@ function RecentCalls({ searchTerm }) {
                             )}
                         </div>
                         <div className="notification-modal-footer">
-                            <button 
-                                className="btn btn-secondary" 
+                            <button
+                                className="btn btn-secondary"
                                 onClick={() => setShowNotificationModal(false)}
                             >
                                 Close
@@ -978,14 +980,7 @@ function RecentCalls({ searchTerm }) {
                     </div>
                 </div>
             )}
-           {activeChat && (
-                <Chat 
-                    chatId={activeChat.id} 
-                    collectionName={activeChat.collection} 
-                    recipientName={activeChat.name}
-                    onClose={() => setActiveChat(null)} 
-                />
-            )}
+          
 
             {/* --- Visibility Toggle --- */}
             <div className="visibility-control">
@@ -993,10 +988,10 @@ function RecentCalls({ searchTerm }) {
                     Profile Visibility
                 </label>
                 <label className="toggle-switch">
-                    <input 
-                        type="checkbox" 
+                    <input
+                        type="checkbox"
                         id="visibility-toggle"
-                        checked={isOnline} 
+                        checked={isOnline}
                         onChange={handleVisibilityToggle}
                         disabled={isVisibilityLoading}
                     />
@@ -1009,8 +1004,8 @@ function RecentCalls({ searchTerm }) {
                 <div>
                     Today's Calls: <strong>{dailyCallCount} / {dailyCallLimit}</strong>
                 </div>
-                <div 
-                    className="notification-bell" 
+                <div
+                    className="notification-bell"
                     title="Notifications"
                     onClick={openNotificationModal}
                 >
@@ -1034,13 +1029,13 @@ function RecentCalls({ searchTerm }) {
                         const isCurrentUserOwner = call.ownerId === user._id;
                         const displayName = isCurrentUserOwner ? call.recipientName : call.ownerName;
                         const displayEmail = isCurrentUserOwner ? call.recipientEmail : call.ownerEmail;
-                        
+
                         if (!displayName) return null;
 
                         return (
                             <div key={call.id} className="call-item">
-                                <div 
-                                    className="call-avatar" 
+                                <div
+                                    className="call-avatar"
                                     style={{ backgroundColor: getAvatarColor(displayName) }}
                                 >
                                     {displayName.charAt(0).toUpperCase()}
@@ -1071,8 +1066,8 @@ function RecentCalls({ searchTerm }) {
                                     </button>
 
                                     {/* 2. The "new call" button */}
-                                    <button 
-                                        className="call-button call-button-call" 
+                                    <button
+                                        className="call-button call-button-call"
                                         title={`Call ${displayName} (New Session)`}
                                         onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
                                         disabled={isCalling === call.id || dailyCallCount >= dailyCallLimit || isDeleting === call.id}
@@ -1085,17 +1080,17 @@ function RecentCalls({ searchTerm }) {
                                             <i className="bi bi-telephone-fill"></i>
                                         )}
                                     </button>
-                                    <button 
-                                    className="call-button call-button-chat" 
-                                    title={`Chat with ${displayName}`}
-                                    onClick={() => handleOpenChat(displayName, displayEmail)}
-                                >
-                                    <i className="bi bi-chat-dots-fill"></i>
-                                </button>
+                                    <button
+                                        className="call-button call-button-chat"
+                                        title={`Chat with ${displayName}`}
+                                        onClick={() => handleOpenChat(displayName, displayEmail)}
+                                    >
+                                        <i className="bi bi-chat-dots-fill"></i>
+                                    </button>
 
                                     {/* 3. Delete button */}
-                                    <button 
-                                        className="call-button call-delete-button" 
+                                    <button
+                                        className="call-button call-delete-button"
                                         title={`Delete ${displayName}`}
                                         onClick={() => promptForDelete(call.id, displayName)}
                                         disabled={isDeleting === call.id || isCalling === call.id}

@@ -8,11 +8,20 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { v4 as uuidv4 } from 'uuid'; // Ensure you have uuid installed: npm install uuid
-
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
     const { user } = useAuth();
+    const { chatId } = useParams(); // Get ID from URL
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Get data passed via navigation state, provide defaults
+    const recipientName = location.state?.recipientName || 'User';
+    const collectionName = location.state?.collectionName || 'direct_chats';
+    
+    const onClose = () => navigate(-1); // Go back on close
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -198,7 +207,7 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
     if (!user) return null;
 
     return (
-        <div className="chat-modal-overlay" onClick={onClose}>
+      <div className="chat-page-container">
             {/* WhatsApp Web Dark Mode Inspired CSS */}
             <style jsx>{`
                 /* Colors */
@@ -223,7 +232,9 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
 
                 .chat-window {
                     width: 100%; height: 100%;
-                    max-width: 1400px; max-height: 95vh;
+                    max-width: 100%; /* Full width */
+                    max-height: 100%; /* Full height */
+                    border-radius: 0; /* Remove corners for full page */
                     background-color: var(--wa-bg);
                     background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
                     background-repeat: repeat;
@@ -232,6 +243,7 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                     display: flex; flex-direction: column; overflow: hidden;
                     box-shadow: 0 15px 50px rgba(0,0,0,0.7);
                     position: relative;
+                    box-shadow: none; /* Remove shadow */
                 }
                 
                 @media (min-width: 768px) {
@@ -398,7 +410,7 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                 @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
             `}</style>
 
-            <div className="chat-window" onClick={(e) => e.stopPropagation()}>
+           <div className="chat-window"> 
                 {/* Header */}
                 <div className="chat-header">
                     <div className="recipient-info">
