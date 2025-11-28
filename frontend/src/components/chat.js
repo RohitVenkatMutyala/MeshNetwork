@@ -218,30 +218,25 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
                     background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(4px);
                     z-index: 2000; display: flex; align-items: center; justify-content: center;
-                    padding: 20px;
                     animation: fadeIn 0.2s ease;
                 }
 
-              .chat-window {
-                    width: 100%; 
-                    height: 100%;
-                    max-width: 1400px; 
-                    max-height: 90vh; /* <--- CHANGED: Reduced from 95vh to 90vh to keep it on screen */
+                .chat-window {
+                    width: 100%; height: 100%;
+                    max-width: 1400px; max-height: 95vh;
                     background-color: var(--wa-bg);
                     background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
                     background-repeat: repeat;
                     background-size: 400px;
-                    border-radius: 12px; /* <--- CHANGED: Always rounded corners */
-                    display: flex; 
-                    flex-direction: column; 
-                    overflow: hidden; /* <--- CRITICAL: Prevents the modal itself from scrolling */
+                    border-radius: 0;
+                    display: flex; flex-direction: column; overflow: hidden;
                     box-shadow: 0 15px 50px rgba(0,0,0,0.7);
                     position: relative;
                 }
                 
                 @media (min-width: 768px) {
                     .chat-window {
-                        width: 95%; height: 90vh; border-radius: 12px;
+                        width: 95%; height: 95vh; border-radius: 12px;
                     }
                 }
 
