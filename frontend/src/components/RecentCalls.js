@@ -9,7 +9,7 @@ import {
 import { useAuth } from '../context/AuthContext'; // Kept original import
 import { toast } from 'react-toastify';
 import emailjs from '@emailjs/browser'; // Kept original import
-
+import Chat from './chat'; // New import for Chat component
 // --- NEW: Audio Context for Notification Sound ---
 // We create this outside the component to be persistent
 let audioContext = null;
@@ -112,6 +112,7 @@ function RecentCalls({ searchTerm }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [isNotifModalLoading, setIsNotifModalLoading] = useState(false);
+    const [activeChat, setActiveChat] = useState(null);
     
     // --- NEW: Effect to initialize Audio Context on first click ---
     useEffect(() => {
@@ -334,7 +335,19 @@ function RecentCalls({ searchTerm }) {
             await batch.commit();
         }
     };
+   const handleOpenChat = (otherName, otherEmail) => {
+        if (!user || !otherEmail) return;
+        
+        // Sort emails to ensure both users generate the same ID (e.g. "a@test.com_b@test.com")
+        const participants = [user.email, otherEmail].sort();
+        const conversationId = participants.join('_');
 
+        setActiveChat({
+            id: conversationId,
+            name: otherName,
+            collection: 'direct_chats'
+        });
+    };
     // --- All original Effects (1-4) are unchanged ---
 
     // Effect 1: Fetch all calls
@@ -635,6 +648,8 @@ function RecentCalls({ searchTerm }) {
                     background-color: var(--bs-primary-bg-subtle);
                     color: var(--bs-primary-text-emphasis);
                 }
+                    .call-button-chat { color: #0dcaf0; } 
+                .call-button-chat:hover { background-color: rgba(13, 202, 240, 0.15); color: #0dcaf0; }
                 .call-button-call { color: var(--bs-success); }
                 .call-button-call:hover {
                     background-color: var(--bs-success-bg-subtle);
@@ -963,7 +978,14 @@ function RecentCalls({ searchTerm }) {
                     </div>
                 </div>
             )}
-
+           {activeChat && (
+                <Chat 
+                    chatId={activeChat.id} 
+                    collectionName={activeChat.collection} 
+                    recipientName={activeChat.name}
+                    onClose={() => setActiveChat(null)} 
+                />
+            )}
 
             {/* --- Visibility Toggle --- */}
             <div className="visibility-control">
@@ -1063,6 +1085,13 @@ function RecentCalls({ searchTerm }) {
                                             <i className="bi bi-telephone-fill"></i>
                                         )}
                                     </button>
+                                    <button 
+                                    className="call-button call-button-chat" 
+                                    title={`Chat with ${displayName}`}
+                                    onClick={() => handleOpenChat(displayName, displayEmail)}
+                                >
+                                    <i className="bi bi-chat-dots-fill"></i>
+                                </button>
 
                                     {/* 3. Delete button */}
                                     <button 
