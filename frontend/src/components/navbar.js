@@ -77,7 +77,7 @@ function Navbar() {
                 }
 
                 /* Brand Style */
-                .navbar-brand-custom {
+              .navbar-brand-custom {
                     font-size: 1.1rem;
                     font-weight: 600;
                     color: var(--nav-text) !important;
@@ -85,6 +85,7 @@ function Navbar() {
                     display: flex;
                     align-items: center;
                     gap: 10px;
+                    text-decoration: none !important; /* <--- THIS REMOVES THE LINE */
                 }
 
                 /* Navigation Links (Tabs) */
@@ -178,12 +179,7 @@ function Navbar() {
                             {user ? (
                                 <>
                                     {/* --- Calls Tab --- */}
-                                    <li className="nav-item">
-                                        <Link className={`nav-link-custom ${isActive('/new-call') ? 'active' : ''}`} to="/new-call">
-                                            <i className="bi bi-telephone"></i>
-                                            <span>Calls</span>
-                                        </Link>
-                                    </li>
+                                  
 
                                     {/* --- Profile Dropdown --- */}
                                     <li className="nav-item ms-lg-2">
