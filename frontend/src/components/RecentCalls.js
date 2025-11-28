@@ -558,20 +558,40 @@ function RecentCalls({ searchTerm }) {
             {/* Global & Component Styles */}
             <style jsx global>{`
                 :root {
+                    /* --- Light Theme (Default) --- */
+                    --wa-bg: #ffffff;
+                    --wa-header: #ffffff; /* WhatsApp Web Light Header is white */
+                    --wa-hover: #f5f6f6;
+                    --wa-primary: #111b21; /* Dark text for light mode */
+                    --wa-secondary: #54656f; /* Muted gray text */
+                    --wa-accent: #008069; /* WhatsApp Green */
+                    --wa-danger: #ea0038;
+                    --wa-blue: #027eb5;
+                    --wa-border: #e9edef;
+                    --wa-search-bg: #f0f2f5; /* Light gray search bar */
+                    --wa-scrollbar: rgba(0,0,0,0.2);
+                }
+
+                /* --- Dark Theme Overrides --- */
+                /* Ensure your theme toggle adds 'dark-theme' class to body or app wrapper */
+                [data-theme='dark'], body.dark-theme, .dark-theme {
                     --wa-bg: #111b21;
                     --wa-header: #202c33;
                     --wa-hover: #2a3942;
-                    --wa-primary: #e9edef;
+                    --wa-primary: #e9edef; /* Light text for dark mode */
                     --wa-secondary: #8696a0;
-                    --wa-accent: #00a884;
+                    --wa-accent: #00a884; /* Brighter green for dark mode */
                     --wa-danger: #ef5350;
                     --wa-blue: #53bdeb;
+                    --wa-border: rgba(134, 150, 160, 0.15);
+                    --wa-search-bg: #202c33;
+                    --wa-scrollbar: rgba(255,255,255,0.1);
                 }
 
                 /* Scrollbar Customization */
                 ::-webkit-scrollbar { width: 6px; }
                 ::-webkit-scrollbar-track { background: transparent; }
-                ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+                ::-webkit-scrollbar-thumb { background: var(--wa-scrollbar); border-radius: 3px; }
             `}</style>
 
             <style jsx>{`
@@ -580,20 +600,22 @@ function RecentCalls({ searchTerm }) {
                     height: 100%;
                     display: flex;
                     flex-direction: column;
-                    border-right: 1px solid rgba(255,255,255,0.1);
+                    border-right: 1px solid var(--wa-border);
                     color: var(--wa-primary);
                     position: relative;
                     overflow: hidden;
+                    transition: background-color 0.3s ease, color 0.3s ease;
                 }
 
-                /* --- STICKY HEADER SECTION (Fixes overlapping) --- */
+                /* --- STICKY HEADER --- */
                 .sticky-header {
                     position: sticky;
                     top: 0;
                     z-index: 100;
-                    background-color: var(--wa-bg);
+                    background-color: var(--wa-header);
                     padding-bottom: 5px;
-                    border-bottom: 1px solid rgba(134, 150, 160, 0.15);
+                    border-bottom: 1px solid var(--wa-border);
+                    transition: background-color 0.3s ease;
                 }
 
                 /* Search Bar */
@@ -601,12 +623,13 @@ function RecentCalls({ searchTerm }) {
                     padding: 10px 15px;
                 }
                 .search-input-group {
-                    background-color: var(--wa-header);
+                    background-color: var(--wa-search-bg);
                     border-radius: 8px;
                     display: flex;
                     align-items: center;
                     padding: 0 15px;
                     height: 35px;
+                    transition: background-color 0.3s ease;
                 }
                 .search-icon { color: var(--wa-secondary); font-size: 0.85rem; }
                 .search-input {
@@ -620,7 +643,7 @@ function RecentCalls({ searchTerm }) {
                 }
                 .search-input::placeholder { color: var(--wa-secondary); }
 
-                /* Call Stats & Bell Row */
+                /* Stats Row */
                 .stats-row {
                     display: flex; justify-content: space-between; align-items: center;
                     padding: 8px 20px;
@@ -630,7 +653,7 @@ function RecentCalls({ searchTerm }) {
                 .bell-btn {
                     position: relative; cursor: pointer; color: var(--wa-secondary); transition: 0.2s;
                 }
-                .bell-btn:hover { color: var(--wa-primary); }
+                .bell-btn:hover { color: var(--wa-accent); }
                 .badge-dot {
                     position: absolute; top: -2px; right: -2px;
                     width: 8px; height: 8px;
@@ -645,19 +668,17 @@ function RecentCalls({ searchTerm }) {
                     padding-top: 5px;
                 }
 
-                /* Call Item Card */
+                /* Call Item */
                 .call-item {
                     display: flex; align-items: center;
                     padding: 12px 15px;
                     cursor: pointer;
                     transition: background-color 0.2s;
-                    border-bottom: 1px solid rgba(134, 150, 160, 0.1);
+                    border-bottom: 1px solid var(--wa-border);
                 }
                 .call-item:hover { background-color: var(--wa-hover); }
 
-                .avatar-container {
-                    position: relative; margin-right: 15px;
-                }
+                .avatar-container { position: relative; margin-right: 15px; }
                 .call-avatar {
                     width: 45px; height: 45px; border-radius: 50%;
                     display: flex; align-items: center; justify-content: center;
@@ -665,15 +686,11 @@ function RecentCalls({ searchTerm }) {
                     flex-shrink: 0;
                 }
 
-                .call-info {
-                    flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;
-                }
-                .info-top {
-                    display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 3px;
-                }
+                .call-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+                
+                .info-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
                 .call-name {
-                    font-size: 1rem; color: var(--wa-primary);
+                    font-size: 1rem; color: var(--wa-primary); font-weight: 500;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
                 .call-date {
@@ -681,16 +698,13 @@ function RecentCalls({ searchTerm }) {
                     flex-shrink: 0; margin-left: 10px;
                 }
 
-                .info-bottom {
-                    display: flex; justify-content: space-between; align-items: center;
-                }
+                .info-bottom { display: flex; justify-content: space-between; align-items: center; }
                 .call-email {
                     font-size: 0.85rem; color: var(--wa-secondary);
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                    max-width: 80%;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%;
                 }
                 
-                /* Actions (Show on Hover) */
+                /* Actions */
                 .call-actions {
                     display: flex; gap: 15px;
                     opacity: 0; transition: opacity 0.2s;
@@ -715,9 +729,10 @@ function RecentCalls({ searchTerm }) {
                 /* Visibility Toggle */
                 .visibility-control {
                     padding: 15px;
-                    border-top: 1px solid rgba(134, 150, 160, 0.1);
+                    border-top: 1px solid var(--wa-border);
                     background-color: var(--wa-header);
                     display: flex; justify-content: space-between; align-items: center;
+                    transition: background-color 0.3s ease;
                 }
                 .vis-label { font-size: 0.9rem; color: var(--wa-primary); }
                 
@@ -727,37 +742,42 @@ function RecentCalls({ searchTerm }) {
                 .slider {
                     position: absolute; cursor: pointer;
                     top: 0; left: 0; right: 0; bottom: 0;
-                    background-color: #3b4a54; transition: .4s; border-radius: 34px;
+                    background-color: var(--wa-secondary); opacity: 0.3; 
+                    transition: .4s; border-radius: 34px;
                 }
                 .slider:before {
                     position: absolute; content: "";
                     height: 14px; width: 14px; left: 3px; bottom: 3px;
                     background-color: white; transition: .4s; border-radius: 50%;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
                 }
-                input:checked + .slider { background-color: var(--wa-accent); }
+                input:checked + .slider { background-color: var(--wa-accent); opacity: 1; }
                 input:checked + .slider:before { transform: translateX(14px); }
 
-                /* Modal Overlays (Reused logic, updated style) */
+                /* Modal Overlay */
                 .modal-overlay {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(0,0,0,0.7); z-index: 1000;
+                    background: rgba(0,0,0,0.6); z-index: 2000;
                     display: flex; align-items: center; justify-content: center;
+                    backdrop-filter: blur(2px);
                 }
                 .modal-card {
-                    background: var(--wa-header); color: var(--wa-primary);
+                    background: var(--wa-bg); color: var(--wa-primary);
                     width: 90%; max-width: 400px; padding: 20px;
-                    border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                    border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                    border: 1px solid var(--wa-border);
                 }
                 .modal-btn {
-                    padding: 8px 16px; border-radius: 4px; border: none; font-weight: 500; margin-left: 10px;
+                    padding: 8px 16px; border-radius: 4px; border: none; font-weight: 500; margin-left: 10px; cursor: pointer;
                 }
-                .btn-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-accent); }
+                .btn-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-border); }
+                .btn-cancel:hover { background: var(--wa-hover); }
                 .btn-danger { background: var(--wa-danger); color: white; }
                 .btn-primary { background: var(--wa-accent); color: white; }
 
                 @media (max-width: 576px) {
-                    .call-actions { opacity: 1; gap: 10px; } /* Always show actions on mobile */
-                    .call-item { padding: 10px; }
+                    .call-actions { opacity: 1; gap: 12px; }
+                    .call-item { padding: 12px; }
                 }
             `}</style>
 
@@ -771,10 +791,8 @@ function RecentCalls({ searchTerm }) {
                             <input
                                 type="text"
                                 className="search-input"
-                                placeholder="Search or start new call"
+                                placeholder="Search recent calls..."
                                 value={searchTerm || ''}
-                            // Assuming you have a setSearchTerm handler in parent, 
-                            // otherwise add onChange logic here if passed as prop
                             />
                         </div>
                     </div>
@@ -793,7 +811,7 @@ function RecentCalls({ searchTerm }) {
                     {!user ? (
                         <div className="empty-state">Please log in to see recent calls.</div>
                     ) : filteredCalls.length === 0 ? (
-                        <div className="empty-state">No chats or calls found.</div>
+                        <div className="empty-state">No recent calls found.</div>
                     ) : (
                         filteredCalls.map(call => {
                             const isCurrentUserOwner = call.ownerId === user._id;
@@ -823,7 +841,7 @@ function RecentCalls({ searchTerm }) {
                                                 {displayEmail}
                                             </span>
 
-                                            {/* Action Icons (Hover to see) */}
+                                            {/* Action Icons */}
                                             <div className="call-actions" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                     className="action-icon icon-call"
@@ -832,7 +850,7 @@ function RecentCalls({ searchTerm }) {
                                                     onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
                                                 >
                                                     {isCalling === call.id ? (
-                                                        <span className="spinner-border spinner-border-sm"></span>
+                                                        <span className="spinner-border spinner-border-sm text-success"></span>
                                                     ) : (
                                                         <i className="bi bi-camera-video-fill"></i>
                                                     )}
@@ -864,7 +882,7 @@ function RecentCalls({ searchTerm }) {
 
                 {/* --- FOOTER VISIBILITY --- */}
                 <div className="visibility-control">
-                    <span className="vis-label">Profile Visibility (Online)</span>
+                    <span className="vis-label">Profile Visibility ({isOnline ? 'Online' : 'Hidden'})</span>
                     <label className="switch">
                         <input
                             type="checkbox"
@@ -878,7 +896,7 @@ function RecentCalls({ searchTerm }) {
 
             </div>
 
-            {/* --- MODALS (Simplified for new theme) --- */}
+            {/* --- MODALS --- */}
             {deleteTarget && (
                 <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
                     <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -920,7 +938,7 @@ function RecentCalls({ searchTerm }) {
                                 <p className="text-center text-muted my-4">No notifications.</p>
                             ) : (
                                 allNotifications.map(notif => (
-                                    <div key={notif.id} className="p-2 border-bottom border-secondary" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                                    <div key={notif.id} className="p-2 border-bottom border-secondary" style={{ borderColor: 'var(--wa-border)' }}>
                                         <div className="d-flex justify-content-between">
                                             <strong style={{ fontSize: '0.9rem' }}>{notif.callerName}</strong>
                                             <small className="text-muted" style={{ fontSize: '0.7rem' }}>{formatTimeAgo(notif.createdAt)}</small>
