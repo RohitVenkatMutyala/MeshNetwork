@@ -6,13 +6,13 @@ import { AuthProvider } from './context/AuthContext';
 import LoginForm from './components/LoginForm';
 
 import RegisterForm from './components/RegisterForm';
-import { ThemeProvider } from './context/ThemeContext';
+import { ThemeProvider } from './context/ThemeContext'; 
 import Call from './components/call.js';
 import CreateCall from './components/CreateCall'; // <-- 1. IMPORT CreateCall
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 function App() {
   return (
-    <ThemeProvider>
+   <ThemeProvider>
       <AuthProvider>
         <Router>
           <Routes>
@@ -37,10 +37,10 @@ function App() {
                 </>
               }
             />
-
-
+         
+            
             {/* --- 2. ADD THE NEW CreateCall ROUTE --- */}
-            <Route
+            <Route 
               path="/new-call"
               element={
                 <>
@@ -51,17 +51,15 @@ function App() {
             />
 
             {/* --- 3. CORRECTED THE Call ROUTE (roomID -> callId) --- */}
-            <Route
-              path="/call/:callId"
+            <Route 
+              path="/call/:callId" 
               element={
                 <>
                   <Helmet><title>Call - Randoman</title></Helmet>
                   <Call />
                 </>
-              }
+              } 
             />
-
-            <Route path="/chat/:chatId" element={<Chat />} />
 
           </Routes>
         </Router>
