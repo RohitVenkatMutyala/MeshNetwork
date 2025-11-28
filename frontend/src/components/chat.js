@@ -1,18 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, storage } from '../firebaseConfig'; // Ensure storage is imported
+// ADD: useParams, useLocation, useNavigate
+import { useParams, useLocation, useNavigate } from 'react-router-dom'; 
+import { db, storage } from '../firebaseConfig';
 import { 
     collection, query, orderBy, onSnapshot, addDoc, 
-    serverTimestamp, doc, setDoc, updateDoc, getDoc 
+    serverTimestamp, doc, setDoc 
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
-import { v4 as uuidv4 } from 'uuid'; // Ensure you have uuid installed: npm install uuid
+import { v4 as uuidv4 } from 'uuid';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
-const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
+// REMOVE props arguments, use hooks instead
+const Chat = () => {
     const { user } = useAuth();
+    // GET params from URL
+    const { collectionName, chatId } = useParams(); 
+    // GET recipientName from navigation state (passed from RecentCalls)
+    const location = useLocation();
+    const navigate = useNavigate();
+    
+    // Fallback if name isn't passed (e.g., page refresh)
+    const recipientName = location.state?.recipientName || 'Chat';
+
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -22,6 +34,11 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
     const messagesEndRef = useRef(null);
     const typingTimeoutRef = useRef(null);
     const fileInputRef = useRef(null);
+
+    // Handle Back Button
+    const handleClose = () => {
+        navigate(-1); // Go back to previous page
+    };
 
     // --- 1. Auto-scroll to bottom ---
     const scrollToBottom = () => {
@@ -56,14 +73,12 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
     useEffect(() => {
         if (!chatId || !user) return;
 
-        // Listen to the parent document (the chat room itself) for typing status
         const chatDocRef = doc(db, collectionName, chatId);
         
         const unsubscribe = onSnapshot(chatDocRef, (snapshot) => {
             if (snapshot.exists()) {
                 const data = snapshot.data();
                 const typingData = data.typing || {};
-                // Check if anyone OTHER than current user is typing
                 const someoneElseTyping = Object.keys(typingData).some(
                     userId => userId !== user._id && typingData[userId] === true
                 );
@@ -79,17 +94,14 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
 
         if (!user || !chatId) return;
 
-        // Update Firestore that I am typing
         if (!isTyping) {
             setIsTyping(true);
             const chatDocRef = doc(db, collectionName, chatId);
-            // Use setDoc with merge to ensure doc exists
             await setDoc(chatDocRef, { 
                 typing: { [user._id]: true } 
             }, { merge: true });
         }
 
-        // Debounce stopping
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         
         typingTimeoutRef.current = setTimeout(async () => {
@@ -98,7 +110,7 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
             await setDoc(chatDocRef, { 
                 typing: { [user._id]: false } 
             }, { merge: true });
-        }, 2000); // Stop typing status after 2 seconds of inactivity
+        }, 2000);
     };
 
     // --- 4. Send Text Message ---
@@ -107,7 +119,6 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
         if (!newMessage.trim()) return;
 
         try {
-            // Immediately stop typing status
             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
             const chatDocRef = doc(db, collectionName, chatId);
             await setDoc(chatDocRef, { typing: { [user._id]: false } }, { merge: true });
@@ -128,7 +139,7 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
         }
     };
 
-    // --- 5. Handle File/Image Upload (Mimics FolderDetailPage logic) ---
+    // --- 5. Handle File/Image Upload ---
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -140,20 +151,15 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
 
         setIsUploading(true);
         try {
-            // Determine type
             const isImage = file.type.startsWith('image/');
             const msgType = isImage ? 'image' : 'file';
-
-            // Generate Path
             const fileId = uuidv4();
             const filePath = `chatFiles/${chatId}/${fileId}-${file.name}`;
             const storageRef = ref(storage, filePath);
 
-            // Upload
             const snapshot = await uploadBytes(storageRef, file);
             const downloadURL = await getDownloadURL(snapshot.ref);
 
-            // Save Metadata to Firestore Message
             await addDoc(collection(db, collectionName, chatId, 'messages'), {
                 type: msgType,
                 fileUrl: downloadURL,
@@ -170,7 +176,6 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
             toast.error("Failed to upload file.");
         } finally {
             setIsUploading(false);
-            // Reset input
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
@@ -179,13 +184,11 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
         fileInputRef.current?.click();
     };
 
-    // Helper: Format Time
     const formatTime = (timestamp) => {
         if (!timestamp) return '...';
         return timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     };
 
-    // Helper: Format File Size
     const formatBytes = (bytes, decimals = 2) => {
         if (!+bytes) return '0 Bytes';
         const k = 1024;
@@ -198,8 +201,8 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
     if (!user) return null;
 
     return (
-        <div className="chat-modal-overlay" onClick={onClose}>
-            {/* WhatsApp Web Dark Mode Inspired CSS */}
+        // Changed container class
+        <div className="chat-page-container">
             <style jsx>{`
                 /* Colors */
                 :root {
@@ -214,32 +217,29 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                     --wa-accent: #00a884;
                 }
 
-                .chat-modal-overlay {
-                    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(4px);
-                    z-index: 2000; display: flex; align-items: center; justify-content: center;
-                    animation: fadeIn 0.2s ease;
+                /* UPDATED: Main Page Container - No longer a modal overlay */
+                .chat-page-container {
+                    width: 100%;
+                    height: 100vh; /* Full viewport height */
+                    background-color: var(--wa-bg);
+                    display: flex;
+                    flex-direction: column;
                 }
 
+                /* UPDATED: Window takes full size */
                 .chat-window {
-                    width: 100%; height: 100%;
-                    max-width: 1400px; max-height: 95vh;
+                    width: 100%; 
+                    height: 100%;
                     background-color: var(--wa-bg);
                     background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
                     background-repeat: repeat;
                     background-size: 400px;
-                    border-radius: 0;
-                    display: flex; flex-direction: column; overflow: hidden;
-                    box-shadow: 0 15px 50px rgba(0,0,0,0.7);
+                    display: flex; 
+                    flex-direction: column; 
+                    overflow: hidden;
                     position: relative;
                 }
                 
-                @media (min-width: 768px) {
-                    .chat-window {
-                        width: 95%; height: 95%; border-radius: 12px;
-                    }
-                }
-
                 /* Header */
                 .chat-header {
                     padding: 10px 16px; 
@@ -248,6 +248,8 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                     color: var(--wa-text-primary);
                     z-index: 10;
                     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    height: 60px; /* Fixed height for header */
+                    flex-shrink: 0;
                 }
                 .recipient-info { display: flex; align-items: center; gap: 12px; cursor: pointer; }
                 .avatar-circle {
@@ -263,22 +265,20 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
 
                 /* Body */
                 .chat-body {
-                    flex: 1; padding: 20px 5%; 
+                    flex: 1; 
+                    padding: 20px 5%; 
                     overflow-y: auto;
                     display: flex; flex-direction: column; gap: 8px;
-                    /* Tint overlay for bg image */
                     background-color: rgba(11, 20, 26, 0.93); 
                 }
 
                 /* Messages */
-                .message-row {
-                    display: flex; width: 100%;
-                }
+                .message-row { display: flex; width: 100%; }
                 .row-own { justify-content: flex-end; }
                 .row-other { justify-content: flex-start; }
 
                 .message-bubble {
-                    max-width: 70%; 
+                    max-width: 85%; /* Slightly wider for full page */
                     padding: 6px 7px 8px 9px; 
                     border-radius: 7.5px;
                     font-size: 0.95rem; 
@@ -289,11 +289,11 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                     display: flex; flex-direction: column;
                 }
                 
-                .bubble-own {
-                    background-color: var(--wa-outgoing);
-                    border-top-right-radius: 0;
+                @media(min-width: 768px) {
+                    .message-bubble { max-width: 65%; }
                 }
-                /* CSS Triangle for Own */
+
+                .bubble-own { background-color: var(--wa-outgoing); border-top-right-radius: 0; }
                 .bubble-own::after {
                     content: ""; position: absolute; top: 0; right: -8px;
                     width: 0; height: 0;
@@ -301,11 +301,7 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                     border-right: 8px solid transparent; 
                 }
 
-                .bubble-other {
-                    background-color: var(--wa-incoming);
-                    border-top-left-radius: 0;
-                }
-                /* CSS Triangle for Other */
+                .bubble-other { background-color: var(--wa-incoming); border-top-left-radius: 0; }
                 .bubble-other::after {
                     content: ""; position: absolute; top: 0; left: -8px;
                     width: 0; height: 0;
@@ -313,15 +309,10 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                     border-left: 8px solid transparent; 
                 }
 
-                .sender-name {
-                    font-size: 0.75rem; font-weight: bold; margin-bottom: 4px;
-                    color: #d1d7db; opacity: 0.7;
-                }
+                .sender-name { font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; color: #d1d7db; opacity: 0.7; }
                 
                 /* Message Content Types */
-                .msg-image {
-                    max-width: 100%; border-radius: 6px; margin-bottom: 4px; cursor: pointer;
-                }
+                .msg-image { max-width: 100%; border-radius: 6px; margin-bottom: 4px; cursor: pointer; }
                 .msg-file-card {
                     display: flex; align-items: center; gap: 10px;
                     background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;
@@ -339,7 +330,6 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                     align-self: flex-end; margin-top: 2px; margin-left: 10px;
                     min-width: fit-content;
                 }
-                /* Adjust time color for own messages to be legible on green */
                 .bubble-own .msg-time { color: rgba(255,255,255,0.6); }
 
                 /* Footer */
@@ -348,6 +338,7 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                     background-color: var(--wa-header); 
                     display: flex; align-items: center; gap: 10px;
                     z-index: 10;
+                    flex-shrink: 0;
                 }
                 
                 .chat-input-bar {
@@ -371,13 +362,9 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                 }
                 .icon-btn:hover { background: rgba(255,255,255,0.05); color: var(--wa-text-primary); }
                 
-                .btn-send {
-                    color: var(--wa-accent); 
-                }
+                .btn-send { color: var(--wa-accent); }
                 .btn-send:hover { background: rgba(0,168,132,0.1); }
 
-                .close-btn { color: var(--wa-text-secondary); background: transparent; border: none; font-size: 1.2rem; }
-                
                 /* Scrollbar */
                 .chat-body::-webkit-scrollbar { width: 6px; }
                 .chat-body::-webkit-scrollbar-track { background: transparent; }
@@ -395,13 +382,17 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                     0%, 80%, 100% { transform: scale(0); }
                     40% { transform: scale(1); }
                 }
-                @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
             `}</style>
 
-            <div className="chat-window" onClick={(e) => e.stopPropagation()}>
+            <div className="chat-window">
                 {/* Header */}
                 <div className="chat-header">
                     <div className="recipient-info">
+                        {/* Added Back Button for Mobile/Full Page */}
+                        <button className="icon-btn me-2" onClick={handleClose}>
+                             <i className="bi bi-arrow-left"></i>
+                        </button>
+                        
                         <div className="avatar-circle">
                             {recipientName ? recipientName.charAt(0).toUpperCase() : '?'}
                         </div>
@@ -420,7 +411,8 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                             </div>
                         </div>
                     </div>
-                    <button className="icon-btn" onClick={onClose} style={{marginLeft: 'auto'}}>
+                    {/* Close button can also act as back button */}
+                    <button className="icon-btn" onClick={handleClose} style={{marginLeft: 'auto'}}>
                         <i className="bi bi-x-lg"></i>
                     </button>
                 </div>
@@ -440,19 +432,14 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                         return (
                             <div key={msg.id} className={`message-row ${isOwn ? 'row-own' : 'row-other'}`}>
                                 <div className={`message-bubble ${isOwn ? 'bubble-own' : 'bubble-other'}`}>
-                                    {/* Sender Name in Groups (Optional, usually hidden in direct chat) */}
                                     {!isOwn && collectionName !== 'direct_chats' && (
                                         <div className="sender-name">{msg.senderName}</div>
                                     )}
 
-                                    {/* Content based on type */}
                                     {msg.type === 'image' ? (
-                                        <>
-                                            <a href={msg.fileUrl} target="_blank" rel="noreferrer">
-                                                <img src={msg.fileUrl} alt="attachment" className="msg-image" />
-                                            </a>
-                                            {/* Optional Caption could go here */}
-                                        </>
+                                        <a href={msg.fileUrl} target="_blank" rel="noreferrer">
+                                            <img src={msg.fileUrl} alt="attachment" className="msg-image" />
+                                        </a>
                                     ) : msg.type === 'file' ? (
                                         <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="msg-file-card">
                                             <div className="file-icon-box"><i className="bi bi-file-earmark-text-fill"></i></div>
@@ -479,7 +466,6 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
 
                 {/* Footer Input */}
                 <div className="chat-footer">
-                    {/* Hidden File Input */}
                     <input 
                         type="file" 
                         ref={fileInputRef} 
@@ -487,7 +473,6 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                         onChange={handleFileUpload}
                     />
 
-                    {/* Attachment Button */}
                     <button className="icon-btn" title="Attach" onClick={triggerFileInput} disabled={isUploading}>
                         {isUploading ? (
                             <span className="spinner-border spinner-border-sm" style={{color: 'var(--wa-text-secondary)'}}></span>

@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import LoginForm from './components/LoginForm';
-
+import Chat from './components/chat';
 import RegisterForm from './components/RegisterForm';
 import { ThemeProvider } from './context/ThemeContext'; 
 import Call from './components/call.js';
@@ -60,6 +60,7 @@ function App() {
                 </>
               } 
             />
+            <Route path="/chat/:collectionName/:chatId" element={<Chat />} />
 
           </Routes>
         </Router>

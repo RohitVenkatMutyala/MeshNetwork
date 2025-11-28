@@ -9,7 +9,7 @@ import {
 import { useAuth } from '../context/AuthContext'; // Kept original import
 import { toast } from 'react-toastify';
 import emailjs from '@emailjs/browser'; // Kept original import
-import Chat from './chat'; // New import for Chat component
+
 // --- NEW: Audio Context for Notification Sound ---
 // We create this outside the component to be persistent
 let audioContext = null;
@@ -112,7 +112,7 @@ function RecentCalls({ searchTerm }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [isNotifModalLoading, setIsNotifModalLoading] = useState(false);
-    const [activeChat, setActiveChat] = useState(null);
+
     
     // --- NEW: Effect to initialize Audio Context on first click ---
     useEffect(() => {
@@ -335,17 +335,17 @@ function RecentCalls({ searchTerm }) {
             await batch.commit();
         }
     };
-   const handleOpenChat = (otherName, otherEmail) => {
+  const handleOpenChat = (otherName, otherEmail) => {
         if (!user || !otherEmail) return;
-        
-        // Sort emails to ensure both users generate the same ID (e.g. "a@test.com_b@test.com")
+
+        // Sort emails to ensure both users generate the same ID
         const participants = [user.email, otherEmail].sort();
         const conversationId = participants.join('_');
+        const collectionName = 'direct_chats';
 
-        setActiveChat({
-            id: conversationId,
-            name: otherName,
-            collection: 'direct_chats'
+        // Navigate to the new page, passing the name in 'state' so we can display it
+        navigate(`/chat/${collectionName}/${conversationId}`, { 
+            state: { recipientName: otherName } 
         });
     };
     // --- All original Effects (1-4) are unchanged ---
@@ -978,14 +978,7 @@ function RecentCalls({ searchTerm }) {
                     </div>
                 </div>
             )}
-           {activeChat && (
-                <Chat 
-                    chatId={activeChat.id} 
-                    collectionName={activeChat.collection} 
-                    recipientName={activeChat.name}
-                    onClose={() => setActiveChat(null)} 
-                />
-            )}
+       
 
             {/* --- Visibility Toggle --- */}
             <div className="visibility-control">
