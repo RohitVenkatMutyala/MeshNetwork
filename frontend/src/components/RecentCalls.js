@@ -557,38 +557,40 @@ function RecentCalls({ searchTerm }) {
         <>
             {/* Global & Component Styles */}
             <style jsx global>{`
+                /* --- CSS VARIABLES SETUP --- */
                 :root {
-                    /* --- Light Theme (Default) --- */
+                    /* DEFAULT: Light Theme Variables */
                     --wa-bg: #ffffff;
-                    --wa-header: #ffffff; /* WhatsApp Web Light Header is white */
+                    --wa-header: #ffffff; 
                     --wa-hover: #f5f6f6;
-                    --wa-primary: #111b21; /* Dark text for light mode */
-                    --wa-secondary: #54656f; /* Muted gray text */
-                    --wa-accent: #008069; /* WhatsApp Green */
+                    --wa-primary: #111b21;      /* Dark text */
+                    --wa-secondary: #54656f;    /* Gray text */
+                    --wa-accent: #008069;       /* Light Mode Green */
                     --wa-danger: #ea0038;
-                    --wa-blue: #027eb5;
                     --wa-border: #e9edef;
-                    --wa-search-bg: #f0f2f5; /* Light gray search bar */
+                    --wa-search-bg: #f0f2f5;
                     --wa-scrollbar: rgba(0,0,0,0.2);
+                    --wa-modal-bg: #ffffff;
                 }
 
-                /* --- Dark Theme Overrides --- */
-                /* Ensure your theme toggle adds 'dark-theme' class to body or app wrapper */
-                [data-theme='dark'], body.dark-theme, .dark-theme {
+                /* --- DARK THEME OVERRIDES --- */
+                /* This matches the class "theme-dark" used in your Navbar */
+                .theme-dark .recent-calls-container,
+                .recent-calls-container.theme-dark {
                     --wa-bg: #111b21;
                     --wa-header: #202c33;
                     --wa-hover: #2a3942;
-                    --wa-primary: #e9edef; /* Light text for dark mode */
+                    --wa-primary: #e9edef;      /* Light text */
                     --wa-secondary: #8696a0;
-                    --wa-accent: #00a884; /* Brighter green for dark mode */
+                    --wa-accent: #00a884;       /* Dark Mode Green */
                     --wa-danger: #ef5350;
-                    --wa-blue: #53bdeb;
                     --wa-border: rgba(134, 150, 160, 0.15);
                     --wa-search-bg: #202c33;
                     --wa-scrollbar: rgba(255,255,255,0.1);
+                    --wa-modal-bg: #202c33;
                 }
 
-                /* Scrollbar Customization */
+                /* Global Scrollbar */
                 ::-webkit-scrollbar { width: 6px; }
                 ::-webkit-scrollbar-track { background: transparent; }
                 ::-webkit-scrollbar-thumb { background: var(--wa-scrollbar); border-radius: 3px; }
@@ -604,7 +606,8 @@ function RecentCalls({ searchTerm }) {
                     color: var(--wa-primary);
                     position: relative;
                     overflow: hidden;
-                    transition: background-color 0.3s ease, color 0.3s ease;
+                    /* Smooth transition for theme switching */
+                    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
                 }
 
                 /* --- STICKY HEADER --- */
@@ -615,7 +618,7 @@ function RecentCalls({ searchTerm }) {
                     background-color: var(--wa-header);
                     padding-bottom: 5px;
                     border-bottom: 1px solid var(--wa-border);
-                    transition: background-color 0.3s ease;
+                    transition: background-color 0.3s ease, border-color 0.3s ease;
                 }
 
                 /* Search Bar */
@@ -762,7 +765,7 @@ function RecentCalls({ searchTerm }) {
                     backdrop-filter: blur(2px);
                 }
                 .modal-card {
-                    background: var(--wa-bg); color: var(--wa-primary);
+                    background: var(--wa-modal-bg); color: var(--wa-primary);
                     width: 90%; max-width: 400px; padding: 20px;
                     border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
                     border: 1px solid var(--wa-border);
@@ -781,7 +784,9 @@ function RecentCalls({ searchTerm }) {
                 }
             `}</style>
 
-            <div className="recent-calls-container">
+            {/* --- WRAPPER WITH THEME CLASS --- */}
+            {/* Logic: checks if 'theme' prop is 'dark', else defaults to light */}
+            <div className={`recent-calls-container ${typeof theme !== 'undefined' && theme === 'dark' ? 'theme-dark' : 'theme-light'}`}>
 
                 {/* --- STICKY HEADER --- */}
                 <div className="sticky-header">
