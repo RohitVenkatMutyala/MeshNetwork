@@ -236,7 +236,7 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                 
                 @media (min-width: 768px) {
                     .chat-window {
-                        width: 95%; height: 95vh; border-radius: 12px;
+                        width: 95%; height: 95%; border-radius: 12px;
                     }
                 }
 
