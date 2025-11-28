@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig'; // Kept original import
-import { 
-    collection, query, where, orderBy, limit, onSnapshot, 
-    doc, setDoc, serverTimestamp, runTransaction, deleteDoc, 
+import {
+    collection, query, where, orderBy, limit, onSnapshot,
+    doc, setDoc, serverTimestamp, runTransaction, deleteDoc,
     updateDoc, addDoc, getDoc, writeBatch, getDocs
 } from 'firebase/firestore'; // Added writeBatch, getDocs, limit
 import { useAuth } from '../context/AuthContext'; // Kept original import
@@ -51,7 +51,7 @@ const playNotificationSound = () => {
 
         // Fade out quickly
         gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
-        
+
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.5); // Play for 0.5s
     } catch (e) {
@@ -66,25 +66,25 @@ const getTodayString = () => {
 
 // --- Custom component for the call notification toast ---
 const CallNotification = ({ callerName, callId, onClose, navigate }) => {
-    
+
     const handleJoin = () => {
-      navigate(`/call/${callId}`);
-      onClose();
+        navigate(`/call/${callId}`);
+        onClose();
     };
 
     return (
-      <div className="call-notification-toast">
-        <strong className="d-block mb-2">{callerName} is calling!</strong>
-        <p className="mb-3">Do you want to join the session?</p>
-        <div className="d-flex justify-content-end gap-2">
-            <button className="btn btn-sm btn-light" onClick={onClose}>
-                Dismiss
-            </button>
-            <button className="btn btn-sm btn-success" onClick={handleJoin}>
-                Join Call
-            </button>
+        <div className="call-notification-toast">
+            <strong className="d-block mb-2">{callerName} is calling!</strong>
+            <p className="mb-3">Do you want to join the session?</p>
+            <div className="d-flex justify-content-end gap-2">
+                <button className="btn btn-sm btn-light" onClick={onClose}>
+                    Dismiss
+                </button>
+                <button className="btn btn-sm btn-success" onClick={handleJoin}>
+                    Join Call
+                </button>
+            </div>
         </div>
-      </div>
     );
 };
 
@@ -95,12 +95,12 @@ function RecentCalls({ searchTerm }) {
     const [filteredCalls, setFilteredCalls] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCalling, setIsCalling] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(null); 
+    const [isDeleting, setIsDeleting] = useState(null);
     const [dailyCallCount, setDailyCallCount] = useState(0);
     const dailyCallLimit = 32;
     const navigate = useNavigate();
 
-    const [deleteTarget, setDeleteTarget] = useState(null); 
+    const [deleteTarget, setDeleteTarget] = useState(null);
 
     // Profile visibility state
     const [isOnline, setIsOnline] = useState(true);
@@ -113,19 +113,19 @@ function RecentCalls({ searchTerm }) {
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [isNotifModalLoading, setIsNotifModalLoading] = useState(false);
 
-    
+
     // --- NEW: Effect to initialize Audio Context on first click ---
     useEffect(() => {
         // This is required for browsers that block audio until a user interaction
         window.addEventListener('click', initAudioContext, { once: true });
-        
+
         return () => {
             // Clean up listener just in case
             window.removeEventListener('click', initAudioContext);
         };
     }, []); // Empty dependency array, runs only once on mount
 
-    
+
     // --- Helper function to show the call toast ---
     // Wrapped in useCallback to safely use in useEffect dependency array
     const showCallToast = useCallback((notification) => {
@@ -142,9 +142,9 @@ function RecentCalls({ searchTerm }) {
                 callId={notification.callId}
                 onClose={() => dismissToast(toastId)} // Pass dismiss function
                 navigate={navigate} // Pass navigate function
-            />, 
-            { 
-                autoClose: false, 
+            />,
+            {
+                autoClose: false,
                 closeOnClick: false,
                 draggable: false,
                 closeButton: false, // Our component has close/decline
@@ -162,7 +162,7 @@ function RecentCalls({ searchTerm }) {
         const emailjsPublicKey = 'Cd-NUUSJ5dW3GJMo0';
         const serviceID = 'service_y8qops6';
         const templateID = 'template_apzjekq';
-        const callLink = `${window.location.origin}/call/${callId}`; 
+        const callLink = `${window.location.origin}/call/${callId}`;
         const templateParams = {
             from_name: `${user.firstname} ${user.lastname}`,
             to_email: invitedEmail,
@@ -195,7 +195,7 @@ function RecentCalls({ searchTerm }) {
             await runTransaction(db, async (transaction) => {
                 const limitDoc = await transaction.get(limitDocRef);
                 let currentCount = 0;
-                
+
                 if (limitDoc.exists()) {
                     const data = limitDoc.data();
                     if (data.lastCallDate === today) {
@@ -220,9 +220,9 @@ function RecentCalls({ searchTerm }) {
                     permissions: { [user._id]: 'editor' },
                     muteStatus: { [user._id]: false },
                 });
-                transaction.set(limitDocRef, { 
-                    count: newCount, 
-                    lastCallDate: today 
+                transaction.set(limitDocRef, {
+                    count: newCount,
+                    lastCallDate: today
                 });
             });
 
@@ -270,8 +270,8 @@ function RecentCalls({ searchTerm }) {
             console.error("Error deleting call:", error);
             toast.error("Could not delete the contact.");
         } finally {
-            setIsDeleting(null); 
-            setDeleteTarget(null); 
+            setIsDeleting(null);
+            setDeleteTarget(null);
         }
     };
 
@@ -279,15 +279,15 @@ function RecentCalls({ searchTerm }) {
         if (!user || !db) return;
         const newIsOnline = !isOnline;
         setIsOnline(newIsOnline);
-        const userSettingsRef = doc(db, 'users', user._id); 
+        const userSettingsRef = doc(db, 'users', user._id);
         try {
             const userDoc = await getDoc(userSettingsRef);
             const hasSeenPrompt = userDoc.exists() ? userDoc.data().hasSeenVisibilityPrompt : false;
             if (newIsOnline && !hasSeenPrompt) {
                 setShowVisibilityModal(true);
             }
-            await setDoc(userSettingsRef, { 
-                isOnline: newIsOnline 
+            await setDoc(userSettingsRef, {
+                isOnline: newIsOnline
             }, { merge: true });
         } catch (error) {
             console.error("Error updating visibility:", error);
@@ -301,8 +301,8 @@ function RecentCalls({ searchTerm }) {
         if (!user || !db) return;
         try {
             const userSettingsRef = doc(db, 'users', user._id);
-            await setDoc(userSettingsRef, { 
-                hasSeenVisibilityPrompt: true 
+            await setDoc(userSettingsRef, {
+                hasSeenVisibilityPrompt: true
             }, { merge: true });
         } catch (error) {
             console.error("Error marking visibility prompt as seen:", error);
@@ -314,14 +314,14 @@ function RecentCalls({ searchTerm }) {
         setIsNotifModalLoading(true);
 
         const q = query(
-            collection(db, 'notifications'), 
-            where('recipientEmail', '==', user.email), 
-            orderBy('createdAt', 'desc'), 
+            collection(db, 'notifications'),
+            where('recipientEmail', '==', user.email),
+            orderBy('createdAt', 'desc'),
             limit(50)
         );
         const querySnapshot = await getDocs(q);
         const notifs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
+
         setAllNotifications(notifs);
         setIsNotifModalLoading(false);
 
@@ -335,7 +335,7 @@ function RecentCalls({ searchTerm }) {
             await batch.commit();
         }
     };
-  const handleOpenChat = (otherName, otherEmail) => {
+    const handleOpenChat = (otherName, otherEmail) => {
         if (!user || !otherEmail) return;
 
         // Sort emails to ensure both users generate the same ID
@@ -344,8 +344,8 @@ function RecentCalls({ searchTerm }) {
         const collectionName = 'direct_chats';
 
         // Navigate to the new page, passing the name in 'state' so we can display it
-        navigate(`/chat/${collectionName}/${conversationId}`, { 
-            state: { recipientName: otherName } 
+        navigate(`/chat/${collectionName}/${conversationId}`, {
+            state: { recipientName: otherName }
         });
     };
     // --- All original Effects (1-4) are unchanged ---
@@ -360,7 +360,7 @@ function RecentCalls({ searchTerm }) {
             collection(db, 'calls'),
             where('allowedEmails', 'array-contains', user.email),
             orderBy('createdAt', 'desc'),
-            limit(20) 
+            limit(20)
         );
         const unsubscribe = onSnapshot(callsQuery, (snapshot) => {
             const callsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -431,15 +431,15 @@ function RecentCalls({ searchTerm }) {
     // Effect 4: Listen for visibility status
     useEffect(() => {
         if (!user) {
-             setIsVisibilityLoading(false);
-             return;
+            setIsVisibilityLoading(false);
+            return;
         }
         setIsVisibilityLoading(true);
         const userSettingsRef = doc(db, 'users', user._id);
         const unsubscribe = onSnapshot(userSettingsRef, (doc) => {
             if (doc.exists()) {
                 const data = doc.data();
-                setIsOnline(data.isOnline ?? true); 
+                setIsOnline(data.isOnline ?? true);
             } else {
                 setIsOnline(true);
             }
@@ -468,16 +468,16 @@ function RecentCalls({ searchTerm }) {
             const batch = writeBatch(db);
             snapshot.docs.forEach((docSnap) => {
                 const notification = docSnap.data();
-                
+
                 if (notification.type === 'call') {
                     // This now calls the useCallback version
                     showCallToast(notification);
                 }
-                
+
                 // Update status to 'unread' to stop toast and add to bell
                 batch.update(docSnap.ref, { status: 'unread' });
             });
-            
+
             await batch.commit();
         });
 
@@ -555,558 +555,391 @@ function RecentCalls({ searchTerm }) {
     // --- Render JSX ---
     return (
         <>
-            {/* Global styles */}
+            {/* Global & Component Styles */}
             <style jsx global>{`
-                .form-control[placeholder="Search recent calls..."] {
-                    height: 48px;
-                    border-radius: 0 12px 12px 0 !important; 
-                    padding-left: 2.5rem !important;
-                    font-size: 0.95rem;
+                :root {
+                    --wa-bg: #111b21;
+                    --wa-header: #202c33;
+                    --wa-hover: #2a3942;
+                    --wa-primary: #e9edef;
+                    --wa-secondary: #8696a0;
+                    --wa-accent: #00a884;
+                    --wa-danger: #ef5350;
+                    --wa-blue: #53bdeb;
                 }
-                .input-group-text {
-                    border-radius: 12px 0 0 12px !important;
-                    height: 48px;
-                }
-                .btn-primary.btn-sm {
-                    background-color: #4A69BD;
-                    border-color: #4A69BD;
-                    border-radius: 12px !important;
-                    height: 48px;
-                    width: 48px;
-                    font-size: 1.25rem;
-                }
-                .btn-primary.btn-sm:hover {
-                    background-color: #3e5aa8;
-                    border-color: #3e5aa8;
-                }
-                .call-notification-toast {
-                    padding: 4px;
-                }
-                .call-notification-toast p {
-                    font-size: 0.9rem;
-                    color: var(--bs-secondary-color);
-                }
+
+                /* Scrollbar Customization */
+                ::-webkit-scrollbar { width: 6px; }
+                ::-webkit-scrollbar-track { background: transparent; }
+                ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
             `}</style>
-            
-            {/* Component styles */}
+
             <style jsx>{`
+                .recent-calls-container {
+                    background-color: var(--wa-bg);
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    border-right: 1px solid rgba(255,255,255,0.1);
+                    color: var(--wa-primary);
+                    position: relative;
+                    overflow: hidden;
+                }
+
+                /* --- STICKY HEADER SECTION (Fixes overlapping) --- */
+                .sticky-header {
+                    position: sticky;
+                    top: 0;
+                    z-index: 100;
+                    background-color: var(--wa-bg);
+                    padding-bottom: 5px;
+                    border-bottom: 1px solid rgba(134, 150, 160, 0.15);
+                }
+
+                /* Search Bar */
+                .search-wrapper {
+                    padding: 10px 15px;
+                }
+                .search-input-group {
+                    background-color: var(--wa-header);
+                    border-radius: 8px;
+                    display: flex;
+                    align-items: center;
+                    padding: 0 15px;
+                    height: 35px;
+                }
+                .search-icon { color: var(--wa-secondary); font-size: 0.85rem; }
+                .search-input {
+                    background: transparent;
+                    border: none;
+                    color: var(--wa-primary);
+                    width: 100%;
+                    margin-left: 15px;
+                    font-size: 0.9rem;
+                    outline: none;
+                }
+                .search-input::placeholder { color: var(--wa-secondary); }
+
+                /* Call Stats & Bell Row */
+                .stats-row {
+                    display: flex; justify-content: space-between; align-items: center;
+                    padding: 8px 20px;
+                    font-size: 0.85rem;
+                    color: var(--wa-secondary);
+                }
+                .bell-btn {
+                    position: relative; cursor: pointer; color: var(--wa-secondary); transition: 0.2s;
+                }
+                .bell-btn:hover { color: var(--wa-primary); }
+                .badge-dot {
+                    position: absolute; top: -2px; right: -2px;
+                    width: 8px; height: 8px;
+                    background-color: var(--wa-accent);
+                    border-radius: 50%;
+                }
+
+                /* --- LIST AREA --- */
                 .recent-calls-list {
-                    max-height: 60vh;
+                    flex: 1;
                     overflow-y: auto;
-                    padding: 0 1.25rem 1.25rem 1.25rem;
+                    padding-top: 5px;
                 }
+
+                /* Call Item Card */
                 .call-item {
-                    display: flex; align-items: center; padding: 1rem 1.25rem;
-                    border: 1px solid var(--bs-border-color); 
-                    transition: background-color 0.2s ease;
-                    border-radius: 12px; margin-bottom: 0.5rem;
+                    display: flex; align-items: center;
+                    padding: 12px 15px;
+                    cursor: pointer;
+                    transition: background-color 0.2s;
+                    border-bottom: 1px solid rgba(134, 150, 160, 0.1);
                 }
-                .call-item:last-child {
-                    border-bottom: 1px solid var(--bs-border-color);
-                    margin-bottom: 0;
+                .call-item:hover { background-color: var(--wa-hover); }
+
+                .avatar-container {
+                    position: relative; margin-right: 15px;
                 }
-                .call-item:hover { background-color: var(--bs-tertiary-bg); }
                 .call-avatar {
-                    width: 40px; height: 40px; border-radius: 50%;
+                    width: 45px; height: 45px; border-radius: 50%;
                     display: flex; align-items: center; justify-content: center;
-                    font-weight: 600; color: white;
-                    font-size: 1.2rem; flex-shrink: 0;
+                    font-weight: 500; color: white; font-size: 1.1rem;
+                    flex-shrink: 0;
                 }
-                .call-info { margin-left: 1rem; flex-grow: 1; min-width: 0; }
+
+                .call-info {
+                    flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;
+                }
+                .info-top {
+                    display: flex; justify-content: space-between; align-items: baseline;
+                    margin-bottom: 3px;
+                }
                 .call-name {
-                    font-weight: 600; font-size: 1rem;
-                    color: var(--bs-body-color); margin-bottom: 0.1rem;
+                    font-size: 1rem; color: var(--wa-primary);
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
-                .call-details {
-                    font-size: 0.85rem; color: var(--bs-secondary-color);
-                    display: flex; flex-wrap: wrap; align-items: center;
+                .call-date {
+                    font-size: 0.75rem; color: var(--wa-secondary);
+                    flex-shrink: 0; margin-left: 10px;
+                }
+
+                .info-bottom {
+                    display: flex; justify-content: space-between; align-items: center;
                 }
                 .call-email {
-                    white-space: nowrap; overflow: hidden;
-                    text-overflow: ellipsis; max-width: 100%;
-                }
-                .call-time { white-space: nowrap; }
-                .call-time-separator { margin: 0 0.35rem; }
-                .call-action {
-                    margin-left: 1rem; flex-shrink: 0;
-                    display: flex; align-items: center; gap: 0.4rem; 
-                }
-                .call-button {
-                    background: none; border: none; font-size: 1.4rem; 
-                    padding: 0.5rem; border-radius: 50%;
-                    width: 44px; height: 44px;
-                    display: flex; align-items: center; justify-content: center;
-                    transition: all 0.2s ease; flex-shrink: 0; 
-                }
-                .call-button:disabled {
-                    color: var(--bs-secondary-color) !important;
-                    background-color: transparent !important;
-                    cursor: not-allowed;
-                }
-                .call-button-rejoin { color: var(--bs-primary); }
-                .call-button-rejoin:hover {
-                    background-color: var(--bs-primary-bg-subtle);
-                    color: var(--bs-primary-text-emphasis);
-                }
-                    .call-button-chat { color: #0dcaf0; } 
-                .call-button-chat:hover { background-color: rgba(13, 202, 240, 0.15); color: #0dcaf0; }
-                .call-button-call { color: var(--bs-success); }
-                .call-button-call:hover {
-                    background-color: var(--bs-success-bg-subtle);
-                    color: var(--bs-success-text-emphasis);
-                }
-                .call-delete-button { color: #8a9199; }
-                .call-delete-button:hover {
-                    background-color: var(--bs-danger-bg-subtle);
-                    color: var(--bs-danger-text-emphasis);
-                }
-                .empty-state {
-                    padding: 2rem; text-align: center;
-                    color: var(--bs-secondary-color);
-                }
-                .call-count-display {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    padding: 0.6rem 1rem;
-                    background-color: var(--bs-tertiary-bg);
-                    border-radius: 10px;
-                    font-size: 0.9rem;
-                    color: var(--bs-secondary-color);
-                    font-weight: 500;
-                    margin: 0.5rem 1.25rem 1rem 1.25rem; 
-                }
-                .call-count-display strong {
-                    color: var(--bs-body-color);
-                    font-weight: 600;
-                }
-
-                /* --- NEW: Notification Bell Styles --- */
-                .notification-bell {
-                    position: relative;
-                    font-size: 1.3rem;
-                    color: var(--bs-secondary-color);
-                    cursor: pointer;
-                    transition: color 0.2s;
-                }
-                .notification-bell:hover {
-                    color: var(--bs-body-color);
-                }
-                .notification-badge {
-                    position: absolute;
-                    top: -5px;
-                    right: -8px;
-                    background-color: var(--bs-danger);
-                    color: white;
-                    width: 18px;
-                    height: 18px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 10px;
-                    font-weight: 600;
-                    border: 1px solid var(--bs-body-bg);
-                }
-
-                @media (max-width: 576px) {
-                    .call-details {
-                        flex-direction: column; align-items: flex-start; gap: 0.1rem;
-                    }
-                    .call-time-separator { display: none; }
-                    .call-time { font-size: 0.75rem; padding-left: 26px; }
-                    .call-item { padding: 1rem 0.75rem; }
-                    .call-count-display { margin: 0.5rem 0.75rem 1rem 0.75rem; }
-                    .recent-calls-list { padding: 0 0.75rem 0.75rem 0.75rem; }
-                    .visibility-control {
-                        flex-direction: column;
-                        align-items: flex-start !important;
-                        gap: 0.25rem;
-                        margin: 0.5rem 0.75rem 1rem 0.75rem;
-                    }
-                }
-
-                /* Modal Styles (Shared) */
-                .delete-modal-overlay, .notification-modal-overlay {
-                    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(0, 0, 0, 0.6);
-                    backdrop-filter: blur(5px);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 100;
-                    border-radius: 0.5rem;
-                }
-                .delete-modal-card, .notification-modal-card {
-                    background: var(--bs-body-bg);
-                    border-radius: 12px;
-                    padding: 0;
-                    width: 90%;
-                    max-width: 450px;
-                    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
-                }
-                .delete-modal-title, .notification-modal-title {
-                    font-weight: 600;
-                    font-size: 1.25rem;
-                    color: var(--bs-body-color);
-                    margin-bottom: 0.5rem;
-                    padding: 1.5rem 1.5rem 0 1.5rem;
-                }
-                .delete-modal-body {
-                    color: var(--bs-secondary-color);
-                    margin-bottom: 1.5rem;
-                    padding: 1rem 1.5rem 0 1.5rem;
-                }
-                .delete-modal-body strong { color: var(--bs-body-color); }
-                .delete-modal-actions, .notification-modal-footer {
-                    display: flex;
-                    gap: 0.75rem;
-                    justify-content: flex-end;
-                    padding: 1.5rem;
-                    background-color: var(--bs-tertiary-bg);
-                    border-top: 1px solid var(--bs-border-color);
-                    border-bottom-left-radius: 12px;
-                    border-bottom-right-radius: 12px;
+                    font-size: 0.85rem; color: var(--wa-secondary);
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                    max-width: 80%;
                 }
                 
-                /* Notification Modal List Styles */
-                .notification-modal-list {
-                    max-height: 50vh;
-                    overflow-y: auto;
-                    padding: 0;
-                    margin: 1rem 0 0 0;
+                /* Actions (Show on Hover) */
+                .call-actions {
+                    display: flex; gap: 15px;
+                    opacity: 0; transition: opacity 0.2s;
                 }
-                .notification-item {
-                    display: flex;
-                    align-items: center;
-                    padding: 1rem 1.5rem;
-                    border-bottom: 1px solid var(--bs-border-color);
+                .call-item:hover .call-actions { opacity: 1; }
+                
+                .action-icon {
+                    font-size: 1.1rem; color: var(--wa-secondary);
+                    background: none; border: none; padding: 0;
+                    cursor: pointer; transition: 0.2s;
                 }
-                .notification-item:last-child {
-                    border-bottom: none;
-                }
-                .notification-item.unread {
-                    background-color: var(--bs-primary-bg-subtle);
-                }
-                .notification-icon {
-                    font-size: 1.4rem;
-                    margin-right: 1rem;
-                }
-                .notification-body {
-                    flex-grow: 1;
+                .action-icon:hover { color: var(--wa-primary); }
+                .icon-call:hover { color: var(--wa-accent); }
+                .icon-delete:hover { color: var(--wa-danger); }
+
+                /* Empty State */
+                .empty-state {
+                    padding: 40px; text-align: center; color: var(--wa-secondary);
                     font-size: 0.9rem;
-                    color: var(--bs-secondary-color);
-                }
-                .notification-body strong {
-                    color: var(--bs-body-color);
-                }
-                .notification-time {
-                    font-size: 0.75rem;
-                    color: var(--bs-secondary-color);
-                }
-                .notification-item.read .notification-body strong {
-                    font-weight: 500;
-                }
-                .notification-item.read .notification-body {
-                    color: var(--bs-secondary-color);
                 }
 
-                /* Visibility Toggle Switch */
+                /* Visibility Toggle */
                 .visibility-control {
-                    display: flex; align-items: center; justify-content: space-between;
-                    padding: 0.75rem 1rem;
-                    margin: 0 1.25rem 1rem 1.25rem;
-                    background-color: var(--bs-tertiary-bg);
-                    border-radius: 10px;
-                    font-size: 0.9rem;
-                    font-weight: 500;
+                    padding: 15px;
+                    border-top: 1px solid rgba(134, 150, 160, 0.1);
+                    background-color: var(--wa-header);
+                    display: flex; justify-content: space-between; align-items: center;
                 }
-                .visibility-label { color: var(--bs-body-color); margin-bottom: 0; }
-                .toggle-switch {
-                    position: relative; display: inline-block;
-                    width: 44px; height: 24px; flex-shrink: 0;
-                }
-                .toggle-switch input { opacity: 0; width: 0; height: 0; }
-                .toggle-slider {
+                .vis-label { font-size: 0.9rem; color: var(--wa-primary); }
+                
+                /* Switch */
+                .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
+                .switch input { opacity: 0; width: 0; height: 0; }
+                .slider {
                     position: absolute; cursor: pointer;
                     top: 0; left: 0; right: 0; bottom: 0;
-                    background-color: #ccc;
-                    transition: .4s;
-                    border-radius: 24px;
+                    background-color: #3b4a54; transition: .4s; border-radius: 34px;
                 }
-                .toggle-slider:before {
+                .slider:before {
                     position: absolute; content: "";
-                    height: 18px; width: 18px; left: 3px; bottom: 3px;
-                    background-color: white; transition: .4s;
-                    border-radius: 50%;
+                    height: 14px; width: 14px; left: 3px; bottom: 3px;
+                    background-color: white; transition: .4s; border-radius: 50%;
                 }
-                
-                /* --- MODIFIED: Use theme color for toggle --- */
-                input:checked + .toggle-slider {
-                    background-color: var(--bs-primary); /* Changed from green */
-                }
-                input:checked + .toggle-slider:before { transform: translateX(20px); }
-                input:disabled + .toggle-slider {
-                    background-color: #e9ecef; cursor: not-allowed;
-                }
+                input:checked + .slider { background-color: var(--wa-accent); }
+                input:checked + .slider:before { transform: translateX(14px); }
 
-                .visibility-modal-body {
-                    color: var(--bs-secondary-color);
-                    margin-bottom: 1.5rem;
-                    font-size: 0.95rem;
-                    line-height: 1.6;
-                    padding: 1rem 1.5rem 0 1.5rem;
+                /* Modal Overlays (Reused logic, updated style) */
+                .modal-overlay {
+                    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                    background: rgba(0,0,0,0.7); z-index: 1000;
+                    display: flex; align-items: center; justify-content: center;
+                }
+                .modal-card {
+                    background: var(--wa-header); color: var(--wa-primary);
+                    width: 90%; max-width: 400px; padding: 20px;
+                    border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                }
+                .modal-btn {
+                    padding: 8px 16px; border-radius: 4px; border: none; font-weight: 500; margin-left: 10px;
+                }
+                .btn-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-accent); }
+                .btn-danger { background: var(--wa-danger); color: white; }
+                .btn-primary { background: var(--wa-accent); color: white; }
+
+                @media (max-width: 576px) {
+                    .call-actions { opacity: 1; gap: 10px; } /* Always show actions on mobile */
+                    .call-item { padding: 10px; }
                 }
             `}</style>
-            
-            {/* --- Visibility Confirmation Modal --- */}
-            {showVisibilityModal && (
-                <div className="notification-modal-overlay" onClick={handleCloseVisibilityModal}>
-                    <div className="notification-modal-card" onClick={(e) => e.stopPropagation()}>
-                        <h5 className="notification-modal-title">Profile Visibility</h5>
-                        <p className="visibility-modal-body">
-                            By enabling "Profile Visibility," you are allowing other users
-                            on the app to see that you are online and available.
-                            <br/><br/>
-                            Your profile (name and email) may appear in their
-                            "Online Users" list, making it easier to start a call.
-                            You can turn this off at any time.
-                        </p>
-                        <div className="notification-modal-footer">
-                            <button 
-                                className="btn btn-primary" 
-                                onClick={handleCloseVisibilityModal}
-                            >
-                                Got it
-                            </button>
+
+            <div className="recent-calls-container">
+
+                {/* --- STICKY HEADER --- */}
+                <div className="sticky-header">
+                    <div className="search-wrapper">
+                        <div className="search-input-group">
+                            <i className="bi bi-search search-icon"></i>
+                            <input
+                                type="text"
+                                className="search-input"
+                                placeholder="Search or start new call"
+                                value={searchTerm || ''}
+                            // Assuming you have a setSearchTerm handler in parent, 
+                            // otherwise add onChange logic here if passed as prop
+                            />
+                        </div>
+                    </div>
+
+                    <div className="stats-row">
+                        <span>Calls ({dailyCallCount}/{dailyCallLimit})</span>
+                        <div className="bell-btn" onClick={openNotificationModal} title="Notifications">
+                            <i className="bi bi-bell-fill"></i>
+                            {unreadCount > 0 && <span className="badge-dot"></span>}
                         </div>
                     </div>
                 </div>
-            )}
 
-            {/* --- Delete Confirmation Modal --- */}
-            {deleteTarget && (
-                <div className="delete-modal-overlay" onClick={() => setDeleteTarget(null)}>
-                    <div className="delete-modal-card" onClick={(e) => e.stopPropagation()}>
-                        <h5 className="delete-modal-title">Delete Contact?</h5>
-                        <p className="delete-modal-body">
-                            Are you sure you want to delete <strong>{deleteTarget.name}</strong> from your recents? This cannot be undone.
-                        </p>
-                        <div className="delete-modal-actions">
-                            <button 
-                                className="btn btn-secondary" 
-                                onClick={() => setDeleteTarget(null)}
-                                disabled={isDeleting === deleteTarget.id}
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                                className="btn btn-danger" 
-                                onClick={confirmDelete}
-                                disabled={isDeleting === deleteTarget.id}
-                            >
-                                {isDeleting === deleteTarget.id ? 'Deleting...' : 'Delete'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                {/* --- SCROLLABLE LIST --- */}
+                <div className="recent-calls-list">
+                    {!user ? (
+                        <div className="empty-state">Please log in to see recent calls.</div>
+                    ) : filteredCalls.length === 0 ? (
+                        <div className="empty-state">No chats or calls found.</div>
+                    ) : (
+                        filteredCalls.map(call => {
+                            const isCurrentUserOwner = call.ownerId === user._id;
+                            const displayName = isCurrentUserOwner ? call.recipientName : call.ownerName;
+                            const displayEmail = isCurrentUserOwner ? call.recipientEmail : call.ownerEmail;
 
-            {/* --- Notification Bell Modal --- */}
-            {showNotificationModal && (
-                <div className="notification-modal-overlay" onClick={() => setShowNotificationModal(false)}>
-                    <div className="notification-modal-card" onClick={(e) => e.stopPropagation()}>
-                        <h5 className="notification-modal-title">Notifications</h5>
-                        <div className="notification-modal-list">
-                            {isNotifModalLoading ? (
-                                <div className="text-center p-5">
-                                    <div className="spinner-border spinner-border-sm" role="status">
-                                        <span className="visually-hidden">Loading...</span>
+                            if (!displayName) return null;
+
+                            return (
+                                <div key={call.id} className="call-item" onClick={() => navigate(`/call/${call.id}`)}>
+                                    <div className="avatar-container">
+                                        <div
+                                            className="call-avatar"
+                                            style={{ backgroundColor: getAvatarColor(displayName) }}
+                                        >
+                                            {displayName.charAt(0).toUpperCase()}
+                                        </div>
+                                    </div>
+
+                                    <div className="call-info">
+                                        <div className="info-top">
+                                            <span className="call-name">{displayName}</span>
+                                            <span className="call-date">{formatTimestamp(call.createdAt)}</span>
+                                        </div>
+                                        <div className="info-bottom">
+                                            <span className="call-email">
+                                                {displayEmail}
+                                            </span>
+
+                                            {/* Action Icons (Hover to see) */}
+                                            <div className="call-actions" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    className="action-icon icon-call"
+                                                    title="Video Call"
+                                                    disabled={isCalling === call.id}
+                                                    onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
+                                                >
+                                                    {isCalling === call.id ? (
+                                                        <span className="spinner-border spinner-border-sm"></span>
+                                                    ) : (
+                                                        <i className="bi bi-camera-video-fill"></i>
+                                                    )}
+                                                </button>
+
+                                                <button
+                                                    className="action-icon"
+                                                    title="Chat"
+                                                    onClick={() => handleOpenChat(displayName, displayEmail)}
+                                                >
+                                                    <i className="bi bi-chat-left-text-fill"></i>
+                                                </button>
+
+                                                <button
+                                                    className="action-icon icon-delete"
+                                                    title="Delete"
+                                                    onClick={() => promptForDelete(call.id, displayName)}
+                                                >
+                                                    <i className="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            ) : allNotifications.length === 0 ? (
-                                <div className="text-center p-5 text-muted">
-                                    You have no notifications.
-                                </div>
+                            );
+                        })
+                    )}
+                </div>
+
+                {/* --- FOOTER VISIBILITY --- */}
+                <div className="visibility-control">
+                    <span className="vis-label">Profile Visibility (Online)</span>
+                    <label className="switch">
+                        <input
+                            type="checkbox"
+                            checked={isOnline}
+                            onChange={handleVisibilityToggle}
+                            disabled={isVisibilityLoading}
+                        />
+                        <span className="slider"></span>
+                    </label>
+                </div>
+
+            </div>
+
+            {/* --- MODALS (Simplified for new theme) --- */}
+            {deleteTarget && (
+                <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
+                    <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                        <h5>Delete Contact?</h5>
+                        <p style={{ color: 'var(--wa-secondary)', fontSize: '0.9rem' }}>
+                            Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
+                        </p>
+                        <div className="d-flex justify-content-end mt-4">
+                            <button className="modal-btn btn-cancel" onClick={() => setDeleteTarget(null)}>Cancel</button>
+                            <button className="modal-btn btn-danger" onClick={confirmDelete}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showVisibilityModal && (
+                <div className="modal-overlay" onClick={handleCloseVisibilityModal}>
+                    <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                        <h5>Profile Visibility</h5>
+                        <p style={{ color: 'var(--wa-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                            Enabling this allows others to see you in the "Online Users" list.
+                        </p>
+                        <div className="d-flex justify-content-end mt-4">
+                            <button className="modal-btn btn-primary" onClick={handleCloseVisibilityModal}>Got it</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showNotificationModal && (
+                <div className="modal-overlay" onClick={() => setShowNotificationModal(false)}>
+                    <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                        <div className="d-flex justify-content-between align-items-center mb-3">
+                            <h5>Notifications</h5>
+                            <button className="action-icon" onClick={() => setShowNotificationModal(false)}><i className="bi bi-x-lg"></i></button>
+                        </div>
+                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                            {allNotifications.length === 0 ? (
+                                <p className="text-center text-muted my-4">No notifications.</p>
                             ) : (
                                 allNotifications.map(notif => (
-                                    <div 
-                                        key={notif.id} 
-                                        className={`notification-item ${notif.status}`}
-                                    >
-                                        <div className="notification-icon">
-                                            {notif.type === 'call' ? (
-                                                <i className="bi bi-telephone-fill text-success"></i>
-                                            ) : (
-                                                <i className="bi bi-info-circle-fill text-primary"></i>
+                                    <div key={notif.id} className="p-2 border-bottom border-secondary" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                                        <div className="d-flex justify-content-between">
+                                            <strong style={{ fontSize: '0.9rem' }}>{notif.callerName}</strong>
+                                            <small className="text-muted" style={{ fontSize: '0.7rem' }}>{formatTimeAgo(notif.createdAt)}</small>
+                                        </div>
+                                        <div className="d-flex justify-content-between align-items-center mt-1">
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--wa-secondary)' }}>{notif.type === 'call' ? 'Incoming Call' : 'New Alert'}</span>
+                                            {notif.type === 'call' && (
+                                                <button className="action-icon icon-call" onClick={() => { navigate(`/call/${notif.callId}`); setShowNotificationModal(false); }}>
+                                                    <i className="bi bi-camera-video-fill"></i>
+                                                </button>
                                             )}
                                         </div>
-                                        <div className="notification-body">
-                                            <div className="mb-1">
-                                                <strong>{notif.callerName}</strong>
-                                                {notif.type === 'call' ? ' invited you to a call.' : ' sent you a notification.'}
-                                            </div>
-                                            <div className="notification-time">
-                                                {formatTimeAgo(notif.createdAt)}
-                                            </div>
-         
-                                        </div>
-                                        {notif.type === 'call' && (
-                                            <button 
-                                                className="btn btn-sm btn-primary ms-auto"
-                                                onClick={() => {
-                                                    navigate(`/call/${notif.callId}`);
-                                                    setShowNotificationModal(false);
-                                                }}
-                                            >
-                                               <span style={{ color: "limegreen" }}>📞</span>
-
-                                            </button>
-                                        )}
                                     </div>
                                 ))
                             )}
                         </div>
-                        <div className="notification-modal-footer">
-                            <button 
-                                className="btn btn-secondary" 
-                                onClick={() => setShowNotificationModal(false)}
-                            >
-                                Close
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}
-       
-
-            {/* --- Visibility Toggle --- */}
-            <div className="visibility-control">
-                <label htmlFor="visibility-toggle" className="visibility-label">
-                    Profile Visibility
-                </label>
-                <label className="toggle-switch">
-                    <input 
-                        type="checkbox" 
-                        id="visibility-toggle"
-                        checked={isOnline} 
-                        onChange={handleVisibilityToggle}
-                        disabled={isVisibilityLoading}
-                    />
-                    <span className="toggle-slider"></span>
-                </label>
-            </div>
-
-            {/* --- Call Count Display (with Bell) --- */}
-            <div className="call-count-display">
-                <div>
-                    Today's Calls: <strong>{dailyCallCount} / {dailyCallLimit}</strong>
-                </div>
-                <div 
-                    className="notification-bell" 
-                    title="Notifications"
-                    onClick={openNotificationModal}
-                >
-                    <i className="bi bi-bell-fill"></i>
-                    {unreadCount > 0 && (
-                        <span className="notification-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
-                    )}
-                </div>
-            </div>
-
-            {/* --- Recent Calls List --- */}
-            <div className="recent-calls-list">
-                {!user ? (
-                    <div className="empty-state">Please log in to see recent calls.</div>
-                ) : filteredCalls.length === 0 ? (
-                    <div className="empty-state">
-                        {searchTerm ? "No calls match your search." : "You have no recent calls."}
-                    </div>
-                ) : (
-                    filteredCalls.map(call => {
-                        const isCurrentUserOwner = call.ownerId === user._id;
-                        const displayName = isCurrentUserOwner ? call.recipientName : call.ownerName;
-                        const displayEmail = isCurrentUserOwner ? call.recipientEmail : call.ownerEmail;
-                        
-                        if (!displayName) return null;
-
-                        return (
-                            <div key={call.id} className="call-item">
-                                <div 
-                                    className="call-avatar" 
-                                    style={{ backgroundColor: getAvatarColor(displayName) }}
-                                >
-                                    {displayName.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="call-info">
-                                    <div className="call-name">{displayName}</div>
-                                    <div className="call-details">
-                                        <span className="call-email">
-                                            <i className="bi bi-envelope-fill me-2"></i>
-                                            {displayEmail}
-                                        </span>
-                                        <span className="call-time-separator d-none d-sm-inline"> • </span>
-                                        <span className="call-time">{formatTimestamp(call.createdAt)}</span>
-                                    </div>
-                                </div>
-
-                                <div className="call-action">
-                                    {/* 1. Re-join button */}
-                                    <button
-                                        className="call-button call-button-rejoin"
-                                        title={`Re-join session ${call.id}`}
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            navigate(`/call/${call.id}`);
-                                        }}
-                                    >
-                                        <i className="bi bi-box-arrow-in-right"></i>
-                                    </button>
-
-                                    {/* 2. The "new call" button */}
-                                    <button 
-                                        className="call-button call-button-call" 
-                                        title={`Call ${displayName} (New Session)`}
-                                        onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
-                                        disabled={isCalling === call.id || dailyCallCount >= dailyCallLimit || isDeleting === call.id}
-                                    >
-                                        {isCalling === call.id ? (
-                                            <div className="spinner-border spinner-border-sm" role="status">
-                                                <span className="visually-hidden">Calling...</span>
-                                            </div>
-                                        ) : (
-                                            <i className="bi bi-telephone-fill"></i>
-                                        )}
-                                    </button>
-                                    <button 
-                                    className="call-button call-button-chat" 
-                                    title={`Chat with ${displayName}`}
-                                    onClick={() => handleOpenChat(displayName, displayEmail)}
-                                >
-                                    <i className="bi bi-chat-dots-fill"></i>
-                                </button>
-
-                                    {/* 3. Delete button */}
-                                    <button 
-                                        className="call-button call-delete-button" 
-                                        title={`Delete ${displayName}`}
-                                        onClick={() => promptForDelete(call.id, displayName)}
-                                        disabled={isDeleting === call.id || isCalling === call.id}
-                                    >
-                                        {isDeleting === call.id ? (
-                                            <div className="spinner-border spinner-border-sm" role="status">
-                                                <span className="visually-hidden">Deleting...</span>
-                                            </div>
-                                        ) : (
-                                            <i className="bi bi-trash-fill"></i>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })
-                )}
-            </div>
         </>
     );
 }
