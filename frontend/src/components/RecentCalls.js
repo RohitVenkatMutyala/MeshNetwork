@@ -178,8 +178,8 @@ function RecentCalls({ searchTerm }) {
     };
 
     // "Speed dial" function
-    // --- UPDATE THIS FUNCTION IN RecentCalls.js ---
-    const handleReCall = async (callId, recipientName, recipientEmail, description, destinationRoute = '/call/') => {
+    const handleReCall = async (callId, recipientName, recipientEmail, description) => {
+        // ... (This function is unchanged, still sends 'pending' notification)
         if (!user) {
             toast.error("You must be logged in to make a call.");
             return;
@@ -206,7 +206,6 @@ function RecentCalls({ searchTerm }) {
                     throw new Error(`You have reached your daily limit of ${dailyCallLimit} calls.`);
                 }
                 const newCount = currentCount + 1;
-
                 transaction.set(callDocRef, {
                     description,
                     createdAt: serverTimestamp(),
@@ -221,14 +220,13 @@ function RecentCalls({ searchTerm }) {
                     permissions: { [user._id]: 'editor' },
                     muteStatus: { [user._id]: false },
                 });
-
                 transaction.set(limitDocRef, {
                     count: newCount,
                     lastCallDate: today
                 });
             });
 
-            // 1. Send In-App Notification
+            // Send in-app notification
             try {
                 await addDoc(collection(db, 'notifications'), {
                     recipientEmail: recipientEmail,
@@ -236,20 +234,16 @@ function RecentCalls({ searchTerm }) {
                     callerEmail: user.email,
                     callId: newCallId,
                     createdAt: serverTimestamp(),
-                    status: 'pending',
+                    status: 'pending', // 'pending' triggers the toast
                     type: 'call'
                 });
             } catch (err) {
                 console.warn("Failed to send in-app notification:", err);
             }
 
-            // 2. Send Email Invitation
             await sendInvitationEmails(newCallId, description, recipientEmail);
-
             toast.success(`Calling ${recipientName}...`);
-
-            // 3. Navigate to the correct route (Audio or Video)
-            navigate(`${destinationRoute}${newCallId}`);
+            navigate(`/call/${newCallId}`);
 
         } catch (error) {
             console.error("Failed to create call:", error);
@@ -830,33 +824,30 @@ function RecentCalls({ searchTerm }) {
                                             </span>
 
                                             {/* Action Icons (Hover to see) */}
-                                            {/* --- UPDATE THIS SECTION IN RecentCalls.js --- */}
                                             <div className="call-actions" onClick={(e) => e.stopPropagation()}>
-
-                                                {/* 1. Audio Call Button */}
                                                 <button
                                                     className="action-icon icon-call"
                                                     title="Voice Call"
                                                     disabled={isCalling === call.id}
-                                                    // Sends '/audio-call/' as destination
-                                                    onClick={() => handleReCall(call.id, displayName, displayEmail, call.description, '/audio-call/')}
+                                                    // Assuming you have a specific route for audio calls, e.g., /audio-call/:id
+                                                    // You might need to update handleReCall to accept a 'type' argument 
+                                                    // OR simply navigate to an audio-specific route if you create new calls differently.
+                                                    // For now, let's assume you want to Join as Audio:
+                                                    onClick={() => navigate(`/audio-call/${call.id}`)}
                                                 >
-                                                    {isCalling === call.id ? (
-                                                        <span className="spinner-border spinner-border-sm text-success"></span>
-                                                    ) : (
-                                                        <i className="bi bi-telephone-fill"></i>
-                                                    )}
+                                                    <i className="bi bi-telephone-fill"></i>
                                                 </button>
-
-                                                {/* 2. Video Call Button */}
                                                 <button
                                                     className="action-icon icon-call"
                                                     title="Video Call"
                                                     disabled={isCalling === call.id}
-                                                    // Sends '/call/' as destination (Default Video)
-                                                    onClick={() => handleReCall(call.id, displayName, displayEmail, call.description, '/call/')}
+                                                    onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
                                                 >
-                                                    <i className="bi bi-camera-video-fill"></i>
+                                                    {isCalling === call.id ? (
+                                                        <span className="spinner-border spinner-border-sm"></span>
+                                                    ) : (
+                                                        <i className="bi bi-camera-video-fill"></i>
+                                                    )}
                                                 </button>
 
                                                 <button
