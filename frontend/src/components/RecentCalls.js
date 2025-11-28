@@ -827,6 +827,18 @@ function RecentCalls({ searchTerm }) {
                                             <div className="call-actions" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                     className="action-icon icon-call"
+                                                    title="Voice Call"
+                                                    disabled={isCalling === call.id}
+                                                    // Assuming you have a specific route for audio calls, e.g., /audio-call/:id
+                                                    // You might need to update handleReCall to accept a 'type' argument 
+                                                    // OR simply navigate to an audio-specific route if you create new calls differently.
+                                                    // For now, let's assume you want to Join as Audio:
+                                                    onClick={() => navigate(`/audio-call/${call.id}`)}
+                                                >
+                                                    <i className="bi bi-telephone-fill"></i>
+                                                </button>
+                                                <button
+                                                    className="action-icon icon-call"
                                                     title="Video Call"
                                                     disabled={isCalling === call.id}
                                                     onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}

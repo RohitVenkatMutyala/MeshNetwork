@@ -10,6 +10,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import Call from './components/call.js';
 import CreateCall from './components/CreateCall'; // <-- 1. IMPORT CreateCall
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import AudioCall from './components/AudioCall.js';
 function App() {
   return (
    <ThemeProvider>
@@ -60,7 +61,8 @@ function App() {
                 </>
               } 
             />
-            <Route path="/chat/:collectionName/:chatId" element={<Chat />} />
+            <Route path="/chat/:collectionName/:chatId" element={<><Helmet><title>Chat - Randoman</title></Helmet><Chat /></>} />
+            <Route path="/audio-call/:callId" element={<><Helmet><title>Audio Call - Randoman</title></Helmet><AudioCall /></>} />
 
           </Routes>
         </Router>
