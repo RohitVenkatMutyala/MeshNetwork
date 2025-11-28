@@ -223,7 +223,7 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
 
                 .chat-window {
                     width: 100%; height: 100%;
-                    max-width: 900px; max-height: 95vh;
+                    max-width: 1400px; max-height: 95vh;
                     background-color: var(--wa-bg);
                     background-image: url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png");
                     background-repeat: repeat;
@@ -236,7 +236,7 @@ const Chat = ({ chatId, collectionName = 'calls', recipientName, onClose }) => {
                 
                 @media (min-width: 768px) {
                     .chat-window {
-                        width: 90%; height: 90%; border-radius: 12px;
+                        width: 95%; height: 95%; border-radius: 12px;
                     }
                 }
 
