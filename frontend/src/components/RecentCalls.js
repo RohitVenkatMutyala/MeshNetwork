@@ -65,31 +65,23 @@ const getTodayString = () => {
 };
 
 // --- Custom component for the call notification toast ---
-// --- Custom component for the call notification toast ---
-// ADDED: callType prop
-const CallNotification = ({ callerName, callId, callType, onClose, navigate }) => {
+const CallNotification = ({ callerName, callId, onClose, navigate }) => {
 
     const handleJoin = () => {
-        // --- FIX: Determine route based on callType ---
-        const targetRoute = callType === 'audio' ? `/audio-call/${callId}` : `/call/${callId}`;
-        navigate(targetRoute);
+        navigate(`/call/${callId}`);
         onClose();
     };
 
     return (
         <div className="call-notification-toast">
             <strong className="d-block mb-2">{callerName} is calling!</strong>
-            <p className="mb-3">
-                {/* Visual indicator of call type */}
-                {callType === 'audio' ? <i className="bi bi-mic-fill me-1"></i> : <i className="bi bi-camera-video-fill me-1"></i>}
-                Incoming {callType === 'audio' ? 'Audio' : 'Video'} Call
-            </p>
+            <p className="mb-3">Do you want to join the session?</p>
             <div className="d-flex justify-content-end gap-2">
                 <button className="btn btn-sm btn-light" onClick={onClose}>
                     Dismiss
                 </button>
                 <button className="btn btn-sm btn-success" onClick={handleJoin}>
-                    Join
+                    Join Call
                 </button>
             </div>
         </div>
@@ -136,31 +128,32 @@ function RecentCalls({ searchTerm }) {
 
     // --- Helper function to show the call toast ---
     // Wrapped in useCallback to safely use in useEffect dependency array
-    // --- Helper function to show the call toast ---
     const showCallToast = useCallback((notification) => {
+        // --- NEW: Play sound ---
         playNotificationSound();
 
+        // Function to pass to the toast to dismiss it
         const dismissToast = (id) => toast.dismiss(id);
 
+        // Show the toast and get its ID
         const toastId = toast(
             <CallNotification
                 callerName={notification.callerName}
                 callId={notification.callId}
-                // --- FIX: Pass the callType from DB ---
-                callType={notification.callType || 'video'}
-                onClose={() => dismissToast(toastId)}
-                navigate={navigate}
+                onClose={() => dismissToast(toastId)} // Pass dismiss function
+                navigate={navigate} // Pass navigate function
             />,
             {
                 autoClose: false,
                 closeOnClick: false,
                 draggable: false,
-                closeButton: false,
+                closeButton: false, // Our component has close/decline
                 position: "top-right",
                 pauseOnHover: true,
             }
         );
-    }, [navigate]);
+    }, [navigate]); // Dependency on navigate
+
 
     // Function to send email
     const sendInvitationEmails = async (callId, callDescription, invitedEmail) => {
@@ -186,16 +179,12 @@ function RecentCalls({ searchTerm }) {
 
     // "Speed dial" function
     // --- UPDATE THIS FUNCTION IN RecentCalls.js ---
-    // --- UPDATED: handleReCall ---
     const handleReCall = async (callId, recipientName, recipientEmail, description, destinationRoute = '/call/') => {
         if (!user) {
             toast.error("You must be logged in to make a call.");
             return;
         }
         setIsCalling(callId);
-
-        // --- FIX: Determine Call Type based on route ---
-        const callType = destinationRoute.includes('audio') ? 'audio' : 'video';
 
         const today = getTodayString();
         const limitDocRef = doc(db, 'userCallLimits', user._id);
@@ -231,8 +220,6 @@ function RecentCalls({ searchTerm }) {
                     allowedEmails: [user.email, recipientEmail],
                     permissions: { [user._id]: 'editor' },
                     muteStatus: { [user._id]: false },
-                    // --- OPTIONAL: Save type in call doc too ---
-                    type: callType
                 });
 
                 transaction.set(limitDocRef, {
@@ -241,7 +228,7 @@ function RecentCalls({ searchTerm }) {
                 });
             });
 
-            // Send in-app notification
+            // 1. Send In-App Notification
             try {
                 await addDoc(collection(db, 'notifications'), {
                     recipientEmail: recipientEmail,
@@ -250,18 +237,18 @@ function RecentCalls({ searchTerm }) {
                     callId: newCallId,
                     createdAt: serverTimestamp(),
                     status: 'pending',
-                    type: 'call',
-                    // --- FIX: Save the callType here ---
-                    callType: callType
+                    type: 'call'
                 });
             } catch (err) {
                 console.warn("Failed to send in-app notification:", err);
             }
 
-            // Send Invitation Email
+            // 2. Send Email Invitation
             await sendInvitationEmails(newCallId, description, recipientEmail);
 
             toast.success(`Calling ${recipientName}...`);
+
+            // 3. Navigate to the correct route (Audio or Video)
             navigate(`${destinationRoute}${newCallId}`);
 
         } catch (error) {
@@ -962,21 +949,8 @@ function RecentCalls({ searchTerm }) {
                                         <div className="d-flex justify-content-between align-items-center mt-1">
                                             <span style={{ fontSize: '0.85rem', color: 'var(--wa-secondary)' }}>{notif.type === 'call' ? 'Incoming Call' : 'New Alert'}</span>
                                             {notif.type === 'call' && (
-                                                <button
-                                                    className="action-icon icon-call"
-                                                    // --- FIX: Check callType for navigation ---
-                                                    onClick={() => {
-                                                        const route = notif.callType === 'audio' ? '/audio-call/' : '/call/';
-                                                        navigate(`${route}${notif.callId}`);
-                                                        setShowNotificationModal(false);
-                                                    }}
-                                                >
-                                                    {/* Change Icon based on type */}
-                                                    {notif.callType === 'audio' ? (
-                                                        <i className="bi bi-telephone-fill"></i>
-                                                    ) : (
-                                                        <i className="bi bi-camera-video-fill"></i>
-                                                    )}
+                                                <button className="action-icon icon-call" onClick={() => { navigate(`/call/${notif.callId}`); setShowNotificationModal(false); }}>
+                                                    <i className="bi bi-camera-video-fill"></i>
                                                 </button>
                                             )}
                                         </div>
