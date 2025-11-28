@@ -28,7 +28,7 @@ function Navbar() {
         const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
             const seed = `${user.firstname} ${user.lastname}`;
             let defaultImage = `https://api.dicebear.com/7.x/initials/svg?seed=${seed}`;
-            
+
             if (docSnap.exists() && docSnap.data().profileImageURL) {
                 setProfileImage(docSnap.data().profileImageURL);
             } else {
@@ -57,178 +57,172 @@ function Navbar() {
             <style>
                 {`
                 :root {
-                    --nav-light-bg: #f8f9fa;
-                    --nav-light-border: #dee2e6;
-                    --nav-light-text: #212529;
-                    --nav-light-link-active-border: #0d6efd;
-                    --nav-dark-bg: #1e1e2f;
-                    --nav-dark-border: rgba(255, 255, 255, 0.1);
-                    --nav-dark-text: #ffffff;
-                    --nav-dark-link-active-border: #ff4b2b;
+                    /* WhatsApp Web Dark Palette */
+                    --nav-bg: #202c33;
+                    --nav-border: rgba(134, 150, 160, 0.15);
+                    --nav-text: #e9edef;
+                    --nav-text-secondary: #8696a0;
+                    --nav-accent: #00a884;
+                    --nav-hover: #2a3942;
+                    --nav-dropdown-bg: #233138;
                 }
 
+                /* Navbar Container */
                 .navbar-custom {
-                    transition: background-color 0.3s ease, border-color 0.3s ease;
+                    background-color: var(--nav-bg);
+                    border-bottom: 1px solid var(--nav-border);
+                    transition: background-color 0.3s ease;
+                    height: 64px; /* Fixed height like WA header */
+                    z-index: 1050; /* Higher than content sticky headers */
                 }
 
-                /* Light Theme */
-                .navbar-custom.theme-light {
-                    background-color: var(--nav-light-bg);
-                    border-bottom: 1px solid var(--nav-light-border);
-                }
-                .theme-light .navbar-brand-custom, .theme-light .nav-link-custom {
-                    color: var(--nav-light-text);
-                }
-                .theme-light .nav-link-custom.active::after {
-                    background-color: var(--nav-light-link-active-border);
-                }
-                .theme-light .profile-dropdown .dropdown-menu {
-                    --bs-dropdown-bg: var(--nav-light-bg);
-                    --bs-dropdown-link-color: var(--nav-light-text);
-                    --bs-dropdown-link-hover-bg: #e9ecef;
-                    --bs-dropdown-border-color: var(--nav-light-border);
-                }
-
-                /* Dark Theme */
-                .navbar-custom.theme-dark {
-                    background: linear-gradient(135deg, #1a1d23 0%, #20232a 50%, #2c3e50 100%);
-                    backdrop-filter: blur(0.5px);
-                    border-bottom: 1px solid var(--nav-dark-border);
-                }
-                 .theme-dark .navbar-brand-custom, .theme-dark .nav-link-custom {
-                    color: var(--nav-dark-text);
-                }
-                .theme-dark .nav-link-custom.active::after {
-                    background-color: var(--nav-dark-link-active-border);
-                }
-                .theme-dark .profile-dropdown .dropdown-menu {
-                    --bs-dropdown-bg: #2c3e50;
-                    --bs-dropdown-link-color: var(--nav-dark-text);
-                    --bs-dropdown-link-hover-bg: #34495e;
-                     --bs-dropdown-border-color: var(--nav-dark-border);
-                }
-.navbar-brand-custom {
-    /* The 3 gradient lines that were here are now removed */
-    font-size: 1.75rem; /* Slightly smaller for new name */
-    font-weight: 800;
-    letter-spacing: -0.8px;
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    text-decoration: none;
-}
-                .navbar-brand-custom:hover {
-                    transform: scale(1.05);
-                }
-
-                .nav-link-custom {
+                /* Brand Style */
+                .navbar-brand-custom {
+                    font-size: 1.1rem;
                     font-weight: 600;
-                    transition: all 0.3s ease;
+                    color: var(--nav-text) !important;
+                    letter-spacing: 0.5px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }
+
+                /* Navigation Links (Tabs) */
+                .nav-link-custom {
+                    color: var(--nav-text-secondary) !important;
+                    font-weight: 500;
+                    font-size: 0.95rem;
                     padding: 8px 16px;
-                    border-radius: 8px;
-                    position: relative;
-                    text-decoration: none;
+                    border-radius: 24px; /* Pill shape */
+                    transition: all 0.2s ease;
                     display: flex;
                     align-items: center;
                     gap: 8px;
                 }
 
-                .nav-link-custom::after {
-                    content: '';
-                    position: absolute;
-                    bottom: -2px;
-                    left: 50%;
-                    width: 0;
-                    height: 2px;
-                    background-color: transparent;
-                    transition: all 0.3s ease;
-                    transform: translateX(-50%);
+                .nav-link-custom:hover {
+                    background-color: var(--nav-hover);
+                    color: var(--nav-text) !important;
                 }
 
-                .nav-link-custom:hover::after, .nav-link-custom.active::after {
-                    width: 70%;
+                .nav-link-custom.active {
+                    background-color: var(--nav-hover);
+                    color: var(--nav-accent) !important; /* Green accent for active */
+                    position: relative;
                 }
 
-                .dropdown-toggle.no-caret::after {
-                    display: none !important;
+                /* Dropdown Menu Customization */
+                .profile-dropdown .dropdown-menu {
+                    background-color: var(--nav-dropdown-bg);
+                    border: 1px solid var(--nav-border);
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                    padding: 8px 0;
+                    margin-top: 10px;
                 }
                 
-                .logo-image {
-                     width: 30px; /* Adjusted size */
-                     height: 30px;
-                     filter: drop-shadow(0 0 5px rgba(241, 39, 17, 0.5));
+                .dropdown-item {
+                    color: var(--nav-text);
+                    padding: 10px 20px;
+                    font-size: 0.9rem;
                 }
                 
-                .logo-dark-theme {
-                    filter: invert(1) brightness(2) drop-shadow(0 0 5px rgba(241, 39, 17, 0.5));
+                .dropdown-item:hover {
+                    background-color: var(--nav-hover);
+                    color: var(--nav-text);
+                }
+
+                .dropdown-divider {
+                    border-top: 1px solid var(--nav-border);
+                    opacity: 1;
+                }
+
+                .dropdown-item-text {
+                    color: var(--nav-text);
+                    padding: 8px 20px;
+                }
+                .text-secondary-custom {
+                    color: var(--nav-text-secondary) !important;
+                }
+
+                /* Toggler (Mobile) */
+                .navbar-toggler {
+                    border: none;
+                }
+                .navbar-toggler:focus {
+                    box-shadow: none;
                 }
                 `}
             </style>
 
-            <nav className={`navbar navbar-expand-lg sticky-top shadow-sm navbar-custom theme-${theme}`}>
-                <div className="container-fluid px-4">
-                   {/* <img
-                        src={logo} 
-                        alt="NETWORK.RANDOMAN Logo"
-                        className={`logo-image ${theme === 'dark' ? 'logo-dark-theme' : ''}`}
-                    /> */}
-                    <Link to={user ? "/new-call" : "/new-call"} className="navbar-brand-custom py-2">
-                        NETWORK
+            <nav className="navbar navbar-expand-lg sticky-top navbar-custom">
+                <div className="container-fluid px-3">
+
+                    {/* Brand */}
+                    <Link to={user ? "/new-call" : "/new-call"} className="navbar-brand-custom">
+                        {/* You can add a small logo icon here if you want */}
+                        <span>NETWORK</span>
                     </Link>
 
+                    {/* Mobile Toggler */}
                     <button
-                        className="navbar-toggler border-0 p-2"
+                        className="navbar-toggler"
                         type="button"
                         onClick={() => setIsCollapsed(!isCollapsed)}
                     >
-                        <i className={`bi ${isCollapsed ? 'bi-list' : 'bi-x'} text-${theme === 'dark' ? 'white' : 'dark'} fs-4`}></i>
+                        <i className="bi bi-list fs-3" style={{ color: 'var(--nav-text-secondary)' }}></i>
                     </button>
 
+                    {/* Collapsible Content */}
                     <div className={`collapse navbar-collapse ${!isCollapsed ? 'show' : ''}`}>
-                        <ul className="navbar-nav ms-auto mb-2 mb-lg-0 gap-1 align-items-lg-center">
+                        <ul className="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center gap-2">
                             {user ? (
                                 <>
-                                    {/* --- UPDATED LINKS --- */}
-                                   
+                                    {/* --- Calls Tab --- */}
                                     <li className="nav-item">
-                                        <Link className={`nav-link nav-link-custom ${isActive('/new-call') ? 'active' : ''}`} to="/new-call">
-                                            <i className="bi bi-telephone-fill"></i><span>Calls</span>
+                                        <Link className={`nav-link-custom ${isActive('/new-call') ? 'active' : ''}`} to="/new-call">
+                                            <i className="bi bi-telephone"></i>
+                                            <span>Calls</span>
                                         </Link>
                                     </li>
-                                    {/* --- END UPDATED LINKS --- */}
 
-
-                                    <li className="nav-item ms-lg-3">
+                                    {/* --- Profile Dropdown --- */}
+                                    <li className="nav-item ms-lg-2">
                                         <div className="dropdown profile-dropdown">
-                                            <a href="#" className="d-block text-decoration-none dropdown-toggle no-caret" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <a href="#" className="d-flex align-items-center text-decoration-none dropdown-toggle no-caret" data-bs-toggle="dropdown">
                                                 {profileImage ? (
-                                                    <img src={profileImage} alt="User" width="38" height="38" className="rounded-circle" style={{ objectFit: 'cover' }} />
+                                                    <img
+                                                        src={profileImage}
+                                                        alt="User"
+                                                        width="35"
+                                                        height="35"
+                                                        className="rounded-circle"
+                                                        style={{ objectFit: 'cover', border: '2px solid var(--nav-hover)' }}
+                                                    />
                                                 ) : (
-                                                    <i className={`bi bi-person-circle fs-3 text-${theme === 'dark' ? 'white' : 'dark'}`}></i>
+                                                    <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '35px', height: '35px', background: 'var(--nav-hover)', color: 'var(--nav-text-secondary)' }}>
+                                                        <i className="bi bi-person-fill fs-5"></i>
+                                                    </div>
                                                 )}
                                             </a>
-                                            <ul className="dropdown-menu dropdown-menu-end mt-2 shadow-lg">
+
+                                            <ul className="dropdown-menu dropdown-menu-end">
                                                 <li>
                                                     <div className="dropdown-item-text">
-                                                        <strong>{user.firstname} {user.lastname}</strong>
-                                                        <div className="small opacity-75">{user.email}</div>
+                                                        <div className="fw-bold">{user.firstname} {user.lastname}</div>
+                                                        <div className="small text-secondary-custom">{user.email}</div>
                                                     </div>
                                                 </li>
                                                 <li><hr className="dropdown-divider" /></li>
-                                        
-                                                <li><hr className="dropdown-divider" /></li>
                                                 <li>
                                                     <button className="dropdown-item d-flex align-items-center gap-2" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                                                        <i className={`bi ${theme === 'dark' ? 'bi-sun-fill' : 'bi-moon-stars-fill'} fs-5`}></i>
-                                                        {theme === 'dark' ? 'Sunshine' : 'Moonbeam'}
+                                                        <i className={`bi ${theme === 'dark' ? 'bi-sun' : 'bi-moon-stars'}`}></i>
+                                                        <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
                                                     </button>
                                                 </li>
-                                                <li><hr className="dropdown-divider" /></li>
                                                 <li>
                                                     <button className="dropdown-item d-flex align-items-center gap-2" onClick={handleLogout}>
-                                                        <i className="bi bi-box-arrow-right"></i> Logout
+                                                        <i className="bi bi-box-arrow-right"></i>
+                                                        <span>Logout</span>
                                                     </button>
                                                 </li>
                                             </ul>
@@ -237,7 +231,7 @@ function Navbar() {
                                 </>
                             ) : (
                                 <li className="nav-item">
-                                   
+                                    <Link className="nav-link-custom" to="/login">Login</Link>
                                 </li>
                             )}
                         </ul>
