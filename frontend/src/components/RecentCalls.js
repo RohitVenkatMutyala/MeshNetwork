@@ -72,23 +72,32 @@ const formatTimeAgo = (timestamp) => {
 };
 
 // --- TOAST COMPONENT ---
-const CallNotification = ({ callerName, callId, onClose, navigate }) => {
+const CallNotification = ({ callerName, callId, callType, onClose, navigate }) => { // Add callType prop
     const handleJoin = () => {
         navigate(`/call/${callId}`);
         onClose();
     };
+
+    const btnStyle = callType === 'group'
+        ? { backgroundColor: '#6f42c1', borderColor: '#6f42c1', color: 'white' } // Purple
+        : {}; // Default Bootstrap Success (Green)
 
     return (
         <div className="d-flex flex-column">
             <strong className="mb-1">{callerName} is calling!</strong>
             <div className="d-flex justify-content-end gap-2 mt-2">
                 <button className="btn btn-sm btn-secondary" onClick={onClose} style={{ fontSize: '0.8rem' }}>Dismiss</button>
-                <button className="btn btn-sm btn-success" onClick={handleJoin} style={{ fontSize: '0.8rem' }}>Join</button>
+                <button
+                    className={`btn btn-sm ${callType === 'group' ? '' : 'btn-success'}`}
+                    style={{ fontSize: '0.8rem', ...btnStyle }}
+                    onClick={handleJoin}
+                >
+                    Join
+                </button>
             </div>
         </div>
     );
 };
-
 function RecentCalls() {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -134,6 +143,11 @@ function RecentCalls() {
             <CallNotification
                 callerName={notification.callerName}
                 callId={notification.callId}
+
+                // --- ADD THIS PROP ---
+                callType={notification.callType}
+                // --------------------
+
                 onClose={() => toast.dismiss(toastId)}
                 navigate={navigate}
             />,
@@ -282,6 +296,7 @@ function RecentCalls() {
                     callerName: `${user.firstname} ${user.lastname}`,
                     callerEmail: user.email,
                     callId: callData.id,
+                    callType: callData.type,
                     createdAt: serverTimestamp(),
                     status: 'pending',
                     type: 'call'
@@ -634,6 +649,15 @@ function RecentCalls() {
     
     .fab-btn-new { background-color: #00a884; }
     .fab-btn-joint { background-color: #6f42c1; }
+
+}
+    /* Add this below your existing .btn-primary styles */
+.btn-joint-action { 
+    background: #6f42c1; 
+    color: white; 
+}
+.btn-joint-action:hover { 
+    background: #59359a; 
 }
             `}</style>
 
@@ -845,7 +869,13 @@ function RecentCalls() {
                                             <div style={{ fontSize: '0.75rem', color: '#8696a0' }}>{formatTimeAgo(n.createdAt)}</div>
                                         </div>
                                         {n.type === 'call' && (
-                                            <button className="btn-modal btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }} onClick={() => { navigate(`/call/${n.callId}`); setShowNotificationModal(false); }}>
+                                            <button
+                                                /* --- UPDATE THIS CLASSNAME LOGIC --- */
+                                                className={`btn-modal ${n.callType === 'group' ? 'btn-joint-action' : 'btn-primary'}`}
+                                                /* ----------------------------------- */
+                                                style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                                                onClick={() => { navigate(`/call/${n.callId}`); setShowNotificationModal(false); }}
+                                            >
                                                 Join
                                             </button>
                                         )}
