@@ -594,7 +594,7 @@ function RecentCalls() {
                 
                 .recent-calls-grid { 
                     flex: 1; overflow-y: auto; padding: 20px; display: grid; 
-                    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; align-content: start; 
+                    grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap: 15px; align-content: start; 
                 }
 
                 @media (max-width: 480px) {
