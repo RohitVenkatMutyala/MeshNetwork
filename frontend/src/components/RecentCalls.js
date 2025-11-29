@@ -102,6 +102,7 @@ const CallNotification = ({ callerName, callId, callType, onClose, navigate }) =
 
     return (
         <div className="d-flex flex-column">
+            {/* Inline styles for toast consistency */}
             <style jsx>{`
                 .glass-btn-green {
                     background: linear-gradient(135deg, rgba(0, 168, 132, 0.6), rgba(0, 143, 111, 0.8));
@@ -142,8 +143,6 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.5 : 1,
-        // --- FIX FOR SCROLLING ---
-        // 'pan-y' allows vertical scrolling. 'none' blocks it.
         touchAction: 'pan-y', 
         position: 'relative',
         zIndex: isDragging ? 999 : 'auto'
@@ -269,7 +268,6 @@ function RecentCalls() {
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
         useSensor(TouchSensor, {
-            // Allows Scrolling. Drag only starts after holding for 250ms
             activationConstraint: {
                 delay: 250,
                 tolerance: 5,
@@ -582,7 +580,6 @@ function RecentCalls() {
                     margin: 0;
                     display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif;
                     box-sizing: border-box; overflow-x: hidden;
-                    /* Global Scroll Handling */
                     touch-action: pan-y;
                 }
                 .sticky-header { 
@@ -603,7 +600,6 @@ function RecentCalls() {
                     flex: 1; overflow-y: auto; padding: 20px; display: grid; 
                     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; align-content: start; 
                     width: 100%; box-sizing: border-box;
-                    /* Ensure vertical scrolling works inside the grid */
                     overscroll-behavior-y: contain; 
                     -webkit-overflow-scrolling: touch;
                 }
@@ -670,7 +666,7 @@ function RecentCalls() {
                 .badge-meeting { background: rgba(0, 168, 132, 0.2); color: #00a884; }
                 .badge-joint { background: rgba(111, 66, 193, 0.2); color: #b185f7; }
 
-                /* Modal & Fab (Unchanged) */
+                /* Modal */
                 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
                 .modal-card { background: #1f2937; color: #e9edef; width: 90%; max-width: 420px; padding: 24px; border-radius: 16px; border: 1px solid #374051; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
                 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -690,7 +686,12 @@ function RecentCalls() {
 
                 .mobile-fab-container { display: none; }
                 @media (max-width: 768px) {
-                    .glass-btn-green, .glass-btn-purple { display: none !important; }
+                    /* FIX: Only hide the buttons inside the header, allowing modal buttons to show */
+                    .header-actions .glass-btn-green, 
+                    .header-actions .glass-btn-purple { 
+                        display: none !important; 
+                    }
+                    
                     .mobile-fab-container { display: flex; align-items: center; position: relative; z-index: 200; }
                     .fab-trigger { width: 40px; height: 40px; border-radius: 50%; background-color: #00a884; color: white; border: none; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.3s ease, background 0.3s; cursor: pointer; z-index: 202; }
                     .fab-options { position: absolute; left: 10px; top: 0; height: 40px; display: flex; align-items: center; gap: 8px; opacity: 0; visibility: hidden; transform: translateX(-10px) scale(0.9); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 201; pointer-events: none; background: rgba(31, 41, 55, 0.9); padding: 5px 10px 5px 35px; border-radius: 24px; margin-left: -5px; }
