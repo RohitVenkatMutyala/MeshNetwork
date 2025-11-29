@@ -168,13 +168,7 @@ function RecentCalls() {
         setIsCreating(true);
         const newCallId = Math.random().toString(36).substring(2, 9);
         const callDocRef = doc(db, 'calls', newCallId);
-        
-        // --- MULTIPLE EMAIL SUPPORT ---
-        // Split by comma, trim whitespace, and remove empty strings
-        const emailList = newContactEmail.split(',').map(email => email.trim()).filter(email => email !== '');
-        
-        // Use the first email as the primary recipient for display purposes
-        const primaryRecipientEmail = emailList[0];
+        const recipientEmail = newContactEmail.trim();
 
         try {
             await setDoc(callDocRef, {
@@ -184,21 +178,15 @@ function RecentCalls() {
                 ownerName: `${user.firstname} ${user.lastname}`,
                 ownerEmail: user.email, 
                 recipientName: newContactName.trim(),
-                recipientEmail: primaryRecipientEmail, // Storing primary for display
+                recipientEmail: recipientEmail, 
                 access: 'private',
                 defaultRole: 'editor',
-                allowedEmails: [user.email, ...emailList], // Add ALL emails to permissions
+                allowedEmails: [user.email, recipientEmail],
                 permissions: { [user._id]: 'editor' },
                 muteStatus: { [user._id]: false },
             });
 
-            // Send invitations to ALL emails
-            const emailPromises = emailList.map(email => 
-                sendInvitationEmails(newCallId, newContactDesc, email)
-            );
-            await Promise.all(emailPromises);
-
-            toast.success(`Meeting created! Invites sent to ${emailList.length} people.`);
+            toast.success("Contact added!");
             setShowAddContactModal(false);
             setNewContactName('');
             setNewContactEmail('');
@@ -366,15 +354,7 @@ function RecentCalls() {
     return (
         <div className="recent-calls-container">
             <style jsx>{`
-                .recent-calls-container { 
-                    background-color: #111b21; 
-                    height: 100%; 
-                    min-height: 100vh; /* Ensures it fills screen on mobile */
-                    display: flex; 
-                    flex-direction: column; 
-                    color: #e9edef; 
-                    font-family: sans-serif; 
-                }
+                .recent-calls-container { background-color: #111b21; height: 100%; display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif; }
                 .sticky-header { position: sticky; top: 0; z-index: 100; background-color: #111b21; padding: 20px 20px 10px; border-bottom: 1px solid rgba(134, 150, 160, 0.15); }
                 
                 /* Header Actions (Google Meet Style) */
@@ -440,6 +420,7 @@ function RecentCalls() {
                     border: 1px solid rgba(134,150,160,0.15); 
                     transition: 0.3s; 
                     position: relative; 
+                    /* Removed cursor pointer from main card since clicking it does nothing now */
                 }
                 .call-card:hover { border-color: #00a884; transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
                 
@@ -478,13 +459,13 @@ function RecentCalls() {
 
             <div className="sticky-header">
                 <div className="header-actions">
-                    {/* New Meeting Button */}
+                    {/* New Call Button (Google Meet Style) */}
                     <button className="new-call-btn" onClick={() => setShowAddContactModal(true)}>
                         <i className="bi bi-plus-lg"></i>
                         New Meeting
                     </button>
 
-                    {/* Search Bar */}
+                    {/* Search Bar (Google Meet Style) */}
                     <div className="search-wrapper">
                         <div className="search-input-group">
                             <i className="bi bi-search" style={{color: '#8696a0', marginRight: '10px'}}></i>
@@ -539,7 +520,7 @@ function RecentCalls() {
                                     <div className="card-subtitle">{email}</div>
                                     <div className="card-date">{formatTimeAgo(call.createdAt)}</div>
                                 </div>
-                                {/* Actions */}
+                                {/* Actions only trigger on button click */}
                                 <div className="card-actions">
                                     <button className="action-btn btn-call" title="Video Call" disabled={isCalling === call.id} onClick={() => handleReCall(call.id, name, email, call.description)}>
                                         {isCalling === call.id ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-camera-video-fill"></i>}
@@ -572,8 +553,7 @@ function RecentCalls() {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Email</label>
-                                <input className="form-control" placeholder="user1@example.com, user2@example.com" value={newContactEmail} onChange={e => setNewContactEmail(e.target.value)} />
-                                <small style={{color:'#8696a0', fontSize:'0.75rem'}}>Separate multiple emails with commas</small>
+                                <input className="form-control" placeholder="recipient@example.com" value={newContactEmail} onChange={e => setNewContactEmail(e.target.value)} />
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Description</label>
