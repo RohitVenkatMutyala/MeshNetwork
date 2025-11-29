@@ -67,7 +67,34 @@ function LoginForm() {
             --brand-purple: #6f42c1;
         }
 
-        body { background-color: var(--bg-page); color: var(--text-primary); font-family: sans-serif; overflow-x: hidden; }
+        body { 
+            background-color: var(--bg-page); 
+            color: var(--text-primary); 
+            font-family: sans-serif; 
+            overflow-x: hidden; 
+            /* Ensure vertical scrolling is enabled */
+            overflow-y: auto; 
+        }
+
+        /* --- CUSTOM SCROLLBAR (PREMIUM LOOK) --- */
+        /* Width */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        /* Track */
+        ::-webkit-scrollbar-track {
+            background: #111b21; 
+        }
+        /* Handle */
+        ::-webkit-scrollbar-thumb {
+            background: #374051; 
+            border-radius: 5px;
+            border: 2px solid #111b21; /* Creates padding effect */
+        }
+        /* Handle on hover */
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00a884; /* Accents green on hover */
+        }
 
         /* --- HERO SECTION --- */
         .hero-section {
