@@ -779,6 +779,15 @@ function RecentCalls() {
                                 >
                                     {isCalling === call.id ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-camera-video-fill"></i>}
                                 </button>
+                                {isOwner && (
+                                    <button
+                                        className="action-btn"
+                                        title="Re-Enter Room (No Notification)"
+                                        onClick={() => navigate(`/call/${call.id}`)}
+                                    >
+                                        <i className="bi bi-box-arrow-in-right"></i>
+                                    </button>
+                                )}
                                 {/* ----------------------------- */}
 
                                 <button className="action-btn" title="Chat" onClick={() => handleOpenChat(call)}>
