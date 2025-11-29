@@ -727,54 +727,73 @@ function RecentCalls() {
                     <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#8696a0', padding: '40px' }}>
                         {searchTerm ? 'No contacts match.' : 'No recent calls.'}
                     </div>
-                ) : (
-                    filteredCalls.map(call => {
-                        const isGroup = call.type === 'group';
-                        const isOwner = call.ownerId === user._id;
+                ) : filteredCalls.map(call => {
+                    const isGroup = call.type === 'group';
+                    const isOwner = call.ownerId === user._id;
 
-                        // Display Logic
-                        const displayTitle = isGroup ? call.description : (isOwner ? call.recipientName : call.ownerName);
-                        const displaySubtitle = isGroup ? `${call.allowedEmails.length} Participants` : (isOwner ? call.recipientEmail : call.ownerEmail);
+                    // Display Logic
+                    const displayTitle = isGroup ? call.description : (isOwner ? call.recipientName : call.ownerName);
+                    const displaySubtitle = isGroup ? `${call.allowedEmails.length} Participants` : (isOwner ? call.recipientEmail : call.ownerEmail);
 
-                        // Condition: Can delete?
-                        // If group: Only owner. If individual: Anyone (removes from history).
-                        const canDelete = isGroup ? isOwner : true;
+                    // Condition: Can delete?
+                    const canDelete = isGroup ? isOwner : true;
 
-                        if (!displayTitle) return null;
+                    if (!displayTitle) return null;
 
-                        return (
-                            <div key={call.id} className={`call-card ${isGroup ? 'joint-meet' : ''}`}>
-                                <span className={`badge ${isGroup ? 'badge-joint' : 'badge-meeting'}`}>
-                                    {isGroup ? 'Joint Meeting' : 'Meeting'}
-                                </span>
+                    // --- NEW: Video Button Logic ---
+                    const handleVideoAction = () => {
+                        if (isGroup && !isOwner) {
+                            // If it's a Joint Meeting and I am NOT the owner:
+                            // Just navigate to the room (Join), don't trigger "handleReCall"
+                            navigate(`/call/${call.id}`);
+                        } else {
+                            // If Individual call OR I am the Group Owner:
+                            // Start the call process (Notifications + Limits)
+                            handleReCall(call);
+                        }
+                    };
 
-                                <div className="card-header-icon" style={{ backgroundColor: getAvatarColor(displayTitle) }}>
-                                    {isGroup ? <i className="bi bi-people-fill"></i> : displayTitle.charAt(0).toUpperCase()}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                    <div className="card-title">{displayTitle}</div>
-                                    <div className="card-subtitle">{displaySubtitle}</div>
-                                    <div className="card-date">{formatTimeAgo(call.createdAt)}</div>
-                                </div>
+                    return (
+                        <div key={call.id} className={`call-card ${isGroup ? 'joint-meet' : ''}`}>
+                            <span className={`badge ${isGroup ? 'badge-joint' : 'badge-meeting'}`}>
+                                {isGroup ? 'Joint Meeting' : 'Meeting'}
+                            </span>
 
-                                <div className="card-actions">
-                                    <button className="action-btn btn-call" title="Video Call" disabled={isCalling === call.id} onClick={() => handleReCall(call)}>
-                                        {isCalling === call.id ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-camera-video-fill"></i>}
-                                    </button>
-                                    <button className="action-btn" title="Chat" onClick={() => handleOpenChat(call)}>
-                                        <i className="bi bi-chat-left-text-fill"></i>
-                                    </button>
-                                    {/* Updated Delete Logic */}
-                                    {canDelete && (
-                                        <button className="action-btn btn-delete" title="Delete" style={{ marginLeft: 'auto' }} onClick={() => setDeleteTarget({ id: call.id, name: displayTitle, type: call.type })}>
-                                            <i className="bi bi-trash"></i>
-                                        </button>
-                                    )}
-                                </div>
+                            <div className="card-header-icon" style={{ backgroundColor: getAvatarColor(displayTitle) }}>
+                                {isGroup ? <i className="bi bi-people-fill"></i> : displayTitle.charAt(0).toUpperCase()}
                             </div>
-                        );
-                    })
-                )}
+                            <div style={{ flex: 1 }}>
+                                <div className="card-title">{displayTitle}</div>
+                                <div className="card-subtitle">{displaySubtitle}</div>
+                                <div className="card-date">{formatTimeAgo(call.createdAt)}</div>
+                            </div>
+
+                            <div className="card-actions">
+                                {/* --- UPDATED VIDEO BUTTON --- */}
+                                <button
+                                    className="action-btn btn-call"
+                                    // Change Title based on permission
+                                    title={isGroup && !isOwner ? "Join Meeting" : "Start Video Call"}
+                                    disabled={isCalling === call.id}
+                                    onClick={handleVideoAction} // Use the new handler
+                                >
+                                    {isCalling === call.id ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-camera-video-fill"></i>}
+                                </button>
+                                {/* ----------------------------- */}
+
+                                <button className="action-btn" title="Chat" onClick={() => handleOpenChat(call)}>
+                                    <i className="bi bi-chat-left-text-fill"></i>
+                                </button>
+
+                                {canDelete && (
+                                    <button className="action-btn btn-delete" title="Delete" style={{ marginLeft: 'auto' }} onClick={() => setDeleteTarget({ id: call.id, name: displayTitle, type: call.type })}>
+                                        <i className="bi bi-trash"></i>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
             {/* --- ADD CONTACT MODAL --- */}
