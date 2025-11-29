@@ -97,7 +97,6 @@ const CallNotification = ({ callerName, callId, callType, onClose, navigate }) =
         onClose();
     };
 
-    // Notification buttons also get the glass effect logic inline
     const isGroup = callType === 'group';
     const btnClass = isGroup ? 'glass-btn-purple' : 'glass-btn-green';
 
@@ -143,7 +142,9 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.5 : 1,
-        touchAction: 'none',
+        // --- FIX FOR SCROLLING ---
+        // 'pan-y' allows vertical scrolling. 'none' blocks it.
+        touchAction: 'pan-y', 
         position: 'relative',
         zIndex: isDragging ? 999 : 'auto'
     };
@@ -154,14 +155,11 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
     const displaySubtitle = isGroup ? `${call.allowedEmails.length} Participants` : (isOwner ? call.recipientEmail : call.ownerEmail);
     const canDelete = isGroup ? isOwner : true;
 
-    // Determine button class based on card type
     const actionBtnClass = isGroup ? 'glass-icon-btn-purple' : 'glass-icon-btn-green';
 
     if (!displayTitle) return null;
 
-    // --- VIDEO BUTTON LOGIC ---
     const handleVideoAction = (e) => {
-        // Essential for mobile: stop propagation so drag doesn't start
         e.stopPropagation(); 
         e.preventDefault();
         
@@ -194,7 +192,6 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
             </div>
 
             <div className="card-actions">
-                {/* 1. Main Call/Join Button */}
                 <button 
                     className={`action-btn ${actionBtnClass}`}
                     title={isGroup && !isOwner ? "Join Meeting" : "Start Video Call"} 
@@ -205,7 +202,6 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
                     {isCalling === call.id ? <span className="spinner-border spinner-border-sm" style={{width: '1rem', height: '1rem'}}></span> : <i className="bi bi-camera-video-fill"></i>}
                 </button>
 
-                {/* 2. Host Re-Login Button (Owner Only) */}
                 {isOwner && (
                     <button 
                         className={`action-btn ${actionBtnClass}`}
@@ -217,7 +213,6 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
                     </button>
                 )}
 
-                {/* 3. Chat Button */}
                 <button 
                     className={`action-btn ${actionBtnClass}`}
                     title="Chat" 
@@ -227,7 +222,6 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
                     <i className="bi bi-chat-left-text-fill"></i>
                 </button>
                 
-                {/* 4. Delete Button (Always Red Glass) */}
                 {canDelete && (
                     <button 
                         className="action-btn glass-icon-btn-red" 
@@ -271,12 +265,11 @@ function RecentCalls() {
     const [groupEmails, setGroupEmails] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
-    // --- DRAG AND DROP SENSORS (FIXED FOR MOBILE) ---
+    // --- DRAG AND DROP SENSORS ---
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-        // ADDED: Delay and Tolerance for touch.
-        // This ensures taps are registered as clicks, and only long-press/drags are registered as DnD.
         useSensor(TouchSensor, {
+            // Allows Scrolling. Drag only starts after holding for 250ms
             activationConstraint: {
                 delay: 250,
                 tolerance: 5,
@@ -589,6 +582,8 @@ function RecentCalls() {
                     margin: 0;
                     display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif;
                     box-sizing: border-box; overflow-x: hidden;
+                    /* Global Scroll Handling */
+                    touch-action: pan-y;
                 }
                 .sticky-header { 
                     position: sticky; top: 0; z-index: 100; background-color: #111b21; padding: 20px 20px 10px; border-bottom: 1px solid rgba(134, 150, 160, 0.15);
@@ -608,6 +603,9 @@ function RecentCalls() {
                     flex: 1; overflow-y: auto; padding: 20px; display: grid; 
                     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; align-content: start; 
                     width: 100%; box-sizing: border-box;
+                    /* Ensure vertical scrolling works inside the grid */
+                    overscroll-behavior-y: contain; 
+                    -webkit-overflow-scrolling: touch;
                 }
 
                 @media (max-width: 480px) {
@@ -617,31 +615,18 @@ function RecentCalls() {
                     .search-input-group { height: 40px; }
                 }
 
-                /* --- PREMIUM GLASSY BUTTONS (Creation Buttons) --- */
+                /* --- BUTTONS & GLASSY UI --- */
                 .glass-btn-green, .glass-btn-purple {
                     border: none; border-radius: 24px; padding: 10px 20px;
                     font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.3s;
                     box-shadow: 0 4px 6px rgba(0,0,0,0.2); white-space: nowrap;
                     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
                 }
-                
-                /* Teal Glass (Normal) */
-                .glass-btn-green {
-                    background: linear-gradient(135deg, rgba(0, 168, 132, 0.7), rgba(0, 143, 111, 0.9));
-                    border: 1px solid rgba(255, 255, 255, 0.2);
-                    color: white;
-                }
+                .glass-btn-green { background: linear-gradient(135deg, rgba(0, 168, 132, 0.7), rgba(0, 143, 111, 0.9)); border: 1px solid rgba(255, 255, 255, 0.2); color: white; }
                 .glass-btn-green:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0, 168, 132, 0.4); }
-
-                /* Purple Glass (Joint) */
-                .glass-btn-purple {
-                    background: linear-gradient(135deg, rgba(111, 66, 193, 0.7), rgba(89, 53, 154, 0.9));
-                    border: 1px solid rgba(255, 255, 255, 0.2);
-                    color: white;
-                }
+                .glass-btn-purple { background: linear-gradient(135deg, rgba(111, 66, 193, 0.7), rgba(89, 53, 154, 0.9)); border: 1px solid rgba(255, 255, 255, 0.2); color: white; }
                 .glass-btn-purple:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(111, 66, 193, 0.4); }
 
-                /* --- GLASSY CARDS --- */
                 .call-card { 
                     background: rgba(31, 41, 55, 0.7); 
                     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -662,41 +647,19 @@ function RecentCalls() {
                     background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%); pointer-events: none;
                 }
 
-                /* --- GLASSY CARD ACTION BUTTONS (Icons) --- */
                 .card-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); z-index: 10; position: relative; }
-                
                 .action-btn { 
-                    width: 38px; height: 38px; 
-                    border-radius: 50%; 
+                    width: 38px; height: 38px; border-radius: 50%; 
                     display: flex; align-items: center; justify-content: center;
                     border: 1px solid rgba(255, 255, 255, 0.1);
-                    cursor: pointer; transition: 0.2s;
-                    backdrop-filter: blur(4px);
-                    font-size: 1.1rem;
-                    z-index: 20; /* Ensure clickable */
+                    cursor: pointer; transition: 0.2s; backdrop-filter: blur(4px); font-size: 1.1rem; z-index: 20; 
                 }
-
-                /* Green Glass Icons (Normal Card) */
-                .glass-icon-btn-green {
-                    background: rgba(0, 168, 132, 0.15);
-                    color: #00a884;
-                }
+                .glass-icon-btn-green { background: rgba(0, 168, 132, 0.15); color: #00a884; }
                 .glass-icon-btn-green:hover { background: rgba(0, 168, 132, 0.4); color: white; transform: scale(1.1); }
-
-                /* Purple Glass Icons (Joint Card) */
-                .glass-icon-btn-purple {
-                    background: rgba(111, 66, 193, 0.2);
-                    color: #b185f7;
-                }
+                .glass-icon-btn-purple { background: rgba(111, 66, 193, 0.2); color: #b185f7; }
                 .glass-icon-btn-purple:hover { background: rgba(111, 66, 193, 0.5); color: white; transform: scale(1.1); }
-
-                /* Red Glass Icon (Delete) */
-                .glass-icon-btn-red {
-                    background: rgba(220, 53, 69, 0.15);
-                    color: #ef5350;
-                }
+                .glass-icon-btn-red { background: rgba(220, 53, 69, 0.15); color: #ef5350; }
                 .glass-icon-btn-red:hover { background: rgba(220, 53, 69, 0.4); color: white; transform: scale(1.1); }
-
 
                 .card-header-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: bold; color: white; margin-bottom: 12px; z-index: 2; }
                 .card-title { font-size: 1.1rem; font-weight: 600; color: #e9edef; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
@@ -707,7 +670,7 @@ function RecentCalls() {
                 .badge-meeting { background: rgba(0, 168, 132, 0.2); color: #00a884; }
                 .badge-joint { background: rgba(111, 66, 193, 0.2); color: #b185f7; }
 
-                /* Modal & Form Styles (Unchanged) */
+                /* Modal & Fab (Unchanged) */
                 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
                 .modal-card { background: #1f2937; color: #e9edef; width: 90%; max-width: 420px; padding: 24px; border-radius: 16px; border: 1px solid #374051; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
                 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -725,10 +688,9 @@ function RecentCalls() {
                 .btn-secondary:hover { border-color: #8696a0; color: white; }
                 .btn-danger { background: #ef5350; color: white; }
 
-                /* MOBILE FAB */
                 .mobile-fab-container { display: none; }
                 @media (max-width: 768px) {
-                    .glass-btn-green, .glass-btn-purple { display: none !important; } /* Hide main buttons on mobile */
+                    .glass-btn-green, .glass-btn-purple { display: none !important; }
                     .mobile-fab-container { display: flex; align-items: center; position: relative; z-index: 200; }
                     .fab-trigger { width: 40px; height: 40px; border-radius: 50%; background-color: #00a884; color: white; border: none; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.3s ease, background 0.3s; cursor: pointer; z-index: 202; }
                     .fab-options { position: absolute; left: 10px; top: 0; height: 40px; display: flex; align-items: center; gap: 8px; opacity: 0; visibility: hidden; transform: translateX(-10px) scale(0.9); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 201; pointer-events: none; background: rgba(31, 41, 55, 0.9); padding: 5px 10px 5px 35px; border-radius: 24px; margin-left: -5px; }
