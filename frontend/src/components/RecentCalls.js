@@ -1,26 +1,22 @@
-import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../firebaseConfig'; // Kept original import
+import { db } from '../firebaseConfig';
 import {
     collection, query, where, orderBy, limit, onSnapshot,
     doc, setDoc, serverTimestamp, runTransaction, deleteDoc,
     updateDoc, addDoc, getDoc, writeBatch, getDocs
-} from 'firebase/firestore'; // Added writeBatch, getDocs, limit
-import { useAuth } from '../context/AuthContext'; // Kept original import
+} from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
-import emailjs from '@emailjs/browser'; // Kept original import
+import emailjs from '@emailjs/browser';
 
 // --- NEW: Audio Context for Notification Sound ---
-// We create this outside the component to be persistent
 let audioContext = null;
 
-// This function initializes the audio context, required by browsers
-// It must be called by a user gesture (a click)
 const initAudioContext = () => {
     if (audioContext) return;
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        // Resume the context if it's in a suspended state
         if (audioContext.state === 'suspended') {
             audioContext.resume();
         }
@@ -30,43 +26,33 @@ const initAudioContext = () => {
     }
 };
 
-// This function plays a generated sound
 const playNotificationSound = () => {
     if (!audioContext) {
         console.warn("Audio Context not initialized. User must click first.");
         return;
     }
-
     try {
-        // Create an OscillatorNode to generate a tone
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
-
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
-
-        oscillator.type = 'sine'; // A simple beep
-        oscillator.frequency.setValueAtTime(900, audioContext.currentTime); // High-pitched
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Not too loud
-
-        // Fade out quickly
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(900, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
-
         oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5); // Play for 0.5s
+        oscillator.stop(audioContext.currentTime + 0.5);
     } catch (e) {
         console.error("Error playing notification sound:", e);
     }
 };
 
-// Helper function to get today's date
 const getTodayString = () => {
     return new Date().toISOString().split('T')[0];
 };
 
 // --- Custom component for the call notification toast ---
 const CallNotification = ({ callerName, callId, onClose, navigate }) => {
-
     const handleJoin = () => {
         navigate(`/call/${callId}`);
         onClose();
@@ -77,17 +63,12 @@ const CallNotification = ({ callerName, callId, onClose, navigate }) => {
             <strong className="d-block mb-2">{callerName} is calling!</strong>
             <p className="mb-3">Do you want to join the session?</p>
             <div className="d-flex justify-content-end gap-2">
-                <button className="btn btn-sm btn-light" onClick={onClose}>
-                    Dismiss
-                </button>
-                <button className="btn btn-sm btn-success" onClick={handleJoin}>
-                    Join Call
-                </button>
+                <button className="btn btn-sm btn-light" onClick={onClose}>Dismiss</button>
+                <button className="btn btn-sm btn-success" onClick={handleJoin}>Join Call</button>
             </div>
         </div>
     );
 };
-
 
 function RecentCalls({ searchTerm }) {
     const { user } = useAuth();
@@ -113,51 +94,36 @@ function RecentCalls({ searchTerm }) {
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [isNotifModalLoading, setIsNotifModalLoading] = useState(false);
 
-
-    // --- NEW: Effect to initialize Audio Context on first click ---
+    // --- Audio Init ---
     useEffect(() => {
-        // This is required for browsers that block audio until a user interaction
         window.addEventListener('click', initAudioContext, { once: true });
+        return () => window.removeEventListener('click', initAudioContext);
+    }, []);
 
-        return () => {
-            // Clean up listener just in case
-            window.removeEventListener('click', initAudioContext);
-        };
-    }, []); // Empty dependency array, runs only once on mount
-
-
-    // --- Helper function to show the call toast ---
-    // Wrapped in useCallback to safely use in useEffect dependency array
+    // --- Toast Helper ---
     const showCallToast = useCallback((notification) => {
-        // --- NEW: Play sound ---
         playNotificationSound();
-
-        // Function to pass to the toast to dismiss it
         const dismissToast = (id) => toast.dismiss(id);
-
-        // Show the toast and get its ID
         const toastId = toast(
             <CallNotification
                 callerName={notification.callerName}
                 callId={notification.callId}
-                onClose={() => dismissToast(toastId)} // Pass dismiss function
-                navigate={navigate} // Pass navigate function
+                onClose={() => dismissToast(toastId)}
+                navigate={navigate}
             />,
             {
                 autoClose: false,
                 closeOnClick: false,
                 draggable: false,
-                closeButton: false, // Our component has close/decline
+                closeButton: false,
                 position: "top-right",
                 pauseOnHover: true,
             }
         );
-    }, [navigate]); // Dependency on navigate
-
+    }, [navigate]);
 
     // Function to send email
     const sendInvitationEmails = async (callId, callDescription, invitedEmail) => {
-        // ... (This function is unchanged)
         if (!invitedEmail) return;
         const emailjsPublicKey = 'Cd-NUUSJ5dW3GJMo0';
         const serviceID = 'service_y8qops6';
@@ -179,7 +145,6 @@ function RecentCalls({ searchTerm }) {
 
     // "Speed dial" function
     const handleReCall = async (callId, recipientName, recipientEmail, description) => {
-        // ... (This function is unchanged, still sends 'pending' notification)
         if (!user) {
             toast.error("You must be logged in to make a call.");
             return;
@@ -226,7 +191,6 @@ function RecentCalls({ searchTerm }) {
                 });
             });
 
-            // Send in-app notification
             try {
                 await addDoc(collection(db, 'notifications'), {
                     recipientEmail: recipientEmail,
@@ -234,7 +198,7 @@ function RecentCalls({ searchTerm }) {
                     callerEmail: user.email,
                     callId: newCallId,
                     createdAt: serverTimestamp(),
-                    status: 'pending', // 'pending' triggers the toast
+                    status: 'pending',
                     type: 'call'
                 });
             } catch (err) {
@@ -251,8 +215,6 @@ function RecentCalls({ searchTerm }) {
             setIsCalling(null);
         }
     };
-
-    // --- All other functions (delete, visibility, etc.) are unchanged ---
 
     const promptForDelete = (callId, displayName) => {
         setDeleteTarget({ id: callId, name: displayName });
@@ -337,18 +299,13 @@ function RecentCalls({ searchTerm }) {
     };
     const handleOpenChat = (otherName, otherEmail) => {
         if (!user || !otherEmail) return;
-
-        // Sort emails to ensure both users generate the same ID
         const participants = [user.email, otherEmail].sort();
         const conversationId = participants.join('_');
         const collectionName = 'direct_chats';
-
-        // Navigate to the new page, passing the name in 'state' so we can display it
         navigate(`/chat/${collectionName}/${conversationId}`, {
             state: { recipientName: otherName }
         });
     };
-    // --- All original Effects (1-4) are unchanged ---
 
     // Effect 1: Fetch all calls
     useEffect(() => {
@@ -452,40 +409,30 @@ function RecentCalls({ searchTerm }) {
         return () => unsubscribe();
     }, [user]);
 
-    // --- MODIFIED Effect 5: Listen for PENDING (toast) notifications ---
+    // Effect 5: Listen for PENDING (toast) notifications
     useEffect(() => {
         if (!user) return;
-
         const notificationsQuery = query(
             collection(db, 'notifications'),
             where('recipientEmail', '==', user.email),
             where('status', '==', 'pending')
         );
-
         const unsubscribe = onSnapshot(notificationsQuery, async (snapshot) => {
             if (snapshot.empty) return;
-
             const batch = writeBatch(db);
             snapshot.docs.forEach((docSnap) => {
                 const notification = docSnap.data();
-
                 if (notification.type === 'call') {
-                    // This now calls the useCallback version
                     showCallToast(notification);
                 }
-
-                // Update status to 'unread' to stop toast and add to bell
                 batch.update(docSnap.ref, { status: 'unread' });
             });
-
             await batch.commit();
         });
-
         return () => unsubscribe();
-    }, [user, showCallToast]); // Use showCallToast in dependency array
+    }, [user, showCallToast]);
 
-
-    // --- Effect 6: Listen for UNREAD (bell) notifications ---
+    // Effect 6: Listen for UNREAD (bell) notifications
     useEffect(() => {
         if (!user) return;
         const q = query(
@@ -499,21 +446,16 @@ function RecentCalls({ searchTerm }) {
         return () => unsubscribe();
     }, [user]);
 
-
-    // --- Helper functions for formatting (unchanged) ---
+    // --- Helpers ---
     const formatTimestamp = (timestamp) => {
         if (!timestamp) return 'No date';
         if (timestamp && typeof timestamp.toDate === 'function') {
             return timestamp.toDate().toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
+                month: 'short', day: 'numeric', year: 'numeric'
             });
         }
         return new Date(timestamp).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
+            month: 'short', day: 'numeric', year: 'numeric'
         });
     };
 
@@ -541,7 +483,6 @@ function RecentCalls({ searchTerm }) {
         return colors[charCodeSum % colors.length];
     };
 
-    // --- Loading State ---
     if (loading) {
         return (
             <div className="d-flex justify-content-center align-items-center py-5">
@@ -552,23 +493,20 @@ function RecentCalls({ searchTerm }) {
         );
     }
 
-    // --- Render JSX ---
     return (
         <>
             {/* Global & Component Styles */}
             <style jsx global>{`
                 :root {
-                    --wa-bg: #111b21;
-                    --wa-header: #202c33;
-                    --wa-hover: #2a3942;
-                    --wa-primary: #e9edef;
-                    --wa-secondary: #8696a0;
-                    --wa-accent: #00a884;
-                    --wa-danger: #ef5350;
-                    --wa-blue: #53bdeb;
+                    --bg-dark: #111b21;
+                    --card-bg: #1f2937; /* Darker card background */
+                    --text-primary: #e9edef;
+                    --text-secondary: #8696a0;
+                    --accent: #00a884; /* Cyan/Green */
+                    --accent-glow: rgba(0, 168, 132, 0.4);
+                    --danger: #ef5350;
+                    --border-color: rgba(134, 150, 160, 0.15);
                 }
-
-                /* Scrollbar Customization */
                 ::-webkit-scrollbar { width: 6px; }
                 ::-webkit-scrollbar-track { background: transparent; }
                 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
@@ -576,194 +514,204 @@ function RecentCalls({ searchTerm }) {
 
             <style jsx>{`
                 .recent-calls-container {
-                    background-color: var(--wa-bg);
+                    background-color: var(--bg-dark);
                     height: 100%;
                     display: flex;
                     flex-direction: column;
-                    border-right: 1px solid rgba(255,255,255,0.1);
-                    color: var(--wa-primary);
-                    position: relative;
+                    color: var(--text-primary);
                     overflow: hidden;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                 }
 
-                /* --- STICKY HEADER SECTION (Fixes overlapping) --- */
+                /* --- STICKY HEADER --- */
                 .sticky-header {
                     position: sticky;
                     top: 0;
                     z-index: 100;
-                    background-color: var(--wa-bg);
-                    padding-bottom: 5px;
-                    border-bottom: 1px solid rgba(134, 150, 160, 0.15);
+                    background-color: var(--bg-dark);
+                    padding: 15px 20px 5px;
+                    border-bottom: 1px solid var(--border-color);
                 }
 
-                /* Search Bar */
+                /* --- SEARCH BAR (Matching Card Theme) --- */
                 .search-wrapper {
-                    padding: 10px 15px;
+                    margin-bottom: 10px;
                 }
                 .search-input-group {
-                    background-color: var(--wa-header);
-                    border-radius: 8px;
+                    background-color: var(--card-bg);
+                    border-radius: 12px;
                     display: flex;
                     align-items: center;
                     padding: 0 15px;
-                    height: 35px;
+                    height: 45px;
+                    border: 1px solid transparent;
+                    transition: border 0.3s ease;
                 }
-                .search-icon { color: var(--wa-secondary); font-size: 0.85rem; }
+                .search-input-group:focus-within {
+                    border-color: var(--accent);
+                }
+                .search-icon { color: var(--text-secondary); font-size: 1rem; }
                 .search-input {
                     background: transparent;
                     border: none;
-                    color: var(--wa-primary);
+                    color: var(--text-primary);
                     width: 100%;
                     margin-left: 15px;
-                    font-size: 0.9rem;
+                    font-size: 1rem;
                     outline: none;
                 }
-                .search-input::placeholder { color: var(--wa-secondary); }
+                .search-input::placeholder { color: var(--text-secondary); }
 
-                /* Call Stats & Bell Row */
+                /* Stats Row */
                 .stats-row {
                     display: flex; justify-content: space-between; align-items: center;
-                    padding: 8px 20px;
+                    padding: 5px 0;
                     font-size: 0.85rem;
-                    color: var(--wa-secondary);
+                    color: var(--text-secondary);
                 }
                 .bell-btn {
-                    position: relative; cursor: pointer; color: var(--wa-secondary); transition: 0.2s;
+                    position: relative; cursor: pointer; color: var(--text-secondary); transition: 0.2s;
+                    font-size: 1.2rem;
                 }
-                .bell-btn:hover { color: var(--wa-primary); }
+                .bell-btn:hover { color: var(--text-primary); }
                 .badge-dot {
                     position: absolute; top: -2px; right: -2px;
                     width: 8px; height: 8px;
-                    background-color: var(--wa-accent);
+                    background-color: var(--accent);
                     border-radius: 50%;
                 }
 
-                /* --- LIST AREA --- */
-                .recent-calls-list {
+                /* --- GRID LAYOUT FOR CARDS --- */
+                .recent-calls-grid {
                     flex: 1;
                     overflow-y: auto;
-                    padding-top: 5px;
+                    padding: 20px;
+                    display: grid;
+                    /* Responsive Grid: Cards roughly 280px wide */
+                    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                    gap: 20px;
+                    align-content: start;
                 }
 
-                /* Call Item Card */
-                .call-item {
-                    display: flex; align-items: center;
-                    padding: 12px 15px;
+                /* --- CARD DESIGN --- */
+                .call-card {
+                    background-color: var(--card-bg);
+                    border-radius: 16px;
+                    padding: 20px;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    min-height: 180px;
+                    border: 1px solid var(--border-color);
+                    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                    position: relative;
                     cursor: pointer;
-                    transition: background-color 0.2s;
-                    border-bottom: 1px solid rgba(134, 150, 160, 0.1);
-                }
-                .call-item:hover { background-color: var(--wa-hover); }
-
-                .avatar-container {
-                    position: relative; margin-right: 15px;
-                }
-                .call-avatar {
-                    width: 45px; height: 45px; border-radius: 50%;
-                    display: flex; align-items: center; justify-content: center;
-                    font-weight: 500; color: white; font-size: 1.1rem;
-                    flex-shrink: 0;
                 }
 
-                .call-info {
-                    flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;
-                }
-                .info-top {
-                    display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 3px;
-                }
-                .call-name {
-                    font-size: 1rem; color: var(--wa-primary);
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                }
-                .call-date {
-                    font-size: 0.75rem; color: var(--wa-secondary);
-                    flex-shrink: 0; margin-left: 10px;
+                /* Hover Effect: Green Border + Lift (Matches 4th card style) */
+                .call-card:hover {
+                    border-color: var(--accent);
+                    transform: translateY(-5px);
+                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--accent-glow);
                 }
 
-                .info-bottom {
-                    display: flex; justify-content: space-between; align-items: center;
+                /* Card Header: Icon/Avatar */
+                .card-header-icon {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.5rem;
+                    font-weight: bold;
+                    color: white;
+                    margin-bottom: 15px;
                 }
-                .call-email {
-                    font-size: 0.85rem; color: var(--wa-secondary);
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                    max-width: 80%;
+
+                /* Card Body: Text */
+                .card-body {
+                    flex: 1;
                 }
-                
-                /* Actions (Show on Hover) */
-                .call-actions {
-                    display: flex; gap: 15px;
-                    opacity: 0; transition: opacity 0.2s;
+                .card-title {
+                    font-size: 1.2rem;
+                    font-weight: 700;
+                    color: var(--text-primary);
+                    margin-bottom: 5px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
-                .call-item:hover .call-actions { opacity: 1; }
-                
-                .action-icon {
-                    font-size: 1.1rem; color: var(--wa-secondary);
-                    background: none; border: none; padding: 0;
-                    cursor: pointer; transition: 0.2s;
+                .card-subtitle {
+                    font-size: 0.9rem;
+                    color: var(--text-secondary);
+                    margin-bottom: 5px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
-                .action-icon:hover { color: var(--wa-primary); }
-                .icon-call:hover { color: var(--wa-accent); }
-                .icon-delete:hover { color: var(--wa-danger); }
+                .card-date {
+                    font-size: 0.75rem;
+                    color: #556066;
+                    margin-bottom: 15px;
+                }
+
+                /* Card Actions (Bottom) */
+                .card-actions {
+                    display: flex;
+                    gap: 10px;
+                    padding-top: 15px;
+                    border-top: 1px solid rgba(255,255,255,0.05);
+                    opacity: 0.7;
+                    transition: opacity 0.2s;
+                }
+                .call-card:hover .card-actions {
+                    opacity: 1;
+                }
+
+                .action-btn {
+                    background: transparent;
+                    border: none;
+                    color: var(--text-secondary);
+                    font-size: 1.1rem;
+                    cursor: pointer;
+                    padding: 5px;
+                    border-radius: 5px;
+                    transition: all 0.2s;
+                }
+                .action-btn:hover { background-color: rgba(255,255,255,0.05); color: var(--text-primary); }
+                .btn-call:hover { color: var(--accent); }
+                .btn-delete:hover { color: var(--danger); }
 
                 /* Empty State */
                 .empty-state {
-                    padding: 40px; text-align: center; color: var(--wa-secondary);
-                    font-size: 0.9rem;
+                    grid-column: 1 / -1;
+                    padding: 40px; text-align: center; color: var(--text-secondary);
                 }
 
-                /* Visibility Toggle */
-                .visibility-control {
-                    padding: 15px;
-                    border-top: 1px solid rgba(134, 150, 160, 0.1);
-                    background-color: var(--wa-header);
-                    display: flex; justify-content: space-between; align-items: center;
-                }
-                .vis-label { font-size: 0.9rem; color: var(--wa-primary); }
-                
-                /* Switch */
-                .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
-                .switch input { opacity: 0; width: 0; height: 0; }
-                .slider {
-                    position: absolute; cursor: pointer;
-                    top: 0; left: 0; right: 0; bottom: 0;
-                    background-color: #3b4a54; transition: .4s; border-radius: 34px;
-                }
-                .slider:before {
-                    position: absolute; content: "";
-                    height: 14px; width: 14px; left: 3px; bottom: 3px;
-                    background-color: white; transition: .4s; border-radius: 50%;
-                }
-                input:checked + .slider { background-color: var(--wa-accent); }
-                input:checked + .slider:before { transform: translateX(14px); }
-
-                /* Modal Overlays (Reused logic, updated style) */
+                /* --- MODALS --- */
                 .modal-overlay {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(0,0,0,0.7); z-index: 1000;
+                    background: rgba(0,0,0,0.8); z-index: 1000;
                     display: flex; align-items: center; justify-content: center;
+                    backdrop-filter: blur(2px);
                 }
                 .modal-card {
-                    background: var(--wa-header); color: var(--wa-primary);
-                    width: 90%; max-width: 400px; padding: 20px;
-                    border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                    background: var(--card-bg); color: var(--text-primary);
+                    width: 90%; max-width: 400px; padding: 25px;
+                    border-radius: 16px; border: 1px solid var(--border-color);
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.6);
                 }
-                .modal-btn {
-                    padding: 8px 16px; border-radius: 4px; border: none; font-weight: 500; margin-left: 10px;
-                }
-                .btn-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-accent); }
-                .btn-danger { background: var(--wa-danger); color: white; }
-                .btn-primary { background: var(--wa-accent); color: white; }
+                .modal-btn { padding: 10px 20px; border-radius: 8px; border: none; font-weight: 600; margin-left: 10px; cursor: pointer;}
+                .btn-cancel { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color); }
+                .btn-danger { background: var(--danger); color: white; }
+                .btn-primary { background: var(--accent); color: white; }
 
-                @media (max-width: 576px) {
-                    .call-actions { opacity: 1; gap: 10px; } /* Always show actions on mobile */
-                    .call-item { padding: 10px; }
-                }
             `}</style>
 
             <div className="recent-calls-container">
 
-                {/* --- STICKY HEADER --- */}
+                {/* --- HEADER --- */}
                 <div className="sticky-header">
                     <div className="search-wrapper">
                         <div className="search-input-group">
@@ -771,16 +719,15 @@ function RecentCalls({ searchTerm }) {
                             <input
                                 type="text"
                                 className="search-input"
-                                placeholder="Search or start new call"
+                                placeholder="Search contacts..."
                                 value={searchTerm || ''}
-                            // Assuming you have a setSearchTerm handler in parent, 
-                            // otherwise add onChange logic here if passed as prop
+                                // Assuming onChange is handled by parent or passed prop
                             />
                         </div>
                     </div>
 
                     <div className="stats-row">
-                        <span>Calls ({dailyCallCount}/{dailyCallLimit})</span>
+                        <span>Daily Limit: {dailyCallCount}/{dailyCallLimit}</span>
                         <div className="bell-btn" onClick={openNotificationModal} title="Notifications">
                             <i className="bi bi-bell-fill"></i>
                             {unreadCount > 0 && <span className="badge-dot"></span>}
@@ -788,12 +735,12 @@ function RecentCalls({ searchTerm }) {
                     </div>
                 </div>
 
-                {/* --- SCROLLABLE LIST --- */}
-                <div className="recent-calls-list">
+                {/* --- GRID LIST --- */}
+                <div className="recent-calls-grid">
                     {!user ? (
-                        <div className="empty-state">Please log in to see recent calls.</div>
+                        <div className="empty-state">Please log in to see contacts.</div>
                     ) : filteredCalls.length === 0 ? (
-                        <div className="empty-state">No chats or calls found.</div>
+                        <div className="empty-state">No contacts found. Start a new call!</div>
                     ) : (
                         filteredCalls.map(call => {
                             const isCurrentUserOwner = call.ownerId === user._id;
@@ -803,70 +750,54 @@ function RecentCalls({ searchTerm }) {
                             if (!displayName) return null;
 
                             return (
-                                <div key={call.id} className="call-item" onClick={() => navigate(`/call/${call.id}`)}>
-                                    <div className="avatar-container">
-                                        <div
-                                            className="call-avatar"
-                                            style={{ backgroundColor: getAvatarColor(displayName) }}
-                                        >
-                                            {displayName.charAt(0).toUpperCase()}
-                                        </div>
+                                <div key={call.id} className="call-card" onClick={() => navigate(`/call/${call.id}`)}>
+                                    
+                                    {/* Icon Top Left */}
+                                    <div 
+                                        className="card-header-icon"
+                                        style={{ backgroundColor: getAvatarColor(displayName) }}
+                                    >
+                                        {displayName.charAt(0).toUpperCase()}
                                     </div>
 
-                                    <div className="call-info">
-                                        <div className="info-top">
-                                            <span className="call-name">{displayName}</span>
-                                            <span className="call-date">{formatTimestamp(call.createdAt)}</span>
-                                        </div>
-                                        <div className="info-bottom">
-                                            <span className="call-email">
-                                                {displayEmail}
-                                            </span>
+                                    {/* Content */}
+                                    <div className="card-body">
+                                        <div className="card-title">{displayName}</div>
+                                        <div className="card-subtitle">{displayEmail}</div>
+                                        <div className="card-date">{formatTimestamp(call.createdAt)}</div>
+                                    </div>
 
-                                            {/* Action Icons (Hover to see) */}
-                                            <div className="call-actions" onClick={(e) => e.stopPropagation()}>
-                                               {/* <button
-                                                    className="action-icon icon-call"
-                                                    title="Voice Call"
-                                                    disabled={isCalling === call.id}
-                                                    // Assuming you have a specific route for audio calls, e.g., /audio-call/:id
-                                                    // You might need to update handleReCall to accept a 'type' argument 
-                                                    // OR simply navigate to an audio-specific route if you create new calls differently.
-                                                    // For now, let's assume you want to Join as Audio:
-                                                    onClick={() => navigate(`/audio-call/${call.id}`)}
-                                                >
-                                                    <i className="bi bi-telephone-fill"></i>
-                                                </button>*/}
-                                                <button
-                                                    className="action-icon icon-call"
-                                                    title="Video Call"
-                                                    disabled={isCalling === call.id}
-                                                    onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
-                                                >
-                                                    {isCalling === call.id ? (
-                                                        <span className="spinner-border spinner-border-sm"></span>
-                                                    ) : (
-                                                        <i className="bi bi-camera-video-fill"></i>
-                                                    )}
-                                                </button>
+                                    {/* Actions Bottom */}
+                                    <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                            className="action-btn btn-call"
+                                            title="Video Call"
+                                            disabled={isCalling === call.id}
+                                            onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
+                                        >
+                                            {isCalling === call.id ? (
+                                                <span className="spinner-border spinner-border-sm"></span>
+                                            ) : (
+                                                <i className="bi bi-camera-video-fill"></i>
+                                            )}
+                                        </button>
 
-                                                <button
-                                                    className="action-icon"
-                                                    title="Chat"
-                                                    onClick={() => handleOpenChat(displayName, displayEmail)}
-                                                >
-                                                    <i className="bi bi-chat-left-text-fill"></i>
-                                                </button>
+                                        <button
+                                            className="action-btn"
+                                            title="Chat"
+                                            onClick={() => handleOpenChat(displayName, displayEmail)}
+                                        >
+                                            <i className="bi bi-chat-left-text-fill"></i>
+                                        </button>
 
-                                                <button
-                                                    className="action-icon icon-delete"
-                                                    title="Delete"
-                                                    onClick={() => promptForDelete(call.id, displayName)}
-                                                >
-                                                    <i className="bi bi-trash"></i>
-                                                </button>
-                                            </div>
-                                        </div>
+                                        <button
+                                            className="action-btn btn-delete"
+                                            title="Delete"
+                                            style={{ marginLeft: 'auto' }} // Push delete to right
+                                            onClick={() => promptForDelete(call.id, displayName)}
+                                        >
+                                            <i className="bi bi-trash"></i>
+                                        </button>
                                     </div>
                                 </div>
                             );
@@ -874,8 +805,8 @@ function RecentCalls({ searchTerm }) {
                     )}
                 </div>
 
-                {/* --- FOOTER VISIBILITY --- */}
-                <div className="visibility-control">
+                {/* --- VISIBILITY TOGGLE (HIDDEN AS REQUESTED) --- */}
+                {/* <div className="visibility-control">
                     <span className="vis-label">Profile Visibility (Online)</span>
                     <label className="switch">
                         <input
@@ -886,19 +817,20 @@ function RecentCalls({ searchTerm }) {
                         />
                         <span className="slider"></span>
                     </label>
-                </div>
+                </div> 
+                */}
 
             </div>
 
-            {/* --- MODALS (Simplified for new theme) --- */}
+            {/* --- MODALS --- */}
             {deleteTarget && (
                 <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
                     <div className="modal-card" onClick={(e) => e.stopPropagation()}>
                         <h5>Delete Contact?</h5>
-                        <p style={{ color: 'var(--wa-secondary)', fontSize: '0.9rem' }}>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
                             Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
                         </p>
-                        <div className="d-flex justify-content-end mt-4">
+                        <div className="d-flex justify-content-end">
                             <button className="modal-btn btn-cancel" onClick={() => setDeleteTarget(null)}>Cancel</button>
                             <button className="modal-btn btn-danger" onClick={confirmDelete}>Delete</button>
                         </div>
@@ -910,10 +842,10 @@ function RecentCalls({ searchTerm }) {
                 <div className="modal-overlay" onClick={handleCloseVisibilityModal}>
                     <div className="modal-card" onClick={(e) => e.stopPropagation()}>
                         <h5>Profile Visibility</h5>
-                        <p style={{ color: 'var(--wa-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
                             Enabling this allows others to see you in the "Online Users" list.
                         </p>
-                        <div className="d-flex justify-content-end mt-4">
+                        <div className="d-flex justify-content-end">
                             <button className="modal-btn btn-primary" onClick={handleCloseVisibilityModal}>Got it</button>
                         </div>
                     </div>
@@ -925,22 +857,22 @@ function RecentCalls({ searchTerm }) {
                     <div className="modal-card" onClick={(e) => e.stopPropagation()}>
                         <div className="d-flex justify-content-between align-items-center mb-3">
                             <h5>Notifications</h5>
-                            <button className="action-icon" onClick={() => setShowNotificationModal(false)}><i className="bi bi-x-lg"></i></button>
+                            <button className="action-btn" onClick={() => setShowNotificationModal(false)}><i className="bi bi-x-lg"></i></button>
                         </div>
                         <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                             {allNotifications.length === 0 ? (
                                 <p className="text-center text-muted my-4">No notifications.</p>
                             ) : (
                                 allNotifications.map(notif => (
-                                    <div key={notif.id} className="p-2 border-bottom border-secondary" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                                    <div key={notif.id} className="p-2 border-bottom" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
                                         <div className="d-flex justify-content-between">
-                                            <strong style={{ fontSize: '0.9rem' }}>{notif.callerName}</strong>
-                                            <small className="text-muted" style={{ fontSize: '0.7rem' }}>{formatTimeAgo(notif.createdAt)}</small>
+                                            <strong>{notif.callerName}</strong>
+                                            <small className="text-muted">{formatTimeAgo(notif.createdAt)}</small>
                                         </div>
                                         <div className="d-flex justify-content-between align-items-center mt-1">
-                                            <span style={{ fontSize: '0.85rem', color: 'var(--wa-secondary)' }}>{notif.type === 'call' ? 'Incoming Call' : 'New Alert'}</span>
+                                            <small style={{ color: 'var(--text-secondary)' }}>{notif.type === 'call' ? 'Incoming Call' : 'New Alert'}</small>
                                             {notif.type === 'call' && (
-                                                <button className="action-icon icon-call" onClick={() => { navigate(`/call/${notif.callId}`); setShowNotificationModal(false); }}>
+                                                <button className="action-btn btn-call" onClick={() => { navigate(`/call/${notif.callId}`); setShowNotificationModal(false); }}>
                                                     <i className="bi bi-camera-video-fill"></i>
                                                 </button>
                                             )}
