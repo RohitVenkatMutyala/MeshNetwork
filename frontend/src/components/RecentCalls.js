@@ -133,7 +133,36 @@ function RecentCalls({ searchTerm }) {
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [isNotifModalLoading, setIsNotifModalLoading] = useState(false);
 
+    // --- NEW STATE: Add Contact Modal ---
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newContact, setNewContact] = useState({ name: '', email: '', desc: '' });
 
+    // --- NEW STATE: Context Menu (Right Click) ---
+    const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, callId: null, name: null });
+
+    // --- HELPER: Handle Right Click ---
+    const handleContextMenu = (e, callId, name) => {
+        e.preventDefault();
+        setContextMenu({ visible: true, x: e.pageX, y: e.pageY, callId, name });
+    };
+
+    // --- HELPER: Close Context Menu on Click ---
+    useEffect(() => {
+        const handleClick = () => setContextMenu({ ...contextMenu, visible: false });
+        window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
+    }, [contextMenu]);
+
+    // --- HELPER: Create Call from Modal ---
+    const handleStartNewChat = () => {
+        if(!newContact.name || !newContact.email) {
+            toast.warn("Name and Email are required");
+            return;
+        }
+        handleReCall(null, newContact.name, newContact.email, newContact.desc || "New Chat", '/call/');
+        setShowAddModal(false);
+        setNewContact({ name: '', email: '', desc: '' });
+    };
     // --- NEW: Effect to initialize Audio Context on first click ---
     useEffect(() => {
         // This is required for browsers that block audio until a user interaction
@@ -573,40 +602,37 @@ function RecentCalls({ searchTerm }) {
     }
 
     // --- Render JSX ---
-  return (
+ return (
         <>
-            {/* Global Styles for Theme & Scrollbar */}
+            {/* --- GLOBAL STYLES & THEME --- */}
             <style jsx global>{`
                 :root {
-                    /* Default Light Theme */
-                    --wa-bg: #ffffff;
-                    --wa-header: #f0f2f5;
+                    /* --- Light Theme --- */
+                    --wa-bg: #f0f2f5; /* Light Grey Background */
+                    --wa-header: #ffffff;
+                    --wa-card-bg: #ffffff;
                     --wa-border: #e9edef;
                     --wa-hover: #f5f6f6;
                     --wa-primary: #111b21;
                     --wa-secondary: #667781;
-                    --wa-accent: #008069;
+                    --wa-accent: #00a884; /* Teal */
                     --wa-danger: #ea0038;
-                    --wa-search-bg: #ffffff;
-                    --wa-icon-color: #54656f;
-                    --wa-input-bg: #ffffff;
+                    --wa-input-bg: #f0f2f5;
                 }
 
-                /* Dark Theme Override */
+                /* --- Dark Theme --- */
                 [data-theme='dark'] {
-                    --wa-bg: #111b21;
+                    --wa-bg: #111b21; /* Deep Background */
                     --wa-header: #202c33;
+                    --wa-card-bg: #202c33;
                     --wa-border: rgba(134, 150, 160, 0.15);
                     --wa-hover: #2a3942;
                     --wa-primary: #e9edef;
                     --wa-secondary: #8696a0;
                     --wa-accent: #00a884;
-                    --wa-search-bg: #202c33;
-                    --wa-icon-color: #aebac1;
                     --wa-input-bg: #2a3942;
                 }
 
-                /* Scrollbar */
                 ::-webkit-scrollbar { width: 6px; }
                 ::-webkit-scrollbar-track { background: transparent; }
                 ::-webkit-scrollbar-thumb { background: rgba(134, 150, 160, 0.3); border-radius: 3px; }
@@ -618,245 +644,279 @@ function RecentCalls({ searchTerm }) {
                     height: 100%;
                     display: flex;
                     flex-direction: column;
-                    border-right: 1px solid var(--wa-border);
                     color: var(--wa-primary);
                     position: relative;
                     overflow: hidden;
                     transition: background-color 0.3s ease;
                 }
 
-                /* --- HEADER SECTION --- */
+                /* --- HEADER --- */
                 .sticky-header {
                     position: sticky;
                     top: 0;
                     z-index: 100;
                     background-color: var(--wa-header);
-                    padding: 10px 16px;
+                    padding: 15px 20px;
                     border-bottom: 1px solid var(--wa-border);
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
                 }
 
-                .header-top {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 10px;
-                }
-                .header-title {
-                    font-size: 1.3rem;
-                    font-weight: 700;
-                    color: var(--wa-primary);
-                }
-                .header-actions {
+                .header-content {
                     display: flex;
                     gap: 15px;
-                }
-                .icon-btn {
-                    background: transparent;
-                    border: none;
-                    color: var(--wa-icon-color);
-                    font-size: 1.2rem;
-                    cursor: pointer;
-                    transition: color 0.2s;
-                    position: relative;
-                }
-                .icon-btn:hover { color: var(--wa-primary); }
-                
-                .badge-dot {
-                    position: absolute; top: -2px; right: -2px;
-                    width: 8px; height: 8px;
-                    background-color: var(--wa-accent);
-                    border-radius: 50%;
-                    border: 2px solid var(--wa-header);
+                    align-items: center;
+                    width: 100%;
                 }
 
                 /* Search Bar */
                 .search-wrapper {
+                    flex-grow: 1;
                     position: relative;
                 }
                 .search-input {
                     width: 100%;
-                    background-color: var(--wa-search-bg);
-                    border: none;
+                    background-color: var(--wa-input-bg);
+                    border: 1px solid transparent;
                     border-radius: 8px;
-                    padding: 7px 15px 7px 40px; /* Left padding for icon */
+                    padding: 10px 15px 10px 40px;
                     color: var(--wa-primary);
-                    font-size: 0.9rem;
+                    font-size: 0.95rem;
                     outline: none;
-                    transition: box-shadow 0.2s;
+                    transition: all 0.2s;
                 }
                 .search-input:focus {
-                    box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.3);
+                    background-color: var(--wa-header);
+                    border-color: var(--wa-accent);
+                    box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.2);
                 }
-                .search-input::placeholder { color: var(--wa-secondary); }
                 .search-icon {
                     position: absolute;
-                    left: 12px;
+                    left: 14px;
                     top: 50%;
                     transform: translateY(-50%);
                     color: var(--wa-secondary);
-                    font-size: 0.85rem;
+                }
+
+                /* Header Buttons */
+                .header-btn {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    border: none;
+                    background-color: var(--wa-input-bg);
+                    color: var(--wa-secondary);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 1.2rem;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    position: relative;
+                }
+                .header-btn:hover {
+                    background-color: var(--wa-hover);
+                    color: var(--wa-accent);
+                    transform: translateY(-1px);
+                }
+                .badge-dot {
+                    position: absolute; top: 2px; right: 2px;
+                    width: 10px; height: 10px;
+                    background-color: var(--wa-danger);
+                    border-radius: 50%;
+                    border: 2px solid var(--wa-header);
                 }
 
                 /* --- LIST AREA --- */
                 .recent-calls-list {
                     flex: 1;
                     overflow-y: auto;
+                    padding: 15px;
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Responsive Grid */
+                    gap: 15px;
+                    align-content: start;
                 }
 
-                /* Contact Card */
-                .call-item {
+                /* --- CARD DESIGN (Matches Login Features) --- */
+                .call-card {
+                    background-color: var(--wa-card-bg);
+                    border: 1px solid var(--wa-border);
+                    border-radius: 12px;
+                    padding: 15px;
                     display: flex;
                     align-items: center;
-                    padding: 12px 16px;
                     cursor: pointer;
-                    transition: background-color 0.2s;
-                    position: relative; 
+                    transition: all 0.2s ease;
+                    position: relative;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
                 }
-                .call-item:hover { background-color: var(--wa-hover); }
-                .call-item::after {
-                    content: '';
-                    position: absolute;
-                    bottom: 0;
-                    right: 0;
-                    width: 82%; 
-                    height: 1px;
-                    background-color: var(--wa-border);
+                .call-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+                    border-color: var(--wa-accent);
                 }
 
-                .avatar-container { margin-right: 15px; }
+                .avatar-container { margin-right: 15px; position: relative; }
                 .call-avatar {
-                    width: 49px; height: 49px;
-                    border-radius: 50%;
+                    width: 50px; height: 50px;
+                    border-radius: 12px; /* Square-ish rounded like feature icons */
                     display: flex; align-items: center; justify-content: center;
-                    font-weight: 500; color: white; font-size: 1.2rem;
-                    flex-shrink: 0;
+                    font-weight: 600; color: white; font-size: 1.3rem;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
                 }
 
                 .call-info {
                     flex: 1; min-width: 0;
-                    display: flex; flex-direction: column; justify-content: center;
-                }
-                
-                .info-top {
-                    display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 2px;
                 }
                 .call-name {
-                    font-size: 1rem; color: var(--wa-primary);
-                    font-weight: 400;
+                    font-size: 1rem;
+                    font-weight: 600;
+                    color: var(--wa-primary);
+                    margin-bottom: 2px;
+                    display: block;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                }
-                .call-date {
-                    font-size: 0.75rem; color: var(--wa-secondary);
-                    flex-shrink: 0; margin-left: 10px;
-                }
-
-                .info-bottom {
-                    display: flex; justify-content: space-between; align-items: center;
                 }
                 .call-desc {
-                    font-size: 0.85rem; color: var(--wa-secondary);
+                    font-size: 0.85rem;
+                    color: var(--wa-secondary);
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                    max-width: 90%;
+                    display: block;
                 }
-                
-                /* Hover Actions */
-                .call-hover-actions {
-                    display: none; gap: 15px; align-items: center;
-                }
-                .call-item:hover .call-hover-actions { display: flex; }
-                .call-item:hover .call-date { display: none; } 
 
-                .action-icon {
-                    font-size: 1.2rem; color: var(--wa-secondary);
-                    background: none; border: none; padding: 0;
-                    cursor: pointer; transition: color 0.2s;
+                /* Hover Actions (Quick Buttons) */
+                .card-actions {
+                    display: flex;
+                    gap: 8px;
+                    opacity: 0;
+                    transition: opacity 0.2s;
                 }
-                .action-icon:hover { color: var(--wa-primary); }
+                .call-card:hover .card-actions { opacity: 1; }
+
+                .mini-btn {
+                    width: 32px; height: 32px;
+                    border-radius: 8px;
+                    border: none;
+                    display: flex; align-items: center; justify-content: center;
+                    cursor: pointer;
+                    font-size: 0.9rem;
+                    transition: 0.2s;
+                }
+                .btn-audio { background: rgba(0, 168, 132, 0.1); color: var(--wa-accent); }
+                .btn-audio:hover { background: var(--wa-accent); color: white; }
+                
+                .btn-video { background: rgba(83, 189, 235, 0.1); color: var(--wa-blue); }
+                .btn-video:hover { background: var(--wa-blue); color: white; }
+
+                /* Context Menu (Right Click) */
+                .context-menu {
+                    position: fixed;
+                    background: var(--wa-card-bg);
+                    border: 1px solid var(--wa-border);
+                    border-radius: 8px;
+                    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+                    z-index: 9999;
+                    min-width: 150px;
+                    padding: 5px 0;
+                    animation: fadeIn 0.1s ease;
+                }
+                .ctx-item {
+                    padding: 10px 20px;
+                    cursor: pointer;
+                    font-size: 0.9rem;
+                    display: flex; align-items: center; gap: 10px;
+                    color: var(--wa-primary);
+                }
+                .ctx-item:hover { background-color: var(--wa-hover); }
+                .ctx-danger { color: var(--wa-danger); }
                 
                 /* Empty State */
                 .empty-state {
-                    padding: 40px; text-align: center;
-                    color: var(--wa-secondary); font-size: 0.95rem; margin-top: 20px;
+                    grid-column: 1 / -1;
+                    padding: 60px;
+                    text-align: center;
+                    color: var(--wa-secondary);
                 }
+                .empty-icon { font-size: 3rem; margin-bottom: 15px; opacity: 0.5; }
 
                 /* --- MODALS --- */
                 .modal-overlay {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(0,0,0,0.7); z-index: 2000;
+                    background: rgba(0,0,0,0.6); z-index: 2000;
                     display: flex; align-items: center; justify-content: center;
-                    backdrop-filter: blur(2px);
+                    backdrop-filter: blur(3px);
                 }
                 .modal-card {
-                    background: var(--wa-header); color: var(--wa-primary);
-                    width: 90%; max-width: 400px; padding: 24px;
-                    border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    background: var(--wa-card-bg); color: var(--wa-primary);
+                    width: 90%; max-width: 400px; padding: 25px;
+                    border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
                     border: 1px solid var(--wa-border);
                 }
-                .modal-btn {
-                    padding: 8px 16px; border-radius: 4px; border: none; font-weight: 500; cursor: pointer;
-                }
-                .btn-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-accent); }
-                .btn-danger { background: var(--wa-danger); color: white; }
-                .btn-primary { background: var(--wa-accent); color: white; }
-                
-                /* Form Inputs in Modal */
                 .modal-input {
-                    width: 100%; padding: 10px; margin-bottom: 15px;
+                    width: 100%; padding: 12px; margin-bottom: 12px;
                     background: var(--wa-input-bg); border: 1px solid var(--wa-border);
-                    color: var(--wa-primary); border-radius: 6px; outline: none;
+                    color: var(--wa-primary); border-radius: 8px; outline: none;
                 }
                 .modal-input:focus { border-color: var(--wa-accent); }
+                .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+                .btn-custom { padding: 8px 20px; border-radius: 8px; border: none; font-weight: 600; transition: 0.2s; }
+                .btn-cancel { background: transparent; color: var(--wa-secondary); }
+                .btn-cancel:hover { background: var(--wa-hover); color: var(--wa-primary); }
+                .btn-primary { background: var(--wa-accent); color: white; }
+                .btn-primary:hover { background: #006e5a; }
+                .btn-danger { background: var(--wa-danger); color: white; }
             `}</style>
 
             <div className="recent-calls-container">
                 
                 {/* --- HEADER --- */}
                 <div className="sticky-header">
-                    <div className="header-top">
-                        <div className="header-title">Chats</div>
-                        <div className="header-actions">
-                            {/* FIXED: Updated onClick to use setShowAddModal */}
-                            <button className="icon-btn" title="Add New Contact" onClick={() => setShowAddModal(true)}>
-                                <i className="bi bi-pencil-square"></i>
-                            </button>
-                            <button className="icon-btn" onClick={openNotificationModal} title="Notifications">
-                                <i className="bi bi-bell"></i>
-                                {unreadCount > 0 && <span className="badge-dot"></span>}
-                            </button>
-                            <button 
-                                className="icon-btn" 
-                                onClick={handleVisibilityToggle}
-                                title={`You are ${isOnline ? 'Online' : 'Offline'}`}
-                                style={{ color: isOnline ? 'var(--wa-accent)' : 'var(--wa-secondary)' }}
-                            >
-                                <i className={`bi ${isOnline ? 'bi-toggle-on' : 'bi-toggle-off'}`}></i>
-                            </button>
+                    <div className="header-content">
+                        {/* Search */}
+                        <div className="search-wrapper">
+                            <i className="bi bi-search search-icon"></i>
+                            <input 
+                                type="text" 
+                                className="search-input" 
+                                placeholder="Search contacts..."
+                                value={searchTerm || ''}
+                                onChange={(e) => typeof setSearchTerm === 'function' ? setSearchTerm(e.target.value) : null}
+                            />
                         </div>
-                    </div>
 
-                    <div className="search-wrapper">
-                        <i className="bi bi-search search-icon"></i>
-                        <input 
-                            type="text" 
-                            className="search-input" 
-                            placeholder="Search or start new chat"
-                            value={searchTerm || ''}
-                            onChange={(e) => typeof setSearchTerm === 'function' ? setSearchTerm(e.target.value) : null}
-                        />
+                        {/* Action Buttons */}
+                        <button className="header-btn" title="Add New Contact" onClick={() => setShowAddModal(true)}>
+                            <i className="bi bi-plus-lg"></i>
+                        </button>
+                        <button className="header-btn" onClick={openNotificationModal} title="Notifications">
+                            <i className="bi bi-bell"></i>
+                            {unreadCount > 0 && <span className="badge-dot"></span>}
+                        </button>
+                        <button 
+                            className="header-btn" 
+                            onClick={handleVisibilityToggle}
+                            title={`You are ${isOnline ? 'Online' : 'Offline'}`}
+                            style={{ color: isOnline ? 'var(--wa-accent)' : 'var(--wa-secondary)' }}
+                        >
+                            <i className={`bi ${isOnline ? 'bi-toggle-on' : 'bi-toggle-off'}`}></i>
+                        </button>
                     </div>
                 </div>
 
-                {/* --- LIST --- */}
+                {/* --- CARD GRID --- */}
                 <div className="recent-calls-list">
                     {!user ? (
-                        <div className="empty-state">Sign in to view your contacts.</div>
+                        <div className="empty-state">
+                            <div className="empty-icon"><i className="bi bi-person-lock"></i></div>
+                            <h4>Sign In Required</h4>
+                            <p>Please sign in to view your contacts.</p>
+                        </div>
                     ) : filteredCalls.length === 0 ? (
                         <div className="empty-state">
-                            <p>No chats found.</p>
-                            {/* FIXED: Updated onClick */}
-                            <button className="btn btn-sm btn-outline-secondary mt-2" onClick={() => setShowAddModal(true)}>
-                                Start a conversation
+                            <div className="empty-icon"><i className="bi bi-chat-square-dots"></i></div>
+                            <h4>No Chats Yet</h4>
+                            <p>Start a new conversation to see it here.</p>
+                            <button className="btn btn-primary btn-custom mt-3" onClick={() => setShowAddModal(true)}>
+                                Add Contact
                             </button>
                         </div>
                     ) : (
@@ -870,12 +930,11 @@ function RecentCalls({ searchTerm }) {
                             return (
                                 <div 
                                     key={call.id} 
-                                    className="call-item" 
+                                    className="call-card" 
+                                    // Default action: Go to video call
                                     onClick={() => navigate(`/call/${call.id}`)}
-                                    onContextMenu={(e) => {
-                                        e.preventDefault();
-                                        promptForDelete(call.id, displayName);
-                                    }}
+                                    // Right Click Logic
+                                    onContextMenu={(e) => handleContextMenu(e, call.id, displayName)}
                                 >
                                     <div className="avatar-container">
                                         <div 
@@ -887,37 +946,29 @@ function RecentCalls({ searchTerm }) {
                                     </div>
 
                                     <div className="call-info">
-                                        <div className="info-top">
-                                            <span className="call-name">{displayName}</span>
-                                            <span className="call-date">{formatTimestamp(call.createdAt)}</span>
-                                            
-                                            {/* Hover Actions */}
-                                            <div className="call-hover-actions">
-                                                <button 
-                                                    className="action-icon" 
-                                                    title="Voice Call"
-                                                    disabled={isCalling === call.id}
-                                                    onClick={(e) => { e.stopPropagation(); handleReCall(call.id, displayName, displayEmail, call.description, '/audio-call/'); }}
-                                                >
-                                                    <i className="bi bi-telephone-fill"></i>
-                                                </button>
+                                        <span className="call-name">{displayName}</span>
+                                        <span className="call-desc">{call.description || displayEmail}</span>
+                                    </div>
 
-                                                <button 
-                                                    className="action-icon" 
-                                                    title="Video Call"
-                                                    disabled={isCalling === call.id}
-                                                    onClick={(e) => { e.stopPropagation(); handleReCall(call.id, displayName, displayEmail, call.description, '/call/'); }}
-                                                >
-                                                    <i className="bi bi-camera-video-fill"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="info-bottom">
-                                            <span className="call-desc">
-                                                {call.description || displayEmail}
-                                            </span>
-                                        </div>
+                                    {/* Quick Actions on Hover */}
+                                    <div className="card-actions">
+                                        <button 
+                                            className="mini-btn btn-audio" 
+                                            title="Voice Call"
+                                            disabled={isCalling === call.id}
+                                            onClick={(e) => { e.stopPropagation(); handleReCall(call.id, displayName, displayEmail, call.description, '/audio-call/'); }}
+                                        >
+                                            <i className="bi bi-telephone-fill"></i>
+                                        </button>
+
+                                        <button 
+                                            className="mini-btn btn-video" 
+                                            title="Video Call"
+                                            disabled={isCalling === call.id}
+                                            onClick={(e) => { e.stopPropagation(); handleReCall(call.id, displayName, displayEmail, call.description, '/call/'); }}
+                                        >
+                                            <i className="bi bi-camera-video-fill"></i>
+                                        </button>
                                     </div>
                                 </div>
                             );
@@ -926,34 +977,63 @@ function RecentCalls({ searchTerm }) {
                 </div>
             </div>
 
-            {/* --- ADD CONTACT MODAL (New Professional Modal) --- */}
+            {/* --- RIGHT CLICK CONTEXT MENU --- */}
+            {contextMenu.visible && (
+                <div 
+                    className="context-menu" 
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="ctx-item" onClick={() => {
+                        navigate(`/call/${contextMenu.callId}`);
+                        setContextMenu({ ...contextMenu, visible: false });
+                    }}>
+                        <i className="bi bi-camera-video"></i> Video Call
+                    </div>
+                    <div className="ctx-item" onClick={() => {
+                        navigate(`/audio-call/${contextMenu.callId}`);
+                        setContextMenu({ ...contextMenu, visible: false });
+                    }}>
+                        <i className="bi bi-telephone"></i> Audio Call
+                    </div>
+                    <div style={{height: '1px', background: 'var(--wa-border)', margin: '4px 0'}}></div>
+                    <div className="ctx-item ctx-danger" onClick={() => {
+                        promptForDelete(contextMenu.callId, contextMenu.name);
+                        setContextMenu({ ...contextMenu, visible: false });
+                    }}>
+                        <i className="bi bi-trash"></i> Delete
+                    </div>
+                </div>
+            )}
+
+            {/* --- ADD CONTACT MODAL --- */}
             {showAddModal && (
                 <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
                     <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-                        <h5 style={{marginBottom:'20px', fontWeight: '600'}}>Start New Chat</h5>
+                        <h4 style={{marginBottom:'20px', fontWeight: '700'}}>New Chat</h4>
                         
                         <input 
                             className="modal-input" 
-                            placeholder="Contact Name"
+                            placeholder="Name (e.g., Jane Doe)"
                             value={newContact.name} 
                             onChange={(e) => setNewContact({...newContact, name: e.target.value})}
                         />
                         <input 
                             className="modal-input" 
-                            placeholder="Email Address"
+                            placeholder="Email (e.g., jane@example.com)"
                             value={newContact.email} 
                             onChange={(e) => setNewContact({...newContact, email: e.target.value})}
                         />
                         <input 
                             className="modal-input" 
-                            placeholder="Short Description (Optional)"
+                            placeholder="Description (Optional)"
                             value={newContact.desc} 
                             onChange={(e) => setNewContact({...newContact, desc: e.target.value})}
                         />
 
-                        <div className="d-flex justify-content-end gap-2 mt-3">
-                            <button className="modal-btn btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
-                            <button className="modal-btn btn-primary" onClick={handleStartNewChat}>Create</button>
+                        <div className="modal-footer">
+                            <button className="btn-custom btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
+                            <button className="btn-custom btn-primary" onClick={handleStartNewChat}>Create Chat</button>
                         </div>
                     </div>
                 </div>
@@ -963,13 +1043,13 @@ function RecentCalls({ searchTerm }) {
             {deleteTarget && (
                 <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
                     <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-                        <h5 style={{marginBottom: '10px'}}>Delete chat?</h5>
+                        <h5 style={{marginBottom: '10px'}}>Delete "{deleteTarget.name}"?</h5>
                         <p style={{color: 'var(--wa-secondary)', fontSize: '0.9rem'}}>
-                            Deleting <strong>{deleteTarget.name}</strong> will remove them from your list.
+                            This will permanently remove the chat history from your list.
                         </p>
-                        <div className="d-flex justify-content-end gap-2 mt-4">
-                            <button className="modal-btn btn-cancel" onClick={() => setDeleteTarget(null)}>Cancel</button>
-                            <button className="modal-btn btn-danger" onClick={confirmDelete}>Delete</button>
+                        <div className="modal-footer">
+                            <button className="btn-custom btn-cancel" onClick={() => setDeleteTarget(null)}>Cancel</button>
+                            <button className="btn-custom btn-danger" onClick={confirmDelete}>Delete</button>
                         </div>
                     </div>
                 </div>
