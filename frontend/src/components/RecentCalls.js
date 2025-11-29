@@ -173,7 +173,7 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
             <div className="card-header-icon" style={{ backgroundColor: getAvatarColor(displayTitle) }}>
                 {isGroup ? <i className="bi bi-people-fill"></i> : displayTitle.charAt(0).toUpperCase()}
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, zIndex: 2 }}>
                 <div className="card-title">{displayTitle}</div>
                 <div className="card-subtitle">{displaySubtitle}</div>
                 <div className="card-date">{formatTimeAgo(call.createdAt)}</div>
@@ -562,12 +562,18 @@ function RecentCalls() {
             <style jsx>{`
                 .recent-calls-container { 
                     background-color: #111b21; 
-                    height: calc(100vh - 60px); /* Fill screen minus navbar */
-                    width: 100%; margin: 0;
-                    display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif; 
+                    height: calc(100vh - 60px); 
+                    width: 100%; /* Fixed Width Bug */
+                    margin: 0;
+                    display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif;
+                    box-sizing: border-box; /* Fixed Width Bug */
+                    overflow-x: hidden;
                 }
-                .sticky-header { position: sticky; top: 0; z-index: 100; background-color: #111b21; padding: 20px 20px 10px; border-bottom: 1px solid rgba(134, 150, 160, 0.15);box-sizing: border-box; /* ADDED */
-        width: 100%; /* ADDED */ }
+                
+                .sticky-header { 
+                    position: sticky; top: 0; z-index: 100; background-color: #111b21; padding: 20px 20px 10px; border-bottom: 1px solid rgba(134, 150, 160, 0.15);
+                    box-sizing: border-box; width: 100%;
+                }
                 
                 .header-actions { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
                 
@@ -589,8 +595,7 @@ function RecentCalls() {
                 .search-input-group { 
                     background-color: #202c33; border-radius: 24px; display: flex; align-items: center; 
                     padding: 0 20px; height: 46px; border: 1px solid transparent; transition: 0.2s;
-                    width: 100%; /* ADDED: Ensures input group fills wrapper */
-        box-sizing: border-box; /* ADDED */
+                    width: 100%; box-sizing: border-box;
                 }
                 .search-input-group:focus-within { background-color: #2a3942; border-color: rgba(255,255,255,0.1); }
                 .search-input { background: transparent; border: none; color: #e9edef; width: 100%; margin-left: 10px; outline: none; font-size: 1rem; }
@@ -598,8 +603,7 @@ function RecentCalls() {
                 .recent-calls-grid { 
                     flex: 1; overflow-y: auto; padding: 20px; display: grid; 
                     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; align-content: start; 
-                    width: 100%; /* ADDED */
-        box-sizing: border-box; /* ADDED */
+                    width: 100%; box-sizing: border-box;
                 }
 
                 @media (max-width: 480px) {
@@ -610,25 +614,66 @@ function RecentCalls() {
                     .new-call-btn, .joint-meet-btn { justify-content: center; }
                 }
 
+                /* --- GLASSY CARDS CSS START --- */
+                
+                /* Standard Card (Individual): Dark Blue-Gray Glass */
                 .call-card { 
-                    background-color: #1f2937; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; 
-                    min-height: 220px; border: 1px solid rgba(134,150,160,0.15); transition: 0.3s; position: relative; 
+                    background: rgba(31, 41, 55, 0.7); /* Base #1F2937 at 70% opacity */
+                    backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
+                    border: 1px solid rgba(255, 255, 255, 0.08); /* Subtle glass border */
+                    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+                    border-radius: 16px; 
+                    padding: 20px; 
+                    display: flex; flex-direction: column; 
+                    min-height: 220px; 
+                    transition: 0.3s all ease; 
+                    position: relative; 
+                    overflow: hidden;
                 }
-                .call-card.joint-meet { background-color: #2a2f42; border: 1px solid #4c5270; }
-                .call-card:hover { border-color: #00a884; transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
-                .call-card.joint-meet:hover { border-color: #8957e5; }
                 
-                .card-header-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: bold; color: white; margin-bottom: 12px; }
-                .card-title { font-size: 1.1rem; font-weight: 600; color: #e9edef; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                .card-subtitle { font-size: 0.85rem; color: #8696a0; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                .card-date { font-size: 0.75rem; color: #556066; margin-bottom: 12px; }
+                /* Joint Meeting Card (Group): Premium Gradient Glass */
+                .call-card.joint-meet { 
+                    /* Diagonal Gradient: Lighter Slate -> Deep Dark */
+                    background: linear-gradient(145deg, rgba(55, 65, 81, 0.7) 0%, rgba(17, 24, 39, 0.85) 100%);
+                    border: 1px solid rgba(255, 255, 255, 0.15); /* Slightly brighter border for premium feel */
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+                }
+
+                /* Hover Effects for Shine & Depth */
+                .call-card:hover { 
+                    transform: translateY(-5px); 
+                    border-color: rgba(255, 255, 255, 0.2); 
+                    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+                }
                 
-                .card-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); }
+                .call-card.joint-meet:hover {
+                    border-color: rgba(111, 66, 193, 0.4); /* Subtle purple hint on hover border */
+                    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
+                }
+
+                /* Glass Shine Reflection (Top down) */
+                .call-card::before {
+                    content: '';
+                    position: absolute;
+                    top: 0; left: 0; right: 0;
+                    height: 100%;
+                    background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%);
+                    pointer-events: none;
+                }
+                /* --- GLASSY CARDS CSS END --- */
+                
+                .card-header-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: bold; color: white; margin-bottom: 12px; z-index: 2; }
+                .card-title { font-size: 1.1rem; font-weight: 600; color: #e9edef; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
+                .card-subtitle { font-size: 0.85rem; color: #8696a0; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
+                .card-date { font-size: 0.75rem; color: #556066; margin-bottom: 12px; z-index: 2; }
+                
+                .card-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); z-index: 2; position: relative; }
                 .action-btn { background: transparent; border: none; color: #8696a0; font-size: 1.2rem; padding: 4px; cursor: pointer; transition: 0.2s; }
                 .action-btn:hover { color: #e9edef; transform: scale(1.1); }
                 .btn-call:hover { color: #00a884; } .btn-delete:hover { color: #ef5350; }
 
-                .badge { position: absolute; top: 15px; right: 15px; font-size: 0.65rem; padding: 4px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+                .badge { position: absolute; top: 15px; right: 15px; font-size: 0.65rem; padding: 4px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; z-index: 2; }
                 .badge-meeting { background: rgba(0, 168, 132, 0.2); color: #00a884; }
                 .badge-joint { background: rgba(111, 66, 193, 0.2); color: #b185f7; }
 
