@@ -102,7 +102,6 @@ const CallNotification = ({ callerName, callId, callType, onClose, navigate }) =
 
     return (
         <div className="d-flex flex-column">
-            {/* Inline styles for toast consistency */}
             <style jsx>{`
                 .glass-btn-green {
                     background: linear-gradient(135deg, rgba(0, 168, 132, 0.6), rgba(0, 143, 111, 0.8));
@@ -154,7 +153,7 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
     const displaySubtitle = isGroup ? `${call.allowedEmails.length} Participants` : (isOwner ? call.recipientEmail : call.ownerEmail);
     const canDelete = isGroup ? isOwner : true;
 
-    const actionBtnClass = isGroup ? 'glass-icon-btn-purple' : 'glass-icon-btn-green';
+    const actionBtnClass = isGroup ? 'icon-btn-purple' : 'icon-btn-green';
 
     if (!displayTitle) return null;
 
@@ -223,7 +222,7 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
                 
                 {canDelete && (
                     <button 
-                        className="action-btn glass-icon-btn-red" 
+                        className="action-btn icon-btn-red" 
                         title="Delete" 
                         style={{ marginLeft: 'auto' }} 
                         onPointerDown={(e) => e.stopPropagation()}
@@ -611,7 +610,7 @@ function RecentCalls() {
                     .search-input-group { height: 40px; }
                 }
 
-                /* --- BUTTONS & GLASSY UI --- */
+                /* --- HEADER BUTTONS (Still Glassy) --- */
                 .glass-btn-green, .glass-btn-purple {
                     border: none; border-radius: 24px; padding: 10px 20px;
                     font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.3s;
@@ -623,6 +622,7 @@ function RecentCalls() {
                 .glass-btn-purple { background: linear-gradient(135deg, rgba(111, 66, 193, 0.7), rgba(89, 53, 154, 0.9)); border: 1px solid rgba(255, 255, 255, 0.2); color: white; }
                 .glass-btn-purple:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(111, 66, 193, 0.4); }
 
+                /* --- CARDS --- */
                 .call-card { 
                     background: rgba(31, 41, 55, 0.7); 
                     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -643,19 +643,25 @@ function RecentCalls() {
                     background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%); pointer-events: none;
                 }
 
+                /* --- CARD ACTION BUTTONS (UPDATED: Flat/Normal Style) --- */
                 .card-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); z-index: 10; position: relative; }
                 .action-btn { 
                     width: 38px; height: 38px; border-radius: 50%; 
                     display: flex; align-items: center; justify-content: center;
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    cursor: pointer; transition: 0.2s; backdrop-filter: blur(4px); font-size: 1.1rem; z-index: 20; 
+                    border: 1px solid rgba(134, 150, 160, 0.15); /* Subtle generic border */
+                    cursor: pointer; transition: 0.2s; font-size: 1.1rem; z-index: 20; 
+                    /* No blur, solid dark background to match image */
+                    background-color: #202c33; 
                 }
-                .glass-icon-btn-green { background: rgba(0, 168, 132, 0.15); color: #00a884; }
-                .glass-icon-btn-green:hover { background: rgba(0, 168, 132, 0.4); color: white; transform: scale(1.1); }
-                .glass-icon-btn-purple { background: rgba(111, 66, 193, 0.2); color: #b185f7; }
-                .glass-icon-btn-purple:hover { background: rgba(111, 66, 193, 0.5); color: white; transform: scale(1.1); }
-                .glass-icon-btn-red { background: rgba(220, 53, 69, 0.15); color: #ef5350; }
-                .glass-icon-btn-red:hover { background: rgba(220, 53, 69, 0.4); color: white; transform: scale(1.1); }
+                
+                .icon-btn-green { color: #00a884; }
+                .icon-btn-green:hover { background-color: rgba(0, 168, 132, 0.1); border-color: #00a884; }
+                
+                .icon-btn-purple { color: #b185f7; }
+                .icon-btn-purple:hover { background-color: rgba(111, 66, 193, 0.1); border-color: #b185f7; }
+                
+                .icon-btn-red { color: #ef5350; }
+                .icon-btn-red:hover { background-color: rgba(239, 83, 80, 0.1); border-color: #ef5350; }
 
                 .card-header-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: bold; color: white; margin-bottom: 12px; z-index: 2; }
                 .card-title { font-size: 1.1rem; font-weight: 600; color: #e9edef; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
@@ -686,7 +692,7 @@ function RecentCalls() {
 
                 .mobile-fab-container { display: none; }
                 @media (max-width: 768px) {
-                    /* FIX: Only hide the buttons inside the header, allowing modal buttons to show */
+                    /* Only hide header buttons, keep notification ones visible */
                     .header-actions .glass-btn-green, 
                     .header-actions .glass-btn-purple { 
                         display: none !important; 
@@ -704,6 +710,7 @@ function RecentCalls() {
             `}</style>
 
             <div className="sticky-header">
+                {/* Header content remains the same */}
                 <div className="header-actions">
                     <button className="glass-btn-green" onClick={() => { setModalType('individual'); setShowAddContactModal(true); }}>
                         <i className="bi bi-person-plus-fill"></i> New Meeting
