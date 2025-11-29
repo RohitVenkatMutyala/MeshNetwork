@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext'; // <-- 1. IMPORT THEME
-import { Eye, EyeOff } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { Eye, EyeOff, Video, Shield, Users, Mic, Monitor, Globe } from 'lucide-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import Navbar from './navbar'; // <-- 3. IMPORT Navbar
-import Footer from './Footer'; // <-- IMPORT FOOTER
+import Navbar from './navbar';
+import Footer from './Footer';
 
 function RegisterForm() {
   const API_URL = process.env.REACT_APP_SERVER_API;
@@ -24,7 +24,7 @@ function RegisterForm() {
   const { setUser, user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const { theme } = useTheme(); // <-- 2. GET THEME
+  const { theme } = useTheme();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -55,341 +55,305 @@ function RegisterForm() {
     return null;
   }
 
-return (
+  // Feature Data for the Grid
+  const features = [
+    { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming.", color: "text-teal" },
+    { icon: <Shield size={32} />, title: "End-to-End Secure", desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.", color: "text-purple" },
+    { icon: <Users size={32} />, title: "Joint Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
+    { icon: <Mic size={32} />, title: "Noise Cancellation", desc: "Advanced audio processing to filter out background noise.", color: "text-purple" },
+    { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
+    { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
+  ];
+
+  return (
     <>
       <Navbar />
       
       <style>{`
         :root {
-            /* --- THEME VARIABLES (Matching Navbar & Login) --- */
-            --nav-bg: #202c33;         
-            --nav-accent: #00a884;     
-            --nav-text: #e9edef;       
-            
-            /* Gradient: Steel Blue to Black-ish */
-            --brand-gradient: linear-gradient(135deg, #202c33 0%, #0b141a 100%);
-            
-            /* Background for the page */
-            --bg-page: #e2e6ea; 
+            --bg-page: #111b21; 
+            --text-primary: #e9edef;
+            --text-secondary: #8696a0;
+            --input-bg: #202c33;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --brand-teal: #00a884;
+            --brand-purple: #6f42c1;
         }
 
-        /* Dark Mode Overrides for Page Background */
-        [data-bs-theme="dark"] .auth-container {
-            background-color: #111b21;
-            background-image: radial-gradient(#2a3942 1px, transparent 1px);
+        body { 
+            background-color: var(--bg-page); 
+            color: var(--text-primary); 
+            font-family: sans-serif; 
+            overflow-x: hidden; 
+            overflow-y: auto; 
         }
 
-        .auth-container {
-            min-height: calc(100vh - 64px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: var(--bg-page);
-            background-image: radial-gradient(#cbd5e0 1px, transparent 1px);
-            background-size: 20px 20px;
-            padding: 2rem 1rem;
-            transition: background-color 0.3s ease;
+        /* --- CUSTOM SCROLLBAR --- */
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: #111b21; }
+        ::-webkit-scrollbar-thumb { background: #374051; border-radius: 5px; border: 2px solid #111b21; }
+        ::-webkit-scrollbar-thumb:hover { background: #00a884; }
+
+        /* --- HERO SECTION --- */
+        .hero-section {
+            padding: 80px 20px 40px;
+            text-align: center;
+            background: radial-gradient(circle at 50% 10%, rgba(0, 168, 132, 0.15) 0%, transparent 50%);
+        }
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #8696a0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 40px;
+            line-height: 1.6;
         }
 
-        .auth-card {
-            border: none;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-            overflow: hidden;
-            background-color: #ffffff; /* Force White Card */
-            min-height: 600px;
+        /* --- FEATURES GRID --- */
+        .features-container {
+            padding: 40px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
         }
-
-        /* --- Left Column (Features) --- */
-        .auth-welcome-col {
-            background: var(--brand-gradient);
-            padding: 4rem;
-            color: var(--nav-text);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        /* Decorative Circle */
-        .auth-welcome-col::before {
-            content: '';
-            position: absolute;
-            top: -100px;
-            right: -100px;
-            width: 300px;
-            height: 300px;
-            background: rgba(0, 168, 132, 0.15); /* Teal Tint */
-            border-radius: 50%;
-        }
-
         .feature-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            margin-top: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
         }
-
         .feature-card {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(31, 41, 55, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            transition: all 0.3s ease;
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 1.5rem;
-            transition: transform 0.3s ease;
-            color: #e9edef;
         }
         .feature-card:hover {
-            transform: translateY(-5px);
-            background: rgba(255, 255, 255, 0.1);
-            border-color: var(--nav-accent);
+            transform: translateY(-10px);
+            background: rgba(31, 41, 55, 0.7);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+        .text-teal { color: var(--brand-teal); }
+        .text-purple { color: var(--brand-purple); }
+
+        /* --- REGISTER SECTION (BOTTOM) --- */
+        .register-section {
+            padding: 80px 20px 100px;
+            position: relative;
+        }
+        .register-bg-glow {
+            position: absolute;
+            width: 100%; height: 100%;
+            top: 0; left: 0;
+            background: radial-gradient(circle at 50% 50%, rgba(111, 66, 193, 0.1) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
         }
 
-        .feature-icon {
-            font-size: 1.8rem;
-            margin-bottom: 0.5rem;
-            color: var(--nav-accent);
-        }
-
-        /* --- Right Column (Form) --- */
-        .auth-form-col {
-            padding: 3rem;
-            background-color: #ffffff; /* Ensure white bg */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #111b21; /* Force dark text */
-        }
-
-        /* --- FORCE INPUTS TO LIGHT MODE STYLE --- */
-        .form-control {
-            background-color: #ffffff !important;
-            color: #111b21 !important;
-            border: 1px solid #dfe6e9;
-            border-left: none;
-            padding: 0.8rem 0.8rem 0.8rem 0;
-            font-size: 1rem;
-        }
-        .form-control::placeholder {
-            color: #8696a0 !important;
-        }
-        .input-group-text {
-            background-color: #ffffff !important;
-            border: 1px solid #dfe6e9;
-            border-right: none;
-            color: #54656f !important;
-        }
-        
-        /* Focus States */
-        .form-control:focus {
-            box-shadow: none;
-            border-color: var(--nav-accent);
-        }
-        .input-group:focus-within .input-group-text {
-            border-color: var(--nav-accent);
-            color: var(--nav-accent) !important;
-        }
-        
-        /* Buttons */
-        .btn-primary {
-            background: var(--nav-accent);
-            border: none;
-            padding: 0.8rem;
+        /* The Register Card Itself */
+        .register-card-glass {
+            background: rgba(31, 41, 55, 0.8);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 24px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            transition: all 0.3s;
-            color: #fff;
-        }
-        .btn-primary:hover {
-            background: #008f6f;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 168, 132, 0.3);
+            padding: 40px;
+            max-width: 500px; /* Slightly wider for the 2-column inputs */
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         }
 
-        .btn-outline-primary {
-            color: var(--nav-bg);
-            border-color: var(--nav-bg);
-            border-radius: 50px;
-            padding: 0.5rem 1.5rem;
+        /* Inputs */
+        .form-label { color: var(--text-secondary); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px; }
+        .form-control {
+            background-color: var(--input-bg) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color);
+            border-left: none; padding: 12px; font-size: 1rem;
         }
-        .btn-outline-primary:hover {
-            background-color: var(--nav-bg);
-            color: #fff;
+        .form-control:focus { border-color: var(--brand-teal); background-color: #2a3942 !important; box-shadow: none; }
+        .form-control::placeholder { color: #54656f !important; }
+        .input-group-text {
+            background-color: var(--input-bg) !important;
+            border: 1px solid var(--border-color);
+            border-right: none; color: var(--text-secondary) !important;
         }
+        .input-group:focus-within .input-group-text { border-color: var(--brand-teal); color: var(--brand-teal) !important; }
+        .btn-eye { border-left: none; border-radius: 0 8px 8px 0; background-color: var(--input-bg) !important; border-color: var(--border-color); }
+        .btn-eye:hover { background-color: #2a3942 !important; }
 
-        /* Mobile Padding */
-        @media (max-width: 992px) {
-            .auth-form-col { padding: 2rem; }
+        /* Gradient Button */
+        .btn-glass-primary {
+            background: linear-gradient(135deg, rgba(0, 168, 132, 0.8), rgba(0, 143, 111, 1));
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white; padding: 14px; border-radius: 50px; font-weight: 700; width: 100%;
+            transition: 0.3s; letter-spacing: 0.5px;
+        }
+        .btn-glass-primary:hover { transform: scale(1.02); box-shadow: 0 10px 25px rgba(0, 168, 132, 0.4); color: white; }
+
+        .btn-glass-outline {
+            border: 1px solid rgba(255, 255, 255, 0.2); color: var(--text-primary);
+            background: transparent; border-radius: 50px; padding: 10px 30px;
+            font-size: 0.9rem; transition: 0.3s; display: inline-block; text-decoration: none;
+        }
+        .btn-glass-outline:hover { border-color: var(--brand-teal); color: var(--brand-teal); background: rgba(0, 168, 132, 0.1); }
+
+        @media (max-width: 768px) {
+            .hero-title { font-size: 2.5rem; }
+            .register-section { padding: 40px 15px; }
+            .register-card-glass { padding: 30px 20px; }
         }
       `}</style>
 
-      {/* Pass theme to container for bg */}
-      <div className="auth-container" data-bs-theme={theme}>
+      {/* --- 1. HERO SECTION --- */ }
+      <div className="hero-section">
         <div className="container">
-          <div className="row justify-content-center">
-            <div className="col-xl-11">
-              
-              {/* Force 'light' theme on card content */}
-              <div className="card auth-card" data-bs-theme="light">
-                <div className="row g-0 h-100">
-                  
-                  {/* LEFT COLUMN (Features - Same as Login) */}
-                  <div className="col-lg-6 d-none d-lg-flex flex-column justify-content-center auth-welcome-col">
-                    <div style={{ position: 'relative', zIndex: 2 }}>
-                        <h1 className="display-6 fw-bold mb-3">Join the Network</h1>
-                        <p className="mb-4" style={{ opacity: 0.8, fontSize: '1.1rem', fontWeight: 300 }}>
-                            Create your account to start secure, high-fidelity communication today.
-                        </p>
-
-                        <div className="feature-grid">
-                            <div className="feature-card">
-                                <div className="feature-icon"><i className="bi bi-shield-lock"></i></div>
-                                <h6 className="fw-bold">End-to-End Secure</h6>
-                                <small style={{ opacity: 0.7 }}>Private P2P connections</small>
-                            </div>
-                            <div className="feature-card">
-                                <div className="feature-icon"><i className="bi bi-broadcast"></i></div>
-                                <h6 className="fw-bold">Ultra-Low Latency</h6>
-                                <small style={{ opacity: 0.7 }}>Real-time interaction</small>
-                            </div>
-                            <div className="feature-card">
-                                <div className="feature-icon"><i className="bi bi-mic-fill"></i></div>
-                                <h6 className="fw-bold">Crystal Audio</h6>
-                                <small style={{ opacity: 0.7 }}>Noise suppression</small>
-                            </div>
-                            <div className="feature-card">
-                                <div className="feature-icon"><i className="bi bi-hdd-network"></i></div>
-                                <h6 className="fw-bold">Decentralized</h6>
-                                <small style={{ opacity: 0.7 }}>No central servers</small>
-                            </div>
-                        </div>
-                    </div>
-                  </div>
-
-                  {/* RIGHT COLUMN (Register Form) */}
-                  <div className="col-lg-6 auth-form-col">
-                    <div className="w-100" style={{ maxWidth: '400px' }}>
-                      <form onSubmit={handleSubmit}>
-                        
-                        <div className="text-center mb-4">
-                          <div className="d-inline-block p-3 rounded-circle mb-3" style={{ background: '#f0f2f5' }}>
-                              <i className="bi bi-person-plus-fill" style={{ fontSize: '2.5rem', color: 'var(--nav-bg)' }}></i>
-                          </div>
-                          <h2 className="fw-bold" style={{ color: 'var(--nav-bg)' }}>Create Account</h2>
-                        </div>
-
-                        {error && (
-                          <div className="alert alert-danger d-flex align-items-center p-2 mb-4" style={{fontSize: '0.9rem'}}>
-                            <i className="bi bi-exclamation-circle-fill me-2"></i>
-                            {error}
-                          </div>
-                        )}
-
-                        <div className="row mb-3">
-                          <div className="col-6">
-                            <label className="form-label small fw-bold text-uppercase text-muted">First Name</label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              placeholder="John"
-                              value={form.firstname}
-                              onChange={(e) => setForm({ ...form, firstname: e.target.value })}
-                              required
-                            />
-                          </div>
-                          <div className="col-6">
-                            <label className="form-label small fw-bold text-uppercase text-muted">Last Name</label>
-                            <input
-                              type="text"
-                              className="form-control"
-                              placeholder="Doe"
-                              value={form.lastname}
-                              onChange={(e) => setForm({ ...form, lastname: e.target.value })}
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <label className="form-label small fw-bold text-uppercase text-muted">Email Address</label>
-                          <div className="input-group">
-                             <span className="input-group-text"><i className="bi bi-envelope"></i></span>
-                            <input
-                              type="email"
-                              className="form-control"
-                              placeholder="name@company.com"
-                              value={form.email}
-                              onChange={(e) => setForm({ ...form, email: e.target.value })}
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mb-3">
-                          <label className="form-label small fw-bold text-uppercase text-muted">Password</label>
-                          <div className="input-group">
-                            <span className="input-group-text"><i className="bi bi-key"></i></span>
-                            <input
-                              type={showPassword ? 'text' : 'password'}
-                              className="form-control"
-                              placeholder="Create a password"
-                              value={form.password}
-                              onChange={(e) => setForm({ ...form, password: e.target.value })}
-                              required
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-outline-secondary"
-                              style={{ borderLeft: 'none', borderRadius: '0 8px 8px 0', borderColor: '#dfe6e9' }}
-                              onClick={() => setShowPassword(!showPassword)}
-                              tabIndex={-1}
-                            >
-                              {showPassword ? <EyeOff size={18} color="#636e72" /> : <Eye size={18} color="#636e72" />}
-                            </button>
-                          </div>
-                          <small className="form-text text-muted mt-1" style={{fontSize: '0.8rem'}}>
-                            Must be at least 8 characters.
-                          </small>
-                        </div>
-                        
-                        {/* Hidden Role Input */}
-                        <input
-                          type="hidden"
-                          value={form.role}
-                          onChange={(e) => setForm({ ...form, role: 'user' })}
-                        />
-
-                        <button
-                          type="submit"
-                          className="btn btn-primary w-100 mt-3 mb-4 shadow-sm"
-                          disabled={loading}
-                        >
-                          {loading ? (
-                            <>
-                              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                              Creating Account...
-                            </>
-                          ) : (
-                            'Sign Up'
-                          )}
-                        </button>
-
-                        <div className="text-center border-top pt-3">
-                          <p className="text-muted mb-2 small">Already have an account?</p>
-                          <Link to="/login" className="btn btn-outline-primary btn-sm fw-bold">
-                            Sign In Instead
-                          </Link>
-                        </div>
-
-                      </form>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          </div>
+          <h1 className="hero-title">Join The Network</h1>
+          <p className="hero-subtitle">
+            Experience the future of communication. Create your account to start secure, 
+            high-fidelity audio and video calls today. It's free, fast, and secure.
+          </p>
+          <a href="#register-area" className="btn btn-glass-primary" style={{ maxWidth: '200px' }}>
+             Create Account <i className="bi bi-arrow-down-short"></i>
+          </a>
         </div>
       </div>
+
+      {/* --- 2. FEATURES GRID --- */}
+      <div className="features-container">
+        <div className="feature-grid">
+            {features.map((feature, index) => (
+                <div key={index} className="feature-card">
+                    <div className={`mb-3 ${feature.color}`}>{feature.icon}</div>
+                    <h4 className="fw-bold mb-2">{feature.title}</h4>
+                    <p className="text-secondary mb-0 small">{feature.desc}</p>
+                </div>
+            ))}
+        </div>
+      </div>
+
+      {/* --- 3. REGISTER SECTION (BOTTOM) --- */}
+      <div id="register-area" className="register-section">
+        <div className="register-bg-glow"></div>
+        <div className="container">
+            <div className="text-center mb-5" style={{ position: 'relative', zIndex: 1 }}>
+                <h2 className="fw-bold display-6">Get Started Now</h2>
+                <p className="text-secondary">Join thousands of users connecting securely every day.</p>
+            </div>
+
+            <div className="register-card-glass">
+                <form onSubmit={handleSubmit}>
+                    <div className="text-center mb-4">
+                        <div className="d-inline-flex p-3 rounded-circle mb-3" style={{ background: 'rgba(0, 168, 132, 0.1)', border: '1px solid rgba(0, 168, 132, 0.2)' }}>
+                            <i className="bi bi-person-plus-fill" style={{ fontSize: '2rem', color: '#00a884' }}></i>
+                        </div>
+                        <h4 className="fw-bold">Create Account</h4>
+                    </div>
+
+                    {error && (
+                        <div className="alert alert-danger d-flex align-items-center p-2 mb-4" style={{fontSize: '0.9rem', background: 'rgba(220, 53, 69, 0.1)', border: '1px solid rgba(220, 53, 69, 0.2)', color: '#ef5350'}}>
+                            <i className="bi bi-exclamation-circle-fill me-2"></i> {error}
+                        </div>
+                    )}
+
+                    <div className="row mb-3">
+                        <div className="col-6">
+                            <label className="form-label text-uppercase">First Name</label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                placeholder="John"
+                                value={form.firstname}
+                                onChange={(e) => setForm({ ...form, firstname: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <div className="col-6">
+                            <label className="form-label text-uppercase">Last Name</label>
+                            <input
+                                type="text"
+                                className="form-control"
+                                placeholder="Doe"
+                                value={form.lastname}
+                                onChange={(e) => setForm({ ...form, lastname: e.target.value })}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="form-label text-uppercase">Email Address</label>
+                        <div className="input-group">
+                            <span className="input-group-text"><i className="bi bi-envelope"></i></span>
+                            <input
+                                type="email"
+                                className="form-control"
+                                placeholder="name@company.com"
+                                value={form.email}
+                                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="mb-4">
+                        <label className="form-label text-uppercase">Password</label>
+                        <div className="input-group">
+                            <span className="input-group-text"><i className="bi bi-key"></i></span>
+                            <input
+                                type={showPassword ? 'text' : 'password'}
+                                className="form-control"
+                                placeholder="Create a password"
+                                value={form.password}
+                                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                required
+                            />
+                            <button
+                                type="button"
+                                className="btn btn-outline-secondary btn-eye"
+                                onClick={() => setShowPassword(!showPassword)}
+                                tabIndex={-1}
+                            >
+                                {showPassword ? <EyeOff size={18} color="#8696a0" /> : <Eye size={18} color="#8696a0" />}
+                            </button>
+                        </div>
+                        <small className="text-secondary mt-1 d-block" style={{fontSize: '0.75rem'}}>Must be at least 8 characters.</small>
+                    </div>
+
+                    <input type="hidden" value={form.role} onChange={(e) => setForm({ ...form, role: 'user' })} />
+
+                    <button type="submit" className="btn btn-glass-primary mt-2 mb-4" disabled={loading}>
+                        {loading ? (
+                            <>
+                                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                Creating Account...
+                            </>
+                        ) : (
+                            'Sign Up'
+                        )}
+                    </button>
+
+                    <div className="text-center">
+                        <p className="text-secondary mb-3 small">Already have an account?</p>
+                        <Link to="/login" className="btn btn-glass-outline">
+                            Sign In Instead
+                        </Link>
+                    </div>
+                </form>
+            </div>
+        </div>
+      </div>
+
       <Footer />
     </>
   );
