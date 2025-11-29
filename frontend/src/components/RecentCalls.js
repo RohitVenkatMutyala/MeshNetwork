@@ -182,7 +182,7 @@ function RecentCalls() {
             }
             const recipientEmail = newContactEmail.trim();
             recipients = [recipientEmail];
-            
+
             callData = {
                 type: 'individual',
                 description: newContactDesc,
@@ -203,7 +203,7 @@ function RecentCalls() {
                 setIsCreating(false);
                 return toast.warn("Description and emails required.");
             }
-            
+
             const emailList = groupEmails.split(',').map(e => e.trim()).filter(e => e !== "");
             recipients = emailList;
             const allAllowed = [user.email, ...emailList];
@@ -240,7 +240,7 @@ function RecentCalls() {
             }
 
             toast.success(modalType === 'individual' ? "Contact saved!" : "Group created!");
-            
+
             // RESET
             setShowAddContactModal(false);
             setNewContactName('');
@@ -262,7 +262,7 @@ function RecentCalls() {
 
         const today = new Date().toISOString().split('T')[0];
         const limitDocRef = doc(db, 'userCallLimits', user._id);
-        
+
         try {
             await runTransaction(db, async (transaction) => {
                 const limitDoc = await transaction.get(limitDocRef);
@@ -273,7 +273,7 @@ function RecentCalls() {
 
             // Send Notifications to all allowed emails except self
             const recipients = callData.allowedEmails.filter(e => e !== user.email);
-            
+
             const batch = writeBatch(db);
             recipients.forEach(email => {
                 const notifRef = doc(collection(db, 'notifications'));
@@ -290,7 +290,7 @@ function RecentCalls() {
             await batch.commit();
 
             await sendInvitationEmails(callData.id, callData.description, recipients);
-            
+
             toast.success(`Starting call...`);
             navigate(`/call/${callData.id}`);
         } catch (error) {
@@ -306,9 +306,9 @@ function RecentCalls() {
             // If it's a group, strictly only owner should reach here based on UI logic
             // But we double check just in case
             await deleteDoc(doc(db, 'calls', deleteTarget.id));
-            if(deleteTarget.type === 'group') {
-                 // Optional: Delete the group chat doc too if you want cleanup
-                 // await deleteDoc(doc(db, 'group_chats', deleteTarget.id));
+            if (deleteTarget.type === 'group') {
+                // Optional: Delete the group chat doc too if you want cleanup
+                // await deleteDoc(doc(db, 'group_chats', deleteTarget.id));
             }
             toast.success("Deleted");
         } catch (e) { toast.error("Delete failed"); }
@@ -335,12 +335,12 @@ function RecentCalls() {
 
     const handleOpenChat = (call) => {
         if (!user) return;
-        
+
         if (call.type === 'group') {
-            navigate(`/chat/group_chats/${call.id}`, { 
-                state: { 
+            navigate(`/chat/group_chats/${call.id}`, {
+                state: {
                     recipientName: call.description // Group Name
-                } 
+                }
             });
         } else {
             const email = call.ownerId === user._id ? call.recipientEmail : call.ownerEmail;
@@ -355,10 +355,10 @@ function RecentCalls() {
         if (!user) return setLoading(false);
         // Query more items because we will filter out duplicates
         const q = query(collection(db, 'calls'), where('allowedEmails', 'array-contains', user.email), orderBy('createdAt', 'desc'), limit(100));
-        
+
         const unsub = onSnapshot(q, (snap) => {
             const rawCalls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
+
             // --- DEDUPLICATION LOGIC ---
             const uniqueCalls = [];
             const seenKeys = new Set();
@@ -372,7 +372,7 @@ function RecentCalls() {
                     // For individual calls, uniqueness is the Contact's Email
                     // Regardless of who started the call, we want one entry per person
                     const otherEmail = call.ownerId === user._id ? call.recipientEmail : call.ownerEmail;
-                    if(otherEmail) {
+                    if (otherEmail) {
                         uniqueKey = 'user_' + otherEmail;
                     } else {
                         uniqueKey = 'unknown_' + call.id;
@@ -384,7 +384,7 @@ function RecentCalls() {
                     uniqueCalls.push(call);
                 }
             }
-            
+
             setAllCalls(uniqueCalls);
             setFilteredCalls(uniqueCalls);
             setLoading(false);
@@ -530,21 +530,130 @@ function RecentCalls() {
                 .btn-secondary { background: transparent; border: 1px solid #374051; color: #8696a0; }
                 .btn-secondary:hover { border-color: #8696a0; color: white; }
                 .btn-danger { background: #ef5350; color: white; }
+                /* ... existing styles ... */
+
+/* --- MOBILE ACTION MENU STYLES --- */
+.mobile-fab-container {
+    display: none; /* Hidden by default on desktop */
+}
+
+@media (max-width: 768px) {
+    /* 1. Hide the original big buttons */
+    .new-call-btn, .joint-meet-btn {
+        display: none !important;
+    }
+
+    /* 2. Show the wrapper */
+    .mobile-fab-container {
+        display: flex;
+        align-items: center;
+        position: relative;
+        z-index: 200;
+    }
+
+    /* 3. The Main Trigger Button (+) */
+    .fab-trigger {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        background-color: #00a884;
+        color: white;
+        border: none;
+        font-size: 1.4rem;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        transition: transform 0.3s ease, background 0.3s;
+        cursor: pointer;
+        z-index: 202;
+    }
+
+    /* 4. The Hidden Menu (Absolute position to slide out) */
+    .fab-options {
+        position: absolute;
+        left: 10px; /* Start slightly overlapped */
+        top: 0;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateX(-10px) scale(0.9);
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        z-index: 201;
+        pointer-events: none;
+        background: rgba(31, 41, 55, 0.9); /* Dark background for contrast */
+        padding: 5px 10px 5px 35px; /* Left padding makes space for the trigger */
+        border-radius: 24px;
+        margin-left: -5px; /* Tuck behind trigger */
+    }
+
+    /* 5. HOVER ACTION (Tap on mobile) */
+    .mobile-fab-container:hover .fab-options,
+    .mobile-fab-container:active .fab-options {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(10px) scale(1);
+        pointer-events: auto;
+        left: 100%; /* Move to right of trigger */
+        margin-left: -35px; /* Adjust to connect visually */
+    }
+
+    .mobile-fab-container:hover .fab-trigger {
+        transform: rotate(45deg); /* Spin the plus to an X */
+        background-color: #202c33;
+    }
+
+    /* 6. Medium Size Buttons */
+    .fab-mini-btn {
+        border: none;
+        border-radius: 20px;
+        padding: 6px 12px;
+        font-size: 0.75rem; /* Medium/Small size */
+        font-weight: 600;
+        color: white;
+        display: flex; align-items: center; gap: 5px;
+        cursor: pointer;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .fab-btn-new { background-color: #00a884; }
+    .fab-btn-joint { background-color: #6f42c1; }
+}
             `}</style>
 
             <div className="sticky-header">
                 <div className="header-actions">
+                    {/* --- DESKTOP BUTTONS (Hidden on Mobile via CSS) --- */}
                     <button className="new-call-btn" onClick={() => { setModalType('individual'); setShowAddContactModal(true); }}>
                         <i className="bi bi-person-plus-fill"></i> New Meeting
                     </button>
-                    
+
                     <button className="joint-meet-btn" onClick={() => { setModalType('group'); setShowAddContactModal(true); }}>
                         <i className="bi bi-people-fill"></i> Joint Meeting
                     </button>
 
+                    {/* --- NEW MOBILE SINGLE BUTTON (Visible on Mobile via CSS) --- */}
+                    <div className="mobile-fab-container">
+                        {/* The Trigger */}
+                        <button className="fab-trigger">
+                            <i className="bi bi-plus-lg"></i>
+                        </button>
+
+                        {/* The Menu Options (Revealed on Hover/Tap) */}
+                        <div className="fab-options">
+                            <button className="fab-mini-btn fab-btn-new" onClick={() => { setModalType('individual'); setShowAddContactModal(true); }}>
+                                <i className="bi bi-person-plus-fill"></i> New
+                            </button>
+                            <button className="fab-mini-btn fab-btn-joint" onClick={() => { setModalType('group'); setShowAddContactModal(true); }}>
+                                <i className="bi bi-people-fill"></i> Joint
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="search-wrapper">
                         <div className="search-input-group">
-                            <i className="bi bi-search" style={{color: '#8696a0', marginRight: '10px'}}></i>
+                            <i className="bi bi-search" style={{ color: '#8696a0', marginRight: '10px' }}></i>
                             <input
                                 type="text"
                                 className="search-input"
@@ -556,15 +665,15 @@ function RecentCalls() {
                     </div>
                 </div>
 
-                <div style={{display:'flex', justifyContent:'space-between', color:'#8696a0', fontSize:'0.85rem', padding:'0 5px'}}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8696a0', fontSize: '0.85rem', padding: '0 5px' }}>
                     <span>Daily Limit: {dailyCallCount}/{dailyCallLimit}</span>
-                    <div style={{cursor:'pointer', position: 'relative'}} onClick={openNotificationModal}>
-                        <i className="bi bi-bell-fill" style={{fontSize: '1.2rem', color: unreadCount ? '#e9edef' : '#8696a0'}}></i>
+                    <div style={{ cursor: 'pointer', position: 'relative' }} onClick={openNotificationModal}>
+                        <i className="bi bi-bell-fill" style={{ fontSize: '1.2rem', color: unreadCount ? '#e9edef' : '#8696a0' }}></i>
                         {unreadCount > 0 && (
                             <span style={{
-                                position: 'absolute', top: '-5px', right: '-5px', 
-                                background: '#00a884', color: 'white', fontSize: '0.6rem', 
-                                width: '16px', height: '16px', borderRadius: '50%', 
+                                position: 'absolute', top: '-5px', right: '-5px',
+                                background: '#00a884', color: 'white', fontSize: '0.6rem',
+                                width: '16px', height: '16px', borderRadius: '50%',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center'
                             }}>
                                 {unreadCount}
@@ -576,24 +685,24 @@ function RecentCalls() {
 
             <div className="recent-calls-grid">
                 {!filteredCalls.length ? (
-                    <div style={{gridColumn: '1/-1', textAlign:'center', color:'#8696a0', padding:'40px'}}>
+                    <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#8696a0', padding: '40px' }}>
                         {searchTerm ? 'No contacts match.' : 'No recent calls.'}
                     </div>
                 ) : (
                     filteredCalls.map(call => {
                         const isGroup = call.type === 'group';
                         const isOwner = call.ownerId === user._id;
-                        
+
                         // Display Logic
                         const displayTitle = isGroup ? call.description : (isOwner ? call.recipientName : call.ownerName);
                         const displaySubtitle = isGroup ? `${call.allowedEmails.length} Participants` : (isOwner ? call.recipientEmail : call.ownerEmail);
-                        
+
                         // Condition: Can delete?
                         // If group: Only owner. If individual: Anyone (removes from history).
                         const canDelete = isGroup ? isOwner : true;
 
                         if (!displayTitle) return null;
-                        
+
                         return (
                             <div key={call.id} className={`call-card ${isGroup ? 'joint-meet' : ''}`}>
                                 <span className={`badge ${isGroup ? 'badge-joint' : 'badge-meeting'}`}>
@@ -603,12 +712,12 @@ function RecentCalls() {
                                 <div className="card-header-icon" style={{ backgroundColor: getAvatarColor(displayTitle) }}>
                                     {isGroup ? <i className="bi bi-people-fill"></i> : displayTitle.charAt(0).toUpperCase()}
                                 </div>
-                                <div style={{flex: 1}}>
+                                <div style={{ flex: 1 }}>
                                     <div className="card-title">{displayTitle}</div>
                                     <div className="card-subtitle">{displaySubtitle}</div>
                                     <div className="card-date">{formatTimeAgo(call.createdAt)}</div>
                                 </div>
-                                
+
                                 <div className="card-actions">
                                     <button className="action-btn btn-call" title="Video Call" disabled={isCalling === call.id} onClick={() => handleReCall(call)}>
                                         {isCalling === call.id ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-camera-video-fill"></i>}
@@ -618,7 +727,7 @@ function RecentCalls() {
                                     </button>
                                     {/* Updated Delete Logic */}
                                     {canDelete && (
-                                        <button className="action-btn btn-delete" title="Delete" style={{marginLeft:'auto'}} onClick={() => setDeleteTarget({id: call.id, name: displayTitle, type: call.type})}>
+                                        <button className="action-btn btn-delete" title="Delete" style={{ marginLeft: 'auto' }} onClick={() => setDeleteTarget({ id: call.id, name: displayTitle, type: call.type })}>
                                             <i className="bi bi-trash"></i>
                                         </button>
                                     )}
@@ -661,14 +770,14 @@ function RecentCalls() {
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Participant Emails (Comma Separated)</label>
-                                        <textarea 
-                                            className="form-control" 
-                                            rows="3" 
-                                            placeholder="alice@test.com, bob@test.com, charlie@test.com" 
-                                            value={groupEmails} 
-                                            onChange={e => setGroupEmails(e.target.value)} 
+                                        <textarea
+                                            className="form-control"
+                                            rows="3"
+                                            placeholder="alice@test.com, bob@test.com, charlie@test.com"
+                                            value={groupEmails}
+                                            onChange={e => setGroupEmails(e.target.value)}
                                         />
-                                        <small style={{color:'#8696a0', fontSize:'0.75rem'}}>Separate emails with commas.</small>
+                                        <small style={{ color: '#8696a0', fontSize: '0.75rem' }}>Separate emails with commas.</small>
                                     </div>
                                 </>
                             )}
@@ -691,7 +800,7 @@ function RecentCalls() {
                             <h5 className="modal-title">Delete {deleteTarget.type === 'group' ? 'Group' : 'Contact'}</h5>
                             <button className="close-btn" onClick={() => setDeleteTarget(null)}><i className="bi bi-x-lg"></i></button>
                         </div>
-                        <p style={{color: '#8696a0', marginBottom: '20px'}}>
+                        <p style={{ color: '#8696a0', marginBottom: '20px' }}>
                             Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
                         </p>
                         <div className="modal-footer">
@@ -701,7 +810,7 @@ function RecentCalls() {
                     </div>
                 </div>
             )}
-            
+
             {/* --- NOTIFICATIONS MODAL --- */}
             {showNotificationModal && (
                 <div className="modal-overlay" onClick={() => setShowNotificationModal(false)}>
@@ -710,18 +819,18 @@ function RecentCalls() {
                             <h5 className="modal-title">Notifications</h5>
                             <button className="close-btn" onClick={() => setShowNotificationModal(false)}><i className="bi bi-x-lg"></i></button>
                         </div>
-                        <div style={{maxHeight:'350px', overflowY:'auto'}}>
+                        <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                             {allNotifications.length === 0 ? (
-                                <p style={{textAlign:'center', color:'#8696a0', padding:'20px'}}>No notifications</p>
+                                <p style={{ textAlign: 'center', color: '#8696a0', padding: '20px' }}>No notifications</p>
                             ) : (
                                 allNotifications.map(n => (
-                                    <div key={n.id} style={{padding:'12px', borderBottom:'1px solid rgba(255,255,255,0.05)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                                    <div key={n.id} style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                         <div>
-                                            <div style={{fontWeight:'600'}}>{n.callerName}</div>
-                                            <div style={{fontSize:'0.75rem', color:'#8696a0'}}>{formatTimeAgo(n.createdAt)}</div>
+                                            <div style={{ fontWeight: '600' }}>{n.callerName}</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#8696a0' }}>{formatTimeAgo(n.createdAt)}</div>
                                         </div>
                                         {n.type === 'call' && (
-                                            <button className="btn-modal btn-primary" style={{padding:'6px 12px', fontSize:'0.85rem'}} onClick={() => { navigate(`/call/${n.callId}`); setShowNotificationModal(false); }}>
+                                            <button className="btn-modal btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }} onClick={() => { navigate(`/call/${n.callId}`); setShowNotificationModal(false); }}>
                                                 Join
                                             </button>
                                         )}
