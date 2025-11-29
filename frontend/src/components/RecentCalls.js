@@ -10,6 +10,25 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import emailjs from '@emailjs/browser';
 
+// --- DRAG & DROP IMPORTS ---
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors, 
+  TouchSensor 
+} from '@dnd-kit/core';
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  rectSortingStrategy, 
+  useSortable 
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 // --- SOUND LOGIC ---
 let audioContext = null;
 
@@ -72,15 +91,15 @@ const formatTimeAgo = (timestamp) => {
 };
 
 // --- TOAST COMPONENT ---
-const CallNotification = ({ callerName, callId, callType, onClose, navigate }) => { // Add callType prop
+const CallNotification = ({ callerName, callId, callType, onClose, navigate }) => {
     const handleJoin = () => {
         navigate(`/call/${callId}`);
         onClose();
     };
 
     const btnStyle = callType === 'group'
-        ? { backgroundColor: '#6f42c1', borderColor: '#6f42c1', color: 'white' } // Purple
-        : {}; // Default Bootstrap Success (Green)
+        ? { backgroundColor: '#6f42c1', borderColor: '#6f42c1', color: 'white' }
+        : {};
 
     return (
         <div className="d-flex flex-column">
@@ -98,6 +117,119 @@ const CallNotification = ({ callerName, callId, callType, onClose, navigate }) =
         </div>
     );
 };
+
+// --- SORTABLE CARD COMPONENT ---
+const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat, setDeleteTarget, navigate, getAvatarColor }) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id: call.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        touchAction: 'none',
+        position: 'relative',
+        zIndex: isDragging ? 999 : 'auto'
+    };
+
+    const isGroup = call.type === 'group';
+    const isOwner = call.ownerId === user._id;
+    const displayTitle = isGroup ? call.description : (isOwner ? call.recipientName : call.ownerName);
+    const displaySubtitle = isGroup ? `${call.allowedEmails.length} Participants` : (isOwner ? call.recipientEmail : call.ownerEmail);
+    const canDelete = isGroup ? isOwner : true;
+
+    if (!displayTitle) return null;
+
+    // --- VIDEO BUTTON LOGIC ---
+    const handleVideoAction = (e) => {
+        e.stopPropagation(); // Stop drag event
+        if (isGroup && !isOwner) {
+            // Participants just join
+            navigate(`/call/${call.id}`);
+        } else {
+            // Owner starts call (notifications)
+            handleReCall(call);
+        }
+    };
+
+    return (
+        <div 
+            ref={setNodeRef} 
+            style={style} 
+            {...attributes} 
+            {...listeners} 
+            className={`call-card ${isGroup ? 'joint-meet' : ''}`}
+        >
+            <span className={`badge ${isGroup ? 'badge-joint' : 'badge-meeting'}`}>
+                {isGroup ? 'Joint Meeting' : 'Meeting'}
+            </span>
+
+            <div className="card-header-icon" style={{ backgroundColor: getAvatarColor(displayTitle) }}>
+                {isGroup ? <i className="bi bi-people-fill"></i> : displayTitle.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ flex: 1 }}>
+                <div className="card-title">{displayTitle}</div>
+                <div className="card-subtitle">{displaySubtitle}</div>
+                <div className="card-date">{formatTimeAgo(call.createdAt)}</div>
+            </div>
+
+            <div className="card-actions">
+                {/* 1. Main Call/Join Button */}
+                <button 
+                    className="action-btn btn-call" 
+                    title={isGroup && !isOwner ? "Join Meeting" : "Start Video Call"} 
+                    disabled={isCalling === call.id} 
+                    onPointerDown={(e) => e.stopPropagation()} 
+                    onClick={handleVideoAction}
+                >
+                    {isCalling === call.id ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-camera-video-fill"></i>}
+                </button>
+
+                {/* 2. Host Re-Login Button (Owner Only) */}
+                {isOwner && (
+                    <button 
+                        className="action-btn" 
+                        title="Re-Enter Room (Silent)" 
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => navigate(`/call/${call.id}`)}
+                    >
+                        <i className="bi bi-box-arrow-in-right"></i>
+                    </button>
+                )}
+
+                {/* 3. Chat Button */}
+                <button 
+                    className="action-btn" 
+                    title="Chat" 
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => handleOpenChat(call)}
+                >
+                    <i className="bi bi-chat-left-text-fill"></i>
+                </button>
+                
+                {/* 4. Delete Button */}
+                {canDelete && (
+                    <button 
+                        className="action-btn btn-delete" 
+                        title="Delete" 
+                        style={{ marginLeft: 'auto' }} 
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => setDeleteTarget({ id: call.id, name: displayTitle, type: call.type })}
+                    >
+                        <i className="bi bi-trash"></i>
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
 function RecentCalls() {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -109,45 +241,42 @@ function RecentCalls() {
     const [dailyCallCount, setDailyCallCount] = useState(0);
     const dailyCallLimit = 32;
 
-    // Actions State
     const [isCalling, setIsCalling] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
-
-    // Modal States
+    
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [showAddContactModal, setShowAddContactModal] = useState(false);
-    const [modalType, setModalType] = useState('individual'); // 'individual' or 'group'
+    const [modalType, setModalType] = useState('individual');
 
-    // Notifications Data
     const [allNotifications, setAllNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
 
-    // New Contact Form State
     const [newContactName, setNewContactName] = useState('');
     const [newContactEmail, setNewContactEmail] = useState('');
     const [newContactDesc, setNewContactDesc] = useState('');
-    const [groupEmails, setGroupEmails] = useState(''); // Comma separated
+    const [groupEmails, setGroupEmails] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
-    // --- INIT ---
+    // --- DRAG AND DROP SENSORS ---
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(TouchSensor),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
     useEffect(() => {
         const enableAudio = () => initAudioContext();
         window.addEventListener('click', enableAudio, { once: true });
         return () => window.removeEventListener('click', enableAudio);
     }, []);
 
-    // --- TOAST HANDLER ---
     const showCallToast = useCallback((notification) => {
         playNotificationSound();
         const toastId = toast(
             <CallNotification
                 callerName={notification.callerName}
                 callId={notification.callId}
-
-                // --- ADD THIS PROP ---
                 callType={notification.callType}
-                // --------------------
-
                 onClose={() => toast.dismiss(toastId)}
                 navigate={navigate}
             />,
@@ -155,15 +284,13 @@ function RecentCalls() {
         );
     }, [navigate]);
 
-    // --- EMAIL HANDLER ---
     const sendInvitationEmails = async (callId, callDescription, invitedEmailsArray) => {
         if (!invitedEmailsArray || invitedEmailsArray.length === 0) return;
-        const emailjsPublicKey = 'Cd-NUUSJ5dW3GJMo0'; // Recommend moving to backend
+        const emailjsPublicKey = 'Cd-NUUSJ5dW3GJMo0'; 
         const serviceID = 'service_y8qops6';
         const templateID = 'template_apzjekq';
         const callLink = `${window.location.origin}/call/${callId}`;
 
-        // Send to all recipients
         for (const email of invitedEmailsArray) {
             try {
                 await emailjs.send(serviceID, templateID, {
@@ -178,7 +305,6 @@ function RecentCalls() {
         }
     };
 
-    // --- CREATE NEW CONTACT / JOINT MEETING LOGIC ---
     const handleCreateNewContact = async () => {
         if (!user) return toast.error("Login required");
 
@@ -196,7 +322,7 @@ function RecentCalls() {
             }
             const recipientEmail = newContactEmail.trim();
             recipients = [recipientEmail];
-
+            
             callData = {
                 type: 'individual',
                 description: newContactDesc,
@@ -212,24 +338,22 @@ function RecentCalls() {
             };
 
         } else {
-            // JOINT MEETING
             if (!newContactDesc.trim() || !groupEmails.trim()) {
                 setIsCreating(false);
                 return toast.warn("Description and emails required.");
             }
-
             const emailList = groupEmails.split(',').map(e => e.trim()).filter(e => e !== "");
             recipients = emailList;
             const allAllowed = [user.email, ...emailList];
 
             callData = {
                 type: 'group',
-                description: newContactDesc, // Description acts as group title
+                description: newContactDesc,
                 createdAt: serverTimestamp(),
                 ownerId: user._id,
                 ownerName: `${user.firstname} ${user.lastname}`,
                 ownerEmail: user.email,
-                recipientName: newContactDesc, // Use desc as name for display logic fallback
+                recipientName: newContactDesc,
                 recipientEmail: 'Multiple',
                 allowedEmails: allAllowed,
                 access: 'private',
@@ -238,10 +362,8 @@ function RecentCalls() {
         }
 
         try {
-            // 1. Create Call Document
             await setDoc(callDocRef, callData);
 
-            // 2. If Group, Initialize Group Chat
             if (modalType === 'group') {
                 const groupChatRef = doc(db, 'group_chats', newCallId);
                 await setDoc(groupChatRef, {
@@ -254,13 +376,8 @@ function RecentCalls() {
             }
 
             toast.success(modalType === 'individual' ? "Contact saved!" : "Group created!");
-
-            // RESET
             setShowAddContactModal(false);
-            setNewContactName('');
-            setNewContactEmail('');
-            setNewContactDesc('');
-            setGroupEmails('');
+            setNewContactName(''); setNewContactEmail(''); setNewContactDesc(''); setGroupEmails('');
         } catch (error) {
             console.error("Create error:", error);
             toast.error("Failed to create.");
@@ -269,14 +386,13 @@ function RecentCalls() {
         }
     };
 
-    // --- MAKE CALL LOGIC (From Card) ---
     const handleReCall = async (callData) => {
         if (!user) return toast.error("Login required");
         setIsCalling(callData.id);
 
         const today = new Date().toISOString().split('T')[0];
         const limitDocRef = doc(db, 'userCallLimits', user._id);
-
+        
         try {
             await runTransaction(db, async (transaction) => {
                 const limitDoc = await transaction.get(limitDocRef);
@@ -285,9 +401,7 @@ function RecentCalls() {
                 transaction.set(limitDocRef, { count: currentCount + 1, lastCallDate: today });
             });
 
-            // Send Notifications to all allowed emails except self
             const recipients = callData.allowedEmails.filter(e => e !== user.email);
-
             const batch = writeBatch(db);
             recipients.forEach(email => {
                 const notifRef = doc(collection(db, 'notifications'));
@@ -296,7 +410,7 @@ function RecentCalls() {
                     callerName: `${user.firstname} ${user.lastname}`,
                     callerEmail: user.email,
                     callId: callData.id,
-                    callType: callData.type,
+                    callType: callData.type, // Added callType
                     createdAt: serverTimestamp(),
                     status: 'pending',
                     type: 'call'
@@ -305,7 +419,6 @@ function RecentCalls() {
             await batch.commit();
 
             await sendInvitationEmails(callData.id, callData.description, recipients);
-
             toast.success(`Starting call...`);
             navigate(`/call/${callData.id}`);
         } catch (error) {
@@ -318,13 +431,7 @@ function RecentCalls() {
     const confirmDelete = async () => {
         if (!deleteTarget) return;
         try {
-            // If it's a group, strictly only owner should reach here based on UI logic
-            // But we double check just in case
             await deleteDoc(doc(db, 'calls', deleteTarget.id));
-            if (deleteTarget.type === 'group') {
-                // Optional: Delete the group chat doc too if you want cleanup
-                // await deleteDoc(doc(db, 'group_chats', deleteTarget.id));
-            }
             toast.success("Deleted");
         } catch (e) { toast.error("Delete failed"); }
         setDeleteTarget(null);
@@ -350,13 +457,8 @@ function RecentCalls() {
 
     const handleOpenChat = (call) => {
         if (!user) return;
-
         if (call.type === 'group') {
-            navigate(`/chat/group_chats/${call.id}`, {
-                state: {
-                    recipientName: call.description // Group Name
-                }
-            });
+            navigate(`/chat/group_chats/${call.id}`, { state: { recipientName: call.description } });
         } else {
             const email = call.ownerId === user._id ? call.recipientEmail : call.ownerEmail;
             const name = call.ownerId === user._id ? call.recipientName : call.ownerName;
@@ -365,41 +467,35 @@ function RecentCalls() {
         }
     };
 
-    // --- EFFECTS (Data Fetching with Deduplication) ---
+    const handleDragEnd = (event) => {
+        const { active, over } = event;
+        if (active.id !== over.id) {
+            setFilteredCalls((items) => {
+                const oldIndex = items.findIndex((item) => item.id === active.id);
+                const newIndex = items.findIndex((item) => item.id === over.id);
+                return arrayMove(items, oldIndex, newIndex);
+            });
+        }
+    };
+
+    // --- EFFECTS ---
     useEffect(() => {
         if (!user) return setLoading(false);
-        // Query more items because we will filter out duplicates
         const q = query(collection(db, 'calls'), where('allowedEmails', 'array-contains', user.email), orderBy('createdAt', 'desc'), limit(100));
-
+        
         const unsub = onSnapshot(q, (snap) => {
             const rawCalls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-            // --- DEDUPLICATION LOGIC ---
+            
+            // Deduplication Logic
             const uniqueCalls = [];
             const seenKeys = new Set();
-
             for (const call of rawCalls) {
-                let uniqueKey;
-                if (call.type === 'group') {
-                    // For groups, uniqueness is the Call/Room ID itself
-                    uniqueKey = 'group_' + call.id;
-                } else {
-                    // For individual calls, uniqueness is the Contact's Email
-                    // Regardless of who started the call, we want one entry per person
-                    const otherEmail = call.ownerId === user._id ? call.recipientEmail : call.ownerEmail;
-                    if (otherEmail) {
-                        uniqueKey = 'user_' + otherEmail;
-                    } else {
-                        uniqueKey = 'unknown_' + call.id;
-                    }
-                }
-
+                let uniqueKey = call.type === 'group' ? 'group_' + call.id : (call.ownerId === user._id ? 'user_' + call.recipientEmail : 'user_' + call.ownerEmail);
                 if (!seenKeys.has(uniqueKey)) {
                     seenKeys.add(uniqueKey);
                     uniqueCalls.push(call);
                 }
             }
-
             setAllCalls(uniqueCalls);
             setFilteredCalls(uniqueCalls);
             setLoading(false);
@@ -464,7 +560,12 @@ function RecentCalls() {
     return (
         <div className="recent-calls-container">
             <style jsx>{`
-                .recent-calls-container { background-color: #111b21; height: 100%; display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif; }
+                .recent-calls-container { 
+                    background-color: #111b21; 
+                    height: calc(100vh - 60px); /* Fill screen minus navbar */
+                    width: 100vw; margin: 0;
+                    display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif; 
+                }
                 .sticky-header { position: sticky; top: 0; z-index: 100; background-color: #111b21; padding: 20px 20px 10px; border-bottom: 1px solid rgba(134, 150, 160, 0.15); }
                 
                 .header-actions { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
@@ -498,22 +599,9 @@ function RecentCalls() {
 
                 @media (max-width: 480px) {
                     .recent-calls-grid { grid-template-columns: 1fr; padding: 15px; } 
-                    .header-actions { 
-        flex-direction: row !important; /* Force them to stay side-by-side */
-        align-items: center; 
-        gap: 10px; /* Space between the + button and search bar */
-    }
-    
-    /* Ensure the search bar takes up all remaining space */
-    .search-wrapper {
-        width: auto; /* Reset any fixed width */
-        flex: 1; /* Grow to fill space */
-    }
-    
-    /* Ensure height matches for visual alignment */
-    .search-input-group {
-        height: 40px; /* Match the height of the + button (fab-trigger) */
-    }
+                    .header-actions { flex-direction: row !important; align-items: center; gap: 10px; }
+                    .search-wrapper { width: auto; flex: 1; }
+                    .search-input-group { height: 40px; }
                     .new-call-btn, .joint-meet-btn { justify-content: center; }
                 }
 
@@ -522,7 +610,6 @@ function RecentCalls() {
                     min-height: 220px; border: 1px solid rgba(134,150,160,0.15); transition: 0.3s; position: relative; 
                 }
                 .call-card.joint-meet { background-color: #2a2f42; border: 1px solid #4c5270; }
-
                 .call-card:hover { border-color: #00a884; transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
                 .call-card.joint-meet:hover { border-color: #8957e5; }
                 
@@ -536,7 +623,6 @@ function RecentCalls() {
                 .action-btn:hover { color: #e9edef; transform: scale(1.1); }
                 .btn-call:hover { color: #00a884; } .btn-delete:hover { color: #ef5350; }
 
-                /* Badges */
                 .badge { position: absolute; top: 15px; right: 15px; font-size: 0.65rem; padding: 4px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
                 .badge-meeting { background: rgba(0, 168, 132, 0.2); color: #00a884; }
                 .badge-joint { background: rgba(111, 66, 193, 0.2); color: #b185f7; }
@@ -560,110 +646,26 @@ function RecentCalls() {
                 .btn-secondary { background: transparent; border: 1px solid #374051; color: #8696a0; }
                 .btn-secondary:hover { border-color: #8696a0; color: white; }
                 .btn-danger { background: #ef5350; color: white; }
-                /* ... existing styles ... */
 
-/* --- MOBILE ACTION MENU STYLES --- */
-.mobile-fab-container {
-    display: none; /* Hidden by default on desktop */
-}
-
-@media (max-width: 768px) {
-    /* 1. Hide the original big buttons */
-    .new-call-btn, .joint-meet-btn {
-        display: none !important;
-    }
-
-    /* 2. Show the wrapper */
-    .mobile-fab-container {
-        display: flex;
-        align-items: center;
-        position: relative;
-        z-index: 200;
-    }
-
-    /* 3. The Main Trigger Button (+) */
-    .fab-trigger {
-        width: 40px; height: 40px;
-        border-radius: 50%;
-        background-color: #00a884;
-        color: white;
-        border: none;
-        font-size: 1.4rem;
-        display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        transition: transform 0.3s ease, background 0.3s;
-        cursor: pointer;
-        z-index: 202;
-    }
-
-    /* 4. The Hidden Menu (Absolute position to slide out) */
-    .fab-options {
-        position: absolute;
-        left: 10px; /* Start slightly overlapped */
-        top: 0;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        opacity: 0;
-        visibility: hidden;
-        transform: translateX(-10px) scale(0.9);
-        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        z-index: 201;
-        pointer-events: none;
-        background: rgba(31, 41, 55, 0.9); /* Dark background for contrast */
-        padding: 5px 10px 5px 35px; /* Left padding makes space for the trigger */
-        border-radius: 24px;
-        margin-left: -5px; /* Tuck behind trigger */
-    }
-
-    /* 5. HOVER ACTION (Tap on mobile) */
-    .mobile-fab-container:hover .fab-options,
-    .mobile-fab-container:active .fab-options {
-        opacity: 1;
-        visibility: visible;
-        transform: translateX(10px) scale(1);
-        pointer-events: auto;
-        left: 100%; /* Move to right of trigger */
-        margin-left: -35px; /* Adjust to connect visually */
-    }
-
-    .mobile-fab-container:hover .fab-trigger {
-        transform: rotate(45deg); /* Spin the plus to an X */
-        background-color: #202c33;
-    }
-
-    /* 6. Medium Size Buttons */
-    .fab-mini-btn {
-        border: none;
-        border-radius: 20px;
-        padding: 6px 12px;
-        font-size: 0.75rem; /* Medium/Small size */
-        font-weight: 600;
-        color: white;
-        display: flex; align-items: center; gap: 5px;
-        cursor: pointer;
-        white-space: nowrap;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    
-    .fab-btn-new { background-color: #00a884; }
-    .fab-btn-joint { background-color: #6f42c1; }
-
-}
-    /* Add this below your existing .btn-primary styles */
-.btn-joint-action { 
-    background: #6f42c1; 
-    color: white; 
-}
-.btn-joint-action:hover { 
-    background: #59359a; 
-}
+                /* MOBILE FAB */
+                .mobile-fab-container { display: none; }
+                @media (max-width: 768px) {
+                    .new-call-btn, .joint-meet-btn { display: none !important; }
+                    .mobile-fab-container { display: flex; align-items: center; position: relative; z-index: 200; }
+                    .fab-trigger { width: 40px; height: 40px; border-radius: 50%; background-color: #00a884; color: white; border: none; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.3s ease, background 0.3s; cursor: pointer; z-index: 202; }
+                    .fab-options { position: absolute; left: 10px; top: 0; height: 40px; display: flex; align-items: center; gap: 8px; opacity: 0; visibility: hidden; transform: translateX(-10px) scale(0.9); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 201; pointer-events: none; background: rgba(31, 41, 55, 0.9); padding: 5px 10px 5px 35px; border-radius: 24px; margin-left: -5px; }
+                    .mobile-fab-container:hover .fab-options, .mobile-fab-container:active .fab-options { opacity: 1; visibility: visible; transform: translateX(10px) scale(1); pointer-events: auto; left: 100%; margin-left: -35px; }
+                    .mobile-fab-container:hover .fab-trigger { transform: rotate(45deg); background-color: #202c33; }
+                    .fab-mini-btn { border: none; border-radius: 20px; padding: 6px 12px; font-size: 0.75rem; font-weight: 600; color: white; display: flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+                    .fab-btn-new { background-color: #00a884; }
+                    .fab-btn-joint { background-color: #6f42c1; }
+                }
+                .btn-joint-action { background: #6f42c1; color: white; }
+                .btn-joint-action:hover { background: #59359a; }
             `}</style>
 
             <div className="sticky-header">
                 <div className="header-actions">
-                    {/* --- DESKTOP BUTTONS (Hidden on Mobile via CSS) --- */}
                     <button className="new-call-btn" onClick={() => { setModalType('individual'); setShowAddContactModal(true); }}>
                         <i className="bi bi-person-plus-fill"></i> New Meeting
                     </button>
@@ -672,14 +674,8 @@ function RecentCalls() {
                         <i className="bi bi-people-fill"></i> Joint Meeting
                     </button>
 
-                    {/* --- NEW MOBILE SINGLE BUTTON (Visible on Mobile via CSS) --- */}
                     <div className="mobile-fab-container">
-                        {/* The Trigger */}
-                        <button className="fab-trigger">
-                            <i className="bi bi-plus-lg"></i>
-                        </button>
-
-                        {/* The Menu Options (Revealed on Hover/Tap) */}
+                        <button className="fab-trigger"><i className="bi bi-plus-lg"></i></button>
                         <div className="fab-options">
                             <button className="fab-mini-btn fab-btn-new" onClick={() => { setModalType('individual'); setShowAddContactModal(true); }}>
                                 <i className="bi bi-person-plus-fill"></i> New
@@ -693,28 +689,17 @@ function RecentCalls() {
                     <div className="search-wrapper">
                         <div className="search-input-group">
                             <i className="bi bi-search" style={{ color: '#8696a0', marginRight: '10px' }}></i>
-                            <input
-                                type="text"
-                                className="search-input"
-                                placeholder="Search"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                            <input type="text" className="search-input" placeholder="Search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
                     </div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8696a0', fontSize: '0.85rem', padding: '0 5px' }}>
-                    <span>Conducted Meetings (Normal & Joint): {dailyCallCount}/{dailyCallLimit}</span>
+                    <span>Conducted Meetings: {dailyCallCount}/{dailyCallLimit}</span>
                     <div style={{ cursor: 'pointer', position: 'relative' }} onClick={openNotificationModal}>
                         <i className="bi bi-bell-fill" style={{ fontSize: '1.2rem', color: unreadCount ? '#e9edef' : '#8696a0' }}></i>
                         {unreadCount > 0 && (
-                            <span style={{
-                                position: 'absolute', top: '-5px', right: '-5px',
-                                background: '#00a884', color: 'white', fontSize: '0.6rem',
-                                width: '16px', height: '16px', borderRadius: '50%',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center'
-                            }}>
+                            <span style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#00a884', color: 'white', fontSize: '0.6rem', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {unreadCount}
                             </span>
                         )}
@@ -727,85 +712,28 @@ function RecentCalls() {
                     <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#8696a0', padding: '40px' }}>
                         {searchTerm ? 'No contacts match.' : 'No recent calls.'}
                     </div>
-                ) : filteredCalls.map(call => {
-                    const isGroup = call.type === 'group';
-                    const isOwner = call.ownerId === user._id;
-
-                    // Display Logic
-                    const displayTitle = isGroup ? call.description : (isOwner ? call.recipientName : call.ownerName);
-                    const displaySubtitle = isGroup ? `${call.allowedEmails.length} Participants` : (isOwner ? call.recipientEmail : call.ownerEmail);
-
-                    // Condition: Can delete?
-                    const canDelete = isGroup ? isOwner : true;
-
-                    if (!displayTitle) return null;
-
-                    // --- NEW: Video Button Logic ---
-                    const handleVideoAction = () => {
-                        if (isGroup && !isOwner) {
-                            // If it's a Joint Meeting and I am NOT the owner:
-                            // Just navigate to the room (Join), don't trigger "handleReCall"
-                            navigate(`/call/${call.id}`);
-                        } else {
-                            // If Individual call OR I am the Group Owner:
-                            // Start the call process (Notifications + Limits)
-                            handleReCall(call);
-                        }
-                    };
-
-                    return (
-                        <div key={call.id} className={`call-card ${isGroup ? 'joint-meet' : ''}`}>
-                            <span className={`badge ${isGroup ? 'badge-joint' : 'badge-meeting'}`}>
-                                {isGroup ? 'Joint Meeting' : 'Meeting'}
-                            </span>
-
-                            <div className="card-header-icon" style={{ backgroundColor: getAvatarColor(displayTitle) }}>
-                                {isGroup ? <i className="bi bi-people-fill"></i> : displayTitle.charAt(0).toUpperCase()}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                                <div className="card-title">{displayTitle}</div>
-                                <div className="card-subtitle">{displaySubtitle}</div>
-                                <div className="card-date">{formatTimeAgo(call.createdAt)}</div>
-                            </div>
-
-                            <div className="card-actions">
-                                {/* --- UPDATED VIDEO BUTTON --- */}
-                                <button
-                                    className="action-btn btn-call"
-                                    // Change Title based on permission
-                                    title={isGroup && !isOwner ? "Join Meeting" : "Start Video Call"}
-                                    disabled={isCalling === call.id}
-                                    onClick={handleVideoAction} // Use the new handler
-                                >
-                                    {isCalling === call.id ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-camera-video-fill"></i>}
-                                </button>
-                                {isOwner && (
-                                    <button
-                                        className="action-btn"
-                                        title="Re-Enter Room (No Notification)"
-                                        onClick={() => navigate(`/call/${call.id}`)}
-                                    >
-                                        <i className="bi bi-box-arrow-in-right"></i>
-                                    </button>
-                                )}
-                                {/* ----------------------------- */}
-
-                                <button className="action-btn" title="Chat" onClick={() => handleOpenChat(call)}>
-                                    <i className="bi bi-chat-left-text-fill"></i>
-                                </button>
-
-                                {canDelete && (
-                                    <button className="action-btn btn-delete" title="Delete" style={{ marginLeft: 'auto' }} onClick={() => setDeleteTarget({ id: call.id, name: displayTitle, type: call.type })}>
-                                        <i className="bi bi-trash"></i>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
+                ) : (
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={filteredCalls} strategy={rectSortingStrategy}>
+                            {filteredCalls.map(call => (
+                                <SortableCallCard
+                                    key={call.id}
+                                    call={call}
+                                    user={user}
+                                    isCalling={isCalling}
+                                    handleReCall={handleReCall}
+                                    handleOpenChat={handleOpenChat}
+                                    setDeleteTarget={setDeleteTarget}
+                                    navigate={navigate}
+                                    getAvatarColor={getAvatarColor}
+                                />
+                            ))}
+                        </SortableContext>
+                    </DndContext>
+                )}
             </div>
 
-            {/* --- ADD CONTACT MODAL --- */}
+            {/* Modals remain the same */}
             {showAddContactModal && (
                 <div className="modal-overlay" onClick={() => setShowAddContactModal(false)}>
                     <div className="modal-card" onClick={e => e.stopPropagation()}>
@@ -837,13 +765,7 @@ function RecentCalls() {
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Participant Emails (Comma Separated)</label>
-                                        <textarea
-                                            className="form-control"
-                                            rows="3"
-                                            placeholder="alice@test.com, bob@test.com, charlie@test.com"
-                                            value={groupEmails}
-                                            onChange={e => setGroupEmails(e.target.value)}
-                                        />
+                                        <textarea className="form-control" rows="3" placeholder="alice@test.com, bob@test.com" value={groupEmails} onChange={e => setGroupEmails(e.target.value)} />
                                         <small style={{ color: '#8696a0', fontSize: '0.75rem' }}>Separate emails with commas.</small>
                                     </div>
                                 </>
@@ -859,7 +781,6 @@ function RecentCalls() {
                 </div>
             )}
 
-            {/* --- DELETE MODAL --- */}
             {deleteTarget && (
                 <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
                     <div className="modal-card" onClick={e => e.stopPropagation()}>
@@ -867,9 +788,7 @@ function RecentCalls() {
                             <h5 className="modal-title">Delete {deleteTarget.type === 'group' ? 'Group' : 'Contact'}</h5>
                             <button className="close-btn" onClick={() => setDeleteTarget(null)}><i className="bi bi-x-lg"></i></button>
                         </div>
-                        <p style={{ color: '#8696a0', marginBottom: '20px' }}>
-                            Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
-                        </p>
+                        <p style={{ color: '#8696a0', marginBottom: '20px' }}>Are you sure you want to delete <strong>{deleteTarget.name}</strong>?</p>
                         <div className="modal-footer">
                             <button className="btn-modal btn-secondary" onClick={() => setDeleteTarget(null)}>Cancel</button>
                             <button className="btn-modal btn-danger" onClick={confirmDelete}>Delete</button>
@@ -878,7 +797,6 @@ function RecentCalls() {
                 </div>
             )}
 
-            {/* --- NOTIFICATIONS MODAL --- */}
             {showNotificationModal && (
                 <div className="modal-overlay" onClick={() => setShowNotificationModal(false)}>
                     <div className="modal-card" onClick={e => e.stopPropagation()}>
@@ -897,11 +815,9 @@ function RecentCalls() {
                                             <div style={{ fontSize: '0.75rem', color: '#8696a0' }}>{formatTimeAgo(n.createdAt)}</div>
                                         </div>
                                         {n.type === 'call' && (
-                                            <button
-                                                /* --- UPDATE THIS CLASSNAME LOGIC --- */
-                                                className={`btn-modal ${n.callType === 'group' ? 'btn-joint-action' : 'btn-primary'}`}
-                                                /* ----------------------------------- */
-                                                style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                                            <button 
+                                                className={`btn-modal ${n.callType === 'group' ? 'btn-joint-action' : 'btn-primary'}`} 
+                                                style={{ padding: '6px 12px', fontSize: '0.85rem' }} 
                                                 onClick={() => { navigate(`/call/${n.callId}`); setShowNotificationModal(false); }}
                                             >
                                                 Join
