@@ -87,7 +87,27 @@ const CallNotification = ({ callerName, callId, onClose, navigate }) => {
         </div>
     );
 };
+// --- NEW: State for Add Contact Modal ---
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newContact, setNewContact] = useState({ name: '', email: '', desc: '' });
 
+    // Helper to start a call from the Add Modal
+    const handleStartNewChat = () => {
+        if(!newContact.name || !newContact.email) {
+            toast.warn("Name and Email are required");
+            return;
+        }
+        // Reuse your existing handleReCall function to create the call
+        handleReCall(
+            null, // callId (null creates a new one)
+            newContact.name, 
+            newContact.email, 
+            newContact.desc || "New Chat", 
+            '/call/' // Default to video, or change to audio if you prefer
+        );
+        setShowAddModal(false);
+        setNewContact({ name: '', email: '', desc: '' });
+    };
 
 function RecentCalls({ searchTerm }) {
     const { user } = useAuth();
@@ -553,25 +573,43 @@ function RecentCalls({ searchTerm }) {
     }
 
     // --- Render JSX ---
-    return (
+  return (
         <>
-            {/* Global & Component Styles */}
+            {/* Global Styles for Theme & Scrollbar */}
             <style jsx global>{`
                 :root {
+                    /* Default Light Theme */
+                    --wa-bg: #ffffff;
+                    --wa-header: #f0f2f5;
+                    --wa-border: #e9edef;
+                    --wa-hover: #f5f6f6;
+                    --wa-primary: #111b21;
+                    --wa-secondary: #667781;
+                    --wa-accent: #008069;
+                    --wa-danger: #ea0038;
+                    --wa-search-bg: #ffffff;
+                    --wa-icon-color: #54656f;
+                    --wa-input-bg: #ffffff;
+                }
+
+                /* Dark Theme Override */
+                [data-theme='dark'] {
                     --wa-bg: #111b21;
                     --wa-header: #202c33;
+                    --wa-border: rgba(134, 150, 160, 0.15);
                     --wa-hover: #2a3942;
                     --wa-primary: #e9edef;
                     --wa-secondary: #8696a0;
                     --wa-accent: #00a884;
-                    --wa-danger: #ef5350;
-                    --wa-blue: #53bdeb;
+                    --wa-search-bg: #202c33;
+                    --wa-icon-color: #aebac1;
+                    --wa-input-bg: #2a3942;
                 }
 
-                /* Scrollbar Customization */
+                /* Scrollbar */
                 ::-webkit-scrollbar { width: 6px; }
                 ::-webkit-scrollbar-track { background: transparent; }
-                ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+                ::-webkit-scrollbar-thumb { background: rgba(134, 150, 160, 0.3); border-radius: 3px; }
             `}</style>
 
             <style jsx>{`
@@ -580,100 +618,132 @@ function RecentCalls({ searchTerm }) {
                     height: 100%;
                     display: flex;
                     flex-direction: column;
-                    border-right: 1px solid rgba(255,255,255,0.1);
+                    border-right: 1px solid var(--wa-border);
                     color: var(--wa-primary);
                     position: relative;
                     overflow: hidden;
+                    transition: background-color 0.3s ease;
                 }
 
-                /* --- STICKY HEADER SECTION (Fixes overlapping) --- */
+                /* --- HEADER SECTION --- */
                 .sticky-header {
                     position: sticky;
                     top: 0;
                     z-index: 100;
-                    background-color: var(--wa-bg);
-                    padding-bottom: 5px;
-                    border-bottom: 1px solid rgba(134, 150, 160, 0.15);
+                    background-color: var(--wa-header);
+                    padding: 10px 16px;
+                    border-bottom: 1px solid var(--wa-border);
                 }
 
-                /* Search Bar */
-                .search-wrapper {
-                    padding: 10px 15px;
-                }
-                .search-input-group {
-                    background-color: var(--wa-header);
-                    border-radius: 8px;
+                .header-top {
                     display: flex;
+                    justify-content: space-between;
                     align-items: center;
-                    padding: 0 15px;
-                    height: 35px;
+                    margin-bottom: 10px;
                 }
-                .search-icon { color: var(--wa-secondary); font-size: 0.85rem; }
-                .search-input {
+                .header-title {
+                    font-size: 1.3rem;
+                    font-weight: 700;
+                    color: var(--wa-primary);
+                }
+                .header-actions {
+                    display: flex;
+                    gap: 15px;
+                }
+                .icon-btn {
                     background: transparent;
                     border: none;
-                    color: var(--wa-primary);
-                    width: 100%;
-                    margin-left: 15px;
-                    font-size: 0.9rem;
-                    outline: none;
+                    color: var(--wa-icon-color);
+                    font-size: 1.2rem;
+                    cursor: pointer;
+                    transition: color 0.2s;
+                    position: relative;
                 }
-                .search-input::placeholder { color: var(--wa-secondary); }
-
-                /* Call Stats & Bell Row */
-                .stats-row {
-                    display: flex; justify-content: space-between; align-items: center;
-                    padding: 8px 20px;
-                    font-size: 0.85rem;
-                    color: var(--wa-secondary);
-                }
-                .bell-btn {
-                    position: relative; cursor: pointer; color: var(--wa-secondary); transition: 0.2s;
-                }
-                .bell-btn:hover { color: var(--wa-primary); }
+                .icon-btn:hover { color: var(--wa-primary); }
+                
                 .badge-dot {
                     position: absolute; top: -2px; right: -2px;
                     width: 8px; height: 8px;
                     background-color: var(--wa-accent);
                     border-radius: 50%;
+                    border: 2px solid var(--wa-header);
+                }
+
+                /* Search Bar */
+                .search-wrapper {
+                    position: relative;
+                }
+                .search-input {
+                    width: 100%;
+                    background-color: var(--wa-search-bg);
+                    border: none;
+                    border-radius: 8px;
+                    padding: 7px 15px 7px 40px; /* Left padding for icon */
+                    color: var(--wa-primary);
+                    font-size: 0.9rem;
+                    outline: none;
+                    transition: box-shadow 0.2s;
+                }
+                .search-input:focus {
+                    box-shadow: 0 0 0 2px rgba(0, 168, 132, 0.3);
+                }
+                .search-input::placeholder { color: var(--wa-secondary); }
+                .search-icon {
+                    position: absolute;
+                    left: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    color: var(--wa-secondary);
+                    font-size: 0.85rem;
                 }
 
                 /* --- LIST AREA --- */
                 .recent-calls-list {
                     flex: 1;
                     overflow-y: auto;
-                    padding-top: 5px;
                 }
 
-                /* Call Item Card */
+                /* Contact Card */
                 .call-item {
-                    display: flex; align-items: center;
-                    padding: 12px 15px;
+                    display: flex;
+                    align-items: center;
+                    padding: 12px 16px;
                     cursor: pointer;
                     transition: background-color 0.2s;
-                    border-bottom: 1px solid rgba(134, 150, 160, 0.1);
+                    position: relative; 
                 }
                 .call-item:hover { background-color: var(--wa-hover); }
-
-                .avatar-container {
-                    position: relative; margin-right: 15px;
+                .call-item::after {
+                    content: '';
+                    position: absolute;
+                    bottom: 0;
+                    right: 0;
+                    width: 82%; 
+                    height: 1px;
+                    background-color: var(--wa-border);
                 }
+
+                .avatar-container { margin-right: 15px; }
                 .call-avatar {
-                    width: 45px; height: 45px; border-radius: 50%;
+                    width: 49px; height: 49px;
+                    border-radius: 50%;
                     display: flex; align-items: center; justify-content: center;
-                    font-weight: 500; color: white; font-size: 1.1rem;
+                    font-weight: 500; color: white; font-size: 1.2rem;
                     flex-shrink: 0;
                 }
 
                 .call-info {
-                    flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;
+                    flex: 1; min-width: 0;
+                    display: flex; flex-direction: column; justify-content: center;
                 }
+                
                 .info-top {
                     display: flex; justify-content: space-between; align-items: baseline;
-                    margin-bottom: 3px;
+                    margin-bottom: 2px;
                 }
                 .call-name {
                     font-size: 1rem; color: var(--wa-primary);
+                    font-weight: 400;
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
                 .call-date {
@@ -684,129 +754,132 @@ function RecentCalls({ searchTerm }) {
                 .info-bottom {
                     display: flex; justify-content: space-between; align-items: center;
                 }
-                .call-email {
+                .call-desc {
                     font-size: 0.85rem; color: var(--wa-secondary);
                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                    max-width: 80%;
+                    max-width: 90%;
                 }
                 
-                /* Actions (Show on Hover) */
-                .call-actions {
-                    display: flex; gap: 15px;
-                    opacity: 0; transition: opacity 0.2s;
+                /* Hover Actions */
+                .call-hover-actions {
+                    display: none; gap: 15px; align-items: center;
                 }
-                .call-item:hover .call-actions { opacity: 1; }
-                
+                .call-item:hover .call-hover-actions { display: flex; }
+                .call-item:hover .call-date { display: none; } 
+
                 .action-icon {
-                    font-size: 1.1rem; color: var(--wa-secondary);
+                    font-size: 1.2rem; color: var(--wa-secondary);
                     background: none; border: none; padding: 0;
-                    cursor: pointer; transition: 0.2s;
+                    cursor: pointer; transition: color 0.2s;
                 }
                 .action-icon:hover { color: var(--wa-primary); }
-                .icon-call:hover { color: var(--wa-accent); }
-                .icon-delete:hover { color: var(--wa-danger); }
-
+                
                 /* Empty State */
                 .empty-state {
-                    padding: 40px; text-align: center; color: var(--wa-secondary);
-                    font-size: 0.9rem;
+                    padding: 40px; text-align: center;
+                    color: var(--wa-secondary); font-size: 0.95rem; margin-top: 20px;
                 }
 
-                /* Visibility Toggle */
-                .visibility-control {
-                    padding: 15px;
-                    border-top: 1px solid rgba(134, 150, 160, 0.1);
-                    background-color: var(--wa-header);
-                    display: flex; justify-content: space-between; align-items: center;
-                }
-                .vis-label { font-size: 0.9rem; color: var(--wa-primary); }
-                
-                /* Switch */
-                .switch { position: relative; display: inline-block; width: 34px; height: 20px; }
-                .switch input { opacity: 0; width: 0; height: 0; }
-                .slider {
-                    position: absolute; cursor: pointer;
-                    top: 0; left: 0; right: 0; bottom: 0;
-                    background-color: #3b4a54; transition: .4s; border-radius: 34px;
-                }
-                .slider:before {
-                    position: absolute; content: "";
-                    height: 14px; width: 14px; left: 3px; bottom: 3px;
-                    background-color: white; transition: .4s; border-radius: 50%;
-                }
-                input:checked + .slider { background-color: var(--wa-accent); }
-                input:checked + .slider:before { transform: translateX(14px); }
-
-                /* Modal Overlays (Reused logic, updated style) */
+                /* --- MODALS --- */
                 .modal-overlay {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                    background: rgba(0,0,0,0.7); z-index: 1000;
+                    background: rgba(0,0,0,0.7); z-index: 2000;
                     display: flex; align-items: center; justify-content: center;
+                    backdrop-filter: blur(2px);
                 }
                 .modal-card {
                     background: var(--wa-header); color: var(--wa-primary);
-                    width: 90%; max-width: 400px; padding: 20px;
-                    border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                    width: 90%; max-width: 400px; padding: 24px;
+                    border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    border: 1px solid var(--wa-border);
                 }
                 .modal-btn {
-                    padding: 8px 16px; border-radius: 4px; border: none; font-weight: 500; margin-left: 10px;
+                    padding: 8px 16px; border-radius: 4px; border: none; font-weight: 500; cursor: pointer;
                 }
                 .btn-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-accent); }
                 .btn-danger { background: var(--wa-danger); color: white; }
                 .btn-primary { background: var(--wa-accent); color: white; }
-
-                @media (max-width: 576px) {
-                    .call-actions { opacity: 1; gap: 10px; } /* Always show actions on mobile */
-                    .call-item { padding: 10px; }
+                
+                /* Form Inputs in Modal */
+                .modal-input {
+                    width: 100%; padding: 10px; margin-bottom: 15px;
+                    background: var(--wa-input-bg); border: 1px solid var(--wa-border);
+                    color: var(--wa-primary); border-radius: 6px; outline: none;
                 }
+                .modal-input:focus { border-color: var(--wa-accent); }
             `}</style>
 
             <div className="recent-calls-container">
-
-                {/* --- STICKY HEADER --- */}
+                
+                {/* --- HEADER --- */}
                 <div className="sticky-header">
-                    <div className="search-wrapper">
-                        <div className="search-input-group">
-                            <i className="bi bi-search search-icon"></i>
-                            <input
-                                type="text"
-                                className="search-input"
-                                placeholder="Search or start new call"
-                                value={searchTerm || ''}
-                            // Assuming you have a setSearchTerm handler in parent, 
-                            // otherwise add onChange logic here if passed as prop
-                            />
+                    <div className="header-top">
+                        <div className="header-title">Chats</div>
+                        <div className="header-actions">
+                            {/* FIXED: Updated onClick to use setShowAddModal */}
+                            <button className="icon-btn" title="Add New Contact" onClick={() => setShowAddModal(true)}>
+                                <i className="bi bi-pencil-square"></i>
+                            </button>
+                            <button className="icon-btn" onClick={openNotificationModal} title="Notifications">
+                                <i className="bi bi-bell"></i>
+                                {unreadCount > 0 && <span className="badge-dot"></span>}
+                            </button>
+                            <button 
+                                className="icon-btn" 
+                                onClick={handleVisibilityToggle}
+                                title={`You are ${isOnline ? 'Online' : 'Offline'}`}
+                                style={{ color: isOnline ? 'var(--wa-accent)' : 'var(--wa-secondary)' }}
+                            >
+                                <i className={`bi ${isOnline ? 'bi-toggle-on' : 'bi-toggle-off'}`}></i>
+                            </button>
                         </div>
                     </div>
 
-                    <div className="stats-row">
-                        <span>Calls ({dailyCallCount}/{dailyCallLimit})</span>
-                        <div className="bell-btn" onClick={openNotificationModal} title="Notifications">
-                            <i className="bi bi-bell-fill"></i>
-                            {unreadCount > 0 && <span className="badge-dot"></span>}
-                        </div>
+                    <div className="search-wrapper">
+                        <i className="bi bi-search search-icon"></i>
+                        <input 
+                            type="text" 
+                            className="search-input" 
+                            placeholder="Search or start new chat"
+                            value={searchTerm || ''}
+                            onChange={(e) => typeof setSearchTerm === 'function' ? setSearchTerm(e.target.value) : null}
+                        />
                     </div>
                 </div>
 
-                {/* --- SCROLLABLE LIST --- */}
+                {/* --- LIST --- */}
                 <div className="recent-calls-list">
                     {!user ? (
-                        <div className="empty-state">Please log in to see recent calls.</div>
+                        <div className="empty-state">Sign in to view your contacts.</div>
                     ) : filteredCalls.length === 0 ? (
-                        <div className="empty-state">No chats or calls found.</div>
+                        <div className="empty-state">
+                            <p>No chats found.</p>
+                            {/* FIXED: Updated onClick */}
+                            <button className="btn btn-sm btn-outline-secondary mt-2" onClick={() => setShowAddModal(true)}>
+                                Start a conversation
+                            </button>
+                        </div>
                     ) : (
                         filteredCalls.map(call => {
                             const isCurrentUserOwner = call.ownerId === user._id;
                             const displayName = isCurrentUserOwner ? call.recipientName : call.ownerName;
                             const displayEmail = isCurrentUserOwner ? call.recipientEmail : call.ownerEmail;
-
+                            
                             if (!displayName) return null;
 
                             return (
-                                <div key={call.id} className="call-item" onClick={() => navigate(`/call/${call.id}`)}>
+                                <div 
+                                    key={call.id} 
+                                    className="call-item" 
+                                    onClick={() => navigate(`/call/${call.id}`)}
+                                    onContextMenu={(e) => {
+                                        e.preventDefault();
+                                        promptForDelete(call.id, displayName);
+                                    }}
+                                >
                                     <div className="avatar-container">
-                                        <div
-                                            className="call-avatar"
+                                        <div 
+                                            className="call-avatar" 
                                             style={{ backgroundColor: getAvatarColor(displayName) }}
                                         >
                                             {displayName.charAt(0).toUpperCase()}
@@ -817,55 +890,33 @@ function RecentCalls({ searchTerm }) {
                                         <div className="info-top">
                                             <span className="call-name">{displayName}</span>
                                             <span className="call-date">{formatTimestamp(call.createdAt)}</span>
-                                        </div>
-                                        <div className="info-bottom">
-                                            <span className="call-email">
-                                                {displayEmail}
-                                            </span>
-
-                                            {/* Action Icons (Hover to see) */}
-                                            <div className="call-actions" onClick={(e) => e.stopPropagation()}>
-                                               {/* <button
-                                                    className="action-icon icon-call"
+                                            
+                                            {/* Hover Actions */}
+                                            <div className="call-hover-actions">
+                                                <button 
+                                                    className="action-icon" 
                                                     title="Voice Call"
                                                     disabled={isCalling === call.id}
-                                                    // Assuming you have a specific route for audio calls, e.g., /audio-call/:id
-                                                    // You might need to update handleReCall to accept a 'type' argument 
-                                                    // OR simply navigate to an audio-specific route if you create new calls differently.
-                                                    // For now, let's assume you want to Join as Audio:
-                                                    onClick={() => navigate(`/audio-call/${call.id}`)}
+                                                    onClick={(e) => { e.stopPropagation(); handleReCall(call.id, displayName, displayEmail, call.description, '/audio-call/'); }}
                                                 >
                                                     <i className="bi bi-telephone-fill"></i>
-                                                </button>*/}
-                                                <button
-                                                    className="action-icon icon-call"
+                                                </button>
+
+                                                <button 
+                                                    className="action-icon" 
                                                     title="Video Call"
                                                     disabled={isCalling === call.id}
-                                                    onClick={() => handleReCall(call.id, displayName, displayEmail, call.description)}
+                                                    onClick={(e) => { e.stopPropagation(); handleReCall(call.id, displayName, displayEmail, call.description, '/call/'); }}
                                                 >
-                                                    {isCalling === call.id ? (
-                                                        <span className="spinner-border spinner-border-sm"></span>
-                                                    ) : (
-                                                        <i className="bi bi-camera-video-fill"></i>
-                                                    )}
-                                                </button>
-
-                                                <button
-                                                    className="action-icon"
-                                                    title="Chat"
-                                                    onClick={() => handleOpenChat(displayName, displayEmail)}
-                                                >
-                                                    <i className="bi bi-chat-left-text-fill"></i>
-                                                </button>
-
-                                                <button
-                                                    className="action-icon icon-delete"
-                                                    title="Delete"
-                                                    onClick={() => promptForDelete(call.id, displayName)}
-                                                >
-                                                    <i className="bi bi-trash"></i>
+                                                    <i className="bi bi-camera-video-fill"></i>
                                                 </button>
                                             </div>
+                                        </div>
+                                        
+                                        <div className="info-bottom">
+                                            <span className="call-desc">
+                                                {call.description || displayEmail}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -873,32 +924,50 @@ function RecentCalls({ searchTerm }) {
                         })
                     )}
                 </div>
-
-                {/* --- FOOTER VISIBILITY --- */}
-                <div className="visibility-control">
-                    <span className="vis-label">Profile Visibility (Online)</span>
-                    <label className="switch">
-                        <input
-                            type="checkbox"
-                            checked={isOnline}
-                            onChange={handleVisibilityToggle}
-                            disabled={isVisibilityLoading}
-                        />
-                        <span className="slider"></span>
-                    </label>
-                </div>
-
             </div>
 
-            {/* --- MODALS (Simplified for new theme) --- */}
+            {/* --- ADD CONTACT MODAL (New Professional Modal) --- */}
+            {showAddModal && (
+                <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+                    <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+                        <h5 style={{marginBottom:'20px', fontWeight: '600'}}>Start New Chat</h5>
+                        
+                        <input 
+                            className="modal-input" 
+                            placeholder="Contact Name"
+                            value={newContact.name} 
+                            onChange={(e) => setNewContact({...newContact, name: e.target.value})}
+                        />
+                        <input 
+                            className="modal-input" 
+                            placeholder="Email Address"
+                            value={newContact.email} 
+                            onChange={(e) => setNewContact({...newContact, email: e.target.value})}
+                        />
+                        <input 
+                            className="modal-input" 
+                            placeholder="Short Description (Optional)"
+                            value={newContact.desc} 
+                            onChange={(e) => setNewContact({...newContact, desc: e.target.value})}
+                        />
+
+                        <div className="d-flex justify-content-end gap-2 mt-3">
+                            <button className="modal-btn btn-cancel" onClick={() => setShowAddModal(false)}>Cancel</button>
+                            <button className="modal-btn btn-primary" onClick={handleStartNewChat}>Create</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- DELETE MODAL --- */}
             {deleteTarget && (
                 <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
                     <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-                        <h5>Delete Contact?</h5>
-                        <p style={{ color: 'var(--wa-secondary)', fontSize: '0.9rem' }}>
-                            Are you sure you want to delete <strong>{deleteTarget.name}</strong>?
+                        <h5 style={{marginBottom: '10px'}}>Delete chat?</h5>
+                        <p style={{color: 'var(--wa-secondary)', fontSize: '0.9rem'}}>
+                            Deleting <strong>{deleteTarget.name}</strong> will remove them from your list.
                         </p>
-                        <div className="d-flex justify-content-end mt-4">
+                        <div className="d-flex justify-content-end gap-2 mt-4">
                             <button className="modal-btn btn-cancel" onClick={() => setDeleteTarget(null)}>Cancel</button>
                             <button className="modal-btn btn-danger" onClick={confirmDelete}>Delete</button>
                         </div>
@@ -906,20 +975,7 @@ function RecentCalls({ searchTerm }) {
                 </div>
             )}
 
-            {showVisibilityModal && (
-                <div className="modal-overlay" onClick={handleCloseVisibilityModal}>
-                    <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-                        <h5>Profile Visibility</h5>
-                        <p style={{ color: 'var(--wa-secondary)', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                            Enabling this allows others to see you in the "Online Users" list.
-                        </p>
-                        <div className="d-flex justify-content-end mt-4">
-                            <button className="modal-btn btn-primary" onClick={handleCloseVisibilityModal}>Got it</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+            {/* --- NOTIFICATION MODAL --- */}
             {showNotificationModal && (
                 <div className="modal-overlay" onClick={() => setShowNotificationModal(false)}>
                     <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -927,21 +983,31 @@ function RecentCalls({ searchTerm }) {
                             <h5>Notifications</h5>
                             <button className="action-icon" onClick={() => setShowNotificationModal(false)}><i className="bi bi-x-lg"></i></button>
                         </div>
-                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                        <div style={{maxHeight: '300px', overflowY: 'auto'}}>
                             {allNotifications.length === 0 ? (
-                                <p className="text-center text-muted my-4">No notifications.</p>
+                                <p className="text-center" style={{color: 'var(--wa-secondary)', padding: '20px'}}>No new notifications.</p>
                             ) : (
                                 allNotifications.map(notif => (
-                                    <div key={notif.id} className="p-2 border-bottom border-secondary" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
-                                        <div className="d-flex justify-content-between">
-                                            <strong style={{ fontSize: '0.9rem' }}>{notif.callerName}</strong>
-                                            <small className="text-muted" style={{ fontSize: '0.7rem' }}>{formatTimeAgo(notif.createdAt)}</small>
+                                    <div key={notif.id} className="p-3 border-bottom" style={{borderColor: 'var(--wa-border)'}}>
+                                        <div className="d-flex justify-content-between mb-1">
+                                            <strong style={{fontSize:'0.95rem', color: 'var(--wa-primary)'}}>{notif.callerName}</strong>
+                                            <small style={{fontSize:'0.75rem', color: 'var(--wa-secondary)'}}>{formatTimeAgo(notif.createdAt)}</small>
                                         </div>
-                                        <div className="d-flex justify-content-between align-items-center mt-1">
-                                            <span style={{ fontSize: '0.85rem', color: 'var(--wa-secondary)' }}>{notif.type === 'call' ? 'Incoming Call' : 'New Alert'}</span>
+                                        <div className="d-flex justify-content-between align-items-center">
+                                            <span style={{fontSize:'0.85rem', color: 'var(--wa-secondary)'}}>
+                                                Incoming {notif.callType === 'audio' ? 'Voice' : 'Video'} Call
+                                            </span>
                                             {notif.type === 'call' && (
-                                                <button className="action-icon icon-call" onClick={() => { navigate(`/call/${notif.callId}`); setShowNotificationModal(false); }}>
-                                                    <i className="bi bi-camera-video-fill"></i>
+                                                <button 
+                                                    className="btn btn-sm text-white" 
+                                                    style={{backgroundColor: 'var(--wa-accent)', borderRadius: '4px'}}
+                                                    onClick={() => { 
+                                                        const route = notif.callType === 'audio' ? '/audio-call/' : '/call/';
+                                                        navigate(`${route}${notif.callId}`); 
+                                                        setShowNotificationModal(false); 
+                                                    }}
+                                                >
+                                                    Join
                                                 </button>
                                             )}
                                         </div>
