@@ -449,7 +449,7 @@ function RecentCalls() {
     return (
         <div className="recent-calls-container">
             <style jsx>{`
-                .recent-calls-container { background-color: #111b21; height: 100%; display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif; }
+                .recent-calls-container { background-color: #111b21;height: calc(100vh - 60px);width: 100vw; margin: 0; display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif; }
                 .sticky-header { position: sticky; top: 0; z-index: 100; background-color: #111b21; padding: 20px 20px 10px; border-bottom: 1px solid rgba(134, 150, 160, 0.15); }
                 
                 .header-actions { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
