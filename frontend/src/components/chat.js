@@ -3,14 +3,14 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { db, storage } from '../firebaseConfig';
 import { 
     collection, query, orderBy, onSnapshot, addDoc, 
-    serverTimestamp, doc, setDoc, deleteDoc, updateDoc, getDoc 
+    serverTimestamp, doc, setDoc, deleteDoc, updateDoc
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { v4 as uuidv4 } from 'uuid';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 const Chat = () => {
     const { user } = useAuth();
@@ -24,7 +24,10 @@ const Chat = () => {
     const [newMessage, setNewMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [isOtherTyping, setIsOtherTyping] = useState(false);
-    const [recipientStatus, setRecipientStatus] = useState('Offline'); // For Online/Offline
+    const [recipientStatus, setRecipientStatus] = useState('Offline');
+    
+    // --- NEW: Delete Modal State ---
+    const [deleteTargetId, setDeleteTargetId] = useState(null);
     
     // Upload & Recording State
     const [isUploading, setIsUploading] = useState(false);
@@ -63,12 +66,10 @@ const Chat = () => {
             }));
             setMessages(msgs);
 
-            // --- READ RECEIPT LOGIC ---
-            // Identify unread messages sent by the OTHER person
+            // Mark unread messages as read
             snapshot.docs.forEach(async (docSnap) => {
                 const data = docSnap.data();
                 if (data.senderId !== user._id && !data.read) {
-                    // Mark as read in database
                     try {
                         await updateDoc(docSnap.ref, { read: true });
                     } catch (err) {
@@ -85,7 +86,6 @@ const Chat = () => {
     useEffect(() => {
         if (!chatId || !user) return;
 
-        // A. Listen for Typing on the Chat Document
         const chatDocRef = doc(db, collectionName, chatId);
         const unsubChat = onSnapshot(chatDocRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -98,22 +98,7 @@ const Chat = () => {
             }
         });
 
-        // B. Listen for Online Status (Find the other user's ID first)
-        // We assume the chat ID is "email_email". We split to find the other email, 
-        // then query users collection. This is a simplified approach.
-        // A better way is to pass recipientId via location state if available.
-        // Here we will try to find the recipient from the messages or ID structure.
-        
-        // For now, let's look at the recipientName passed in state or infer simple "Online" logic
-        // If you have a 'users' collection where docId is userId:
-        /* const recipientId = ... logic to get ID ...
-           const userRef = doc(db, 'users', recipientId);
-           onSnapshot(userRef, (doc) => setRecipientStatus(doc.data()?.isOnline ? 'Online' : 'Offline'));
-        */
-
-        return () => {
-            unsubChat();
-        };
+        return () => unsubChat();
     }, [chatId, collectionName, user]);
 
     // --- 4. Text Message Logic ---
@@ -152,7 +137,7 @@ const Chat = () => {
                 senderId: user._id,
                 senderEmail: user.email,
                 timestamp: serverTimestamp(),
-                read: false // Default unread
+                read: false 
             });
             setNewMessage('');
         } catch (error) {
@@ -161,15 +146,21 @@ const Chat = () => {
         }
     };
 
-    // --- 5. Delete Message Logic ---
-    const handleDeleteMessage = async (messageId) => {
-        if(!window.confirm("Delete this message?")) return;
+    // --- 5. Delete Message Logic (Updated) ---
+    const promptDelete = (messageId) => {
+        setDeleteTargetId(messageId); // Open Custom Modal
+    };
+
+    const confirmDeleteMessage = async () => {
+        if (!deleteTargetId) return;
         try {
-            await deleteDoc(doc(db, collectionName, chatId, 'messages', messageId));
+            await deleteDoc(doc(db, collectionName, chatId, 'messages', deleteTargetId));
             toast.success("Message deleted");
         } catch (error) {
             console.error("Error deleting:", error);
             toast.error("Could not delete message");
+        } finally {
+            setDeleteTargetId(null); // Close Modal
         }
     };
 
@@ -229,11 +220,8 @@ const Chat = () => {
             };
 
             recorder.onstop = async () => {
-                // Combine chunks
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); // or audio/mp3 depending on browser
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
                 await uploadAudio(audioBlob);
-                
-                // Stop all tracks
                 stream.getTracks().forEach(track => track.stop());
             };
 
@@ -241,7 +229,7 @@ const Chat = () => {
             setIsRecording(true);
         } catch (err) {
             console.error("Error accessing microphone:", err);
-            toast.error("Microphone access denied or not available.");
+            toast.error("Microphone access denied.");
         }
     };
 
@@ -259,14 +247,6 @@ const Chat = () => {
             const filePath = `chatVoice/${chatId}/${fileId}.webm`;
             const storageRef = ref(storage, filePath);
             
-            // Note: passing the blob directly
-            // We need to recreate the blob here because audioChunks state 
-            // might not be fully updated inside the onstop closure depending on React render cycles,
-            // but usually chunks are collected via 'ondataavailable'.
-            // A safer way for the onstop is to use the event blob if provided, 
-            // but MediaRecorder usually just fires dataavailable then stop.
-            
-            // Let's rely on the Blob created in onstop.
             const snapshot = await uploadBytes(storageRef, blob);
             const downloadURL = await getDownloadURL(snapshot.ref);
 
@@ -305,6 +285,23 @@ const Chat = () => {
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
     };
 
+    // --- NEW: Date Separator Helper ---
+    const getDateLabel = (timestamp) => {
+        if (!timestamp) return null;
+        const date = timestamp.toDate();
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        if (date.toDateString() === today.toDateString()) {
+            return 'Today';
+        } else if (date.toDateString() === yesterday.toDateString()) {
+            return 'Yesterday';
+        } else {
+            return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+    };
+
     if (!user) return null;
 
     return (
@@ -312,24 +309,16 @@ const Chat = () => {
             <style jsx>{`
                 /* --- THEME CONFIGURATION --- */
                 :root {
-                    /* Dark Mode Base */
                     --wa-bg: #0b141a;
                     --wa-header: #202c33;
-                    --wa-panel: #111b21;
-                    
-                    /* Bubbles */
-                    /* Sent Bubble: Steel Blue (Derived from your image) */
                     --wa-outgoing: #0c3e59; 
-                    /* Received Bubble: Dark Gray */
                     --wa-incoming: #202c33;
-                    
-                    /* Text & Accents */
                     --wa-input-bg: #2a3942;
                     --wa-text-primary: #e9edef;
                     --wa-text-secondary: #8696a0;
-                    --wa-accent: #34b7f1; /* Light Blue Accent */
-                    --wa-tick-read: #53bdeb; /* Blue Ticks */
-                    --wa-tick-sent: #8696a0; /* Grey Ticks */
+                    --wa-accent: #34b7f1; 
+                    --wa-tick-read: #53bdeb; 
+                    --wa-tick-sent: #8696a0; 
                 }
 
                 .chat-page-container {
@@ -341,7 +330,7 @@ const Chat = () => {
                 .chat-window {
                     width: 100%; height: 100%;
                     background-color: var(--wa-bg);
-                    /* UNIQUE BACKGROUND: Subtle Geometric Dots Pattern */
+                    /* Subtle Geometric Dots Pattern */
                     background-image: radial-gradient(#2a3942 1.5px, transparent 1.5px);
                     background-size: 24px 24px;
                     display: flex; flex-direction: column; overflow: hidden;
@@ -376,8 +365,27 @@ const Chat = () => {
                     flex: 1; padding: 20px 5%; 
                     overflow-y: auto;
                     display: flex; flex-direction: column; gap: 6px;
-                    /* Dark overlay to soften the pattern */
                     background-color: rgba(11, 20, 26, 0.95); 
+                }
+
+                /* --- DATE SEPARATOR --- */
+                .date-separator {
+                    display: flex;
+                    justify-content: center;
+                    margin: 15px 0;
+                    position: sticky; /* Optional: makes date stick to top */
+                    top: 5px;
+                    z-index: 5;
+                }
+                .date-badge {
+                    background-color: #1f2c34;
+                    color: #8696a0;
+                    font-size: 0.75rem;
+                    padding: 5px 12px;
+                    border-radius: 8px;
+                    text-transform: uppercase;
+                    font-weight: 500;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
                 }
 
                 /* --- MESSAGES --- */
@@ -388,7 +396,7 @@ const Chat = () => {
                 .message-bubble {
                     max-width: 85%;
                     padding: 6px 7px 8px 9px; 
-                    border-radius: 12px; /* Softer corners */
+                    border-radius: 12px; 
                     font-size: 0.95rem; 
                     line-height: 1.35; 
                     position: relative;
@@ -408,6 +416,7 @@ const Chat = () => {
                     border-radius: 50%; width: 20px; height: 20px;
                     display: none; align-items: center; justify-content: center;
                     font-size: 10px; cursor: pointer; border: 1px solid #333;
+                    z-index: 2;
                 }
                 .message-row:hover .delete-btn { display: flex; }
 
@@ -450,7 +459,7 @@ const Chat = () => {
                 .chat-input-bar {
                     flex: 1; 
                     background-color: var(--wa-input-bg);
-                    border-radius: 20px; /* Rounder input */
+                    border-radius: 20px;
                     padding: 10px 16px;
                     border: none; color: var(--wa-text-primary);
                     font-size: 1rem; outline: none;
@@ -466,7 +475,6 @@ const Chat = () => {
                 }
                 .icon-btn:hover { background: rgba(255,255,255,0.05); color: var(--wa-text-primary); }
                 
-                /* Send / Mic Buttons */
                 .btn-send { color: var(--wa-accent); }
                 .btn-mic { color: var(--wa-text-secondary); transition: all 0.2s; }
                 .btn-mic.recording { 
@@ -481,23 +489,36 @@ const Chat = () => {
                     100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
                 }
 
-                /* Scrollbar */
                 .chat-body::-webkit-scrollbar { width: 6px; }
                 .chat-body::-webkit-scrollbar-track { background: transparent; }
                 .chat-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 
-                /* Typing Animation */
-                .typing-dots span {
-                    display: inline-block; width: 4px; height: 4px; border-radius: 50%;
-                    background-color: var(--wa-accent); margin-right: 2px;
-                    animation: typing 1.4s infinite ease-in-out both;
+                /* --- DELETE MODAL CSS --- */
+                .delete-modal-overlay {
+                    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                    background: rgba(0,0,0,0.7);
+                    z-index: 2000;
+                    display: flex; align-items: center; justify-content: center;
+                    backdrop-filter: blur(2px);
                 }
-                .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
-                .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
-                @keyframes typing {
-                    0%, 80%, 100% { transform: scale(0); }
-                    40% { transform: scale(1); }
+                .delete-modal {
+                    background: var(--wa-header);
+                    color: var(--wa-text-primary);
+                    padding: 20px;
+                    border-radius: 12px;
+                    width: 300px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    text-align: center;
+                    animation: fadeIn 0.2s ease-out;
                 }
+                .delete-modal h5 { margin-bottom: 10px; font-size: 1.1rem; }
+                .delete-modal p { color: var(--wa-text-secondary); font-size: 0.9rem; margin-bottom: 20px; }
+                .delete-actions { display: flex; justify-content: center; gap: 10px; }
+                .btn-modal { padding: 8px 16px; border: none; border-radius: 20px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+                .btn-modal-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-accent); }
+                .btn-modal-confirm { background: #ef5350; color: white; }
+
+                @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
             `}</style>
 
             <div className="chat-window">
@@ -515,12 +536,11 @@ const Chat = () => {
                             <span style={{fontWeight: 500, fontSize: '1rem'}}>{recipientName || 'Unknown'}</span>
                             <div className="status-text">
                                 {isOtherTyping ? (
-                                    <span className="status-typing typing-dots">
-                                        typing<span></span><span></span><span></span>
+                                    <span className="status-typing" style={{fontWeight: 500, color: 'var(--wa-accent)'}}>
+                                        typing...
                                     </span>
                                 ) : (
                                     <>
-                                        {/* You can implement real dynamic online/offline here */}
                                         {collectionName === 'direct_chats' && recipientStatus === 'Online' && (
                                             <span className="status-online">Online</span>
                                         )}
@@ -529,7 +549,6 @@ const Chat = () => {
                             </div>
                         </div>
                     </div>
-                    {/* Add Call buttons here if needed */}
                 </div>
 
                 {/* Messages Body */}
@@ -542,66 +561,75 @@ const Chat = () => {
                         </div>
                     )}
 
-                    {messages.map((msg) => {
+                    {messages.map((msg, index) => {
                         const isOwn = msg.senderId === user._id;
+                        const dateLabel = getDateLabel(msg.timestamp);
+                        const prevMsg = messages[index - 1];
+                        const prevDateLabel = prevMsg ? getDateLabel(prevMsg.timestamp) : null;
+                        const showDate = dateLabel && dateLabel !== prevDateLabel;
+
                         return (
-                            <div key={msg.id} className={`message-row ${isOwn ? 'row-own' : 'row-other'}`}>
-                                <div className={`message-bubble ${isOwn ? 'bubble-own' : 'bubble-other'}`}>
-                                    
-                                    {/* Delete Button (Only for own messages) */}
-                                    {isOwn && (
-                                        <div className="delete-btn" onClick={() => handleDeleteMessage(msg.id)} title="Delete Message">
-                                            <i className="bi bi-trash"></i>
-                                        </div>
-                                    )}
+                            <React.Fragment key={msg.id}>
+                                {/* --- NEW: Date Separator --- */}
+                                {showDate && (
+                                    <div className="date-separator">
+                                        <span className="date-badge">{dateLabel}</span>
+                                    </div>
+                                )}
 
-                                    {!isOwn && collectionName !== 'direct_chats' && (
-                                        <div className="sender-name">{msg.senderName}</div>
-                                    )}
-
-                                    {/* --- CONTENT TYPES --- */}
-                                    
-                                    {/* Image */}
-                                    {msg.type === 'image' && (
-                                        <a href={msg.fileUrl} target="_blank" rel="noreferrer">
-                                            <img src={msg.fileUrl} alt="attachment" className="msg-image" />
-                                        </a>
-                                    )}
-                                    
-                                    {/* File */}
-                                    {msg.type === 'file' && (
-                                        <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="msg-file-card">
-                                            <div className="file-icon-box"><i className="bi bi-file-earmark-text-fill"></i></div>
-                                            <div className="file-info">
-                                                <span className="file-name">{msg.fileName}</span>
-                                                <span className="file-size">{formatBytes(msg.fileSize)}</span>
-                                            </div>
-                                            <i className="bi bi-download ms-2" style={{color: '#8696a0'}}></i>
-                                        </a>
-                                    )}
-
-                                    {/* Audio/Voice */}
-                                    {msg.type === 'audio' && (
-                                        <div className="d-flex align-items-center gap-2">
-                                            <i className="bi bi-mic-fill" style={{color: isOwn ? '#fff' : '#8696a0'}}></i>
-                                            <audio controls src={msg.fileUrl} className="msg-audio" />
-                                        </div>
-                                    )}
-
-                                    {/* Text */}
-                                    {msg.type === 'text' && <span>{msg.text}</span>}
-
-                                    {/* --- META (Time & Ticks) --- */}
-                                    <div className="msg-meta">
-                                        <span className="msg-time">{formatTime(msg.timestamp)}</span>
+                                <div className={`message-row ${isOwn ? 'row-own' : 'row-other'}`}>
+                                    <div className={`message-bubble ${isOwn ? 'bubble-own' : 'bubble-other'}`}>
+                                        
+                                        {/* Delete Button (Custom Modal Trigger) */}
                                         {isOwn && (
-                                            <span className={`read-ticks ${msg.read ? 'blue' : 'grey'}`}>
-                                                <i className="bi bi-check2-all"></i>
-                                            </span>
+                                            <div className="delete-btn" onClick={() => promptDelete(msg.id)} title="Delete Message">
+                                                <i className="bi bi-trash"></i>
+                                            </div>
                                         )}
+
+                                        {!isOwn && collectionName !== 'direct_chats' && (
+                                            <div className="sender-name">{msg.senderName}</div>
+                                        )}
+
+                                        {/* Content Types */}
+                                        {msg.type === 'image' && (
+                                            <a href={msg.fileUrl} target="_blank" rel="noreferrer">
+                                                <img src={msg.fileUrl} alt="attachment" className="msg-image" />
+                                            </a>
+                                        )}
+                                        
+                                        {msg.type === 'file' && (
+                                            <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="msg-file-card">
+                                                <div className="file-icon-box"><i className="bi bi-file-earmark-text-fill"></i></div>
+                                                <div className="file-info">
+                                                    <span className="file-name">{msg.fileName}</span>
+                                                    <span className="file-size">{formatBytes(msg.fileSize)}</span>
+                                                </div>
+                                                <i className="bi bi-download ms-2" style={{color: '#8696a0'}}></i>
+                                            </a>
+                                        )}
+
+                                        {msg.type === 'audio' && (
+                                            <div className="d-flex align-items-center gap-2">
+                                                <i className="bi bi-mic-fill" style={{color: isOwn ? '#fff' : '#8696a0'}}></i>
+                                                <audio controls src={msg.fileUrl} className="msg-audio" />
+                                            </div>
+                                        )}
+
+                                        {msg.type === 'text' && <span>{msg.text}</span>}
+
+                                        {/* Meta (Time & Ticks) */}
+                                        <div className="msg-meta">
+                                            <span className="msg-time">{formatTime(msg.timestamp)}</span>
+                                            {isOwn && (
+                                                <span className={`read-ticks ${msg.read ? 'blue' : 'grey'}`}>
+                                                    <i className="bi bi-check2-all"></i>
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </React.Fragment>
                         );
                     })}
                     <div ref={messagesEndRef} />
@@ -636,7 +664,6 @@ const Chat = () => {
                         </form>
                     )}
 
-                    {/* Send or Mic Button */}
                     {(newMessage.trim() || isUploading) && !isRecording ? (
                         <button onClick={handleSendMessage} className="icon-btn btn-send" disabled={isUploading}>
                             {isUploading ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-send-fill"></i>}
@@ -652,6 +679,20 @@ const Chat = () => {
                     )}
                 </div>
             </div>
+
+            {/* --- NEW: Custom Delete Modal --- */}
+            {deleteTargetId && (
+                <div className="delete-modal-overlay" onClick={() => setDeleteTargetId(null)}>
+                    <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
+                        <h5>Delete Message?</h5>
+                        <p>This message will be deleted for everyone in this chat.</p>
+                        <div className="delete-actions">
+                            <button className="btn-modal btn-modal-cancel" onClick={() => setDeleteTargetId(null)}>Cancel</button>
+                            <button className="btn-modal btn-modal-confirm" onClick={confirmDeleteMessage}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
