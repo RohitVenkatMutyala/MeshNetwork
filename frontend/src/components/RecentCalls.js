@@ -118,7 +118,7 @@ const CallNotification = ({ callerName, callId, callType, onClose, navigate }) =
     );
 };
 
-// --- SORTABLE CARD COMPONENT (Handles Drag & Drop) ---
+// --- SORTABLE CARD COMPONENT ---
 const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat, setDeleteTarget, navigate, getAvatarColor }) => {
     const {
         attributes,
@@ -146,11 +146,14 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
 
     if (!displayTitle) return null;
 
+    // --- VIDEO BUTTON LOGIC ---
     const handleVideoAction = (e) => {
-        e.stopPropagation(); 
+        e.stopPropagation(); // Stop drag event
         if (isGroup && !isOwner) {
+            // Participants just join
             navigate(`/call/${call.id}`);
         } else {
+            // Owner starts call (notifications)
             handleReCall(call);
         }
     };
@@ -177,6 +180,7 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
             </div>
 
             <div className="card-actions">
+                {/* 1. Main Call/Join Button */}
                 <button 
                     className="action-btn btn-call" 
                     title={isGroup && !isOwner ? "Join Meeting" : "Start Video Call"} 
@@ -187,6 +191,7 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
                     {isCalling === call.id ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-camera-video-fill"></i>}
                 </button>
 
+                {/* 2. Host Re-Login Button (Owner Only) */}
                 {isOwner && (
                     <button 
                         className="action-btn" 
@@ -198,6 +203,7 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
                     </button>
                 )}
 
+                {/* 3. Chat Button */}
                 <button 
                     className="action-btn" 
                     title="Chat" 
@@ -207,6 +213,7 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
                     <i className="bi bi-chat-left-text-fill"></i>
                 </button>
                 
+                {/* 4. Delete Button */}
                 {canDelete && (
                     <button 
                         className="action-btn btn-delete" 
@@ -237,9 +244,6 @@ function RecentCalls() {
     const [isCalling, setIsCalling] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     
-    // --- STATE FOR MOBILE MENU ---
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [showAddContactModal, setShowAddContactModal] = useState(false);
     const [modalType, setModalType] = useState('individual');
@@ -406,7 +410,7 @@ function RecentCalls() {
                     callerName: `${user.firstname} ${user.lastname}`,
                     callerEmail: user.email,
                     callId: callData.id,
-                    callType: callData.type,
+                    callType: callData.type, // Added callType
                     createdAt: serverTimestamp(),
                     status: 'pending',
                     type: 'call'
@@ -482,6 +486,7 @@ function RecentCalls() {
         const unsub = onSnapshot(q, (snap) => {
             const rawCalls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
+            // Deduplication Logic
             const uniqueCalls = [];
             const seenKeys = new Set();
             for (const call of rawCalls) {
@@ -557,7 +562,7 @@ function RecentCalls() {
             <style jsx>{`
                 .recent-calls-container { 
                     background-color: #111b21; 
-                    height: calc(100vh - 60px); 
+                    height: calc(100vh - 60px); /* Fill screen minus navbar */
                     width: 100vw; margin: 0;
                     display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif; 
                 }
@@ -594,18 +599,8 @@ function RecentCalls() {
 
                 @media (max-width: 480px) {
                     .recent-calls-grid { grid-template-columns: 1fr; padding: 15px; } 
-                    
-                    /* --- MOBILE HEADER FIXES --- */
-                    .header-actions { 
-                        flex-direction: row !important; /* Force side-by-side */
-                        align-items: center; 
-                        gap: 10px; 
-                    }
-                    .search-wrapper { 
-                        width: auto; 
-                        flex: 1; /* Search bar fills space */
-                        min-width: 0; /* Prevents overflow */
-                    }
+                    .header-actions { flex-direction: row !important; align-items: center; gap: 10px; }
+                    .search-wrapper { width: auto; flex: 1; }
                     .search-input-group { height: 40px; }
                     .new-call-btn, .joint-meet-btn { justify-content: center; }
                 }
@@ -652,59 +647,16 @@ function RecentCalls() {
                 .btn-secondary:hover { border-color: #8696a0; color: white; }
                 .btn-danger { background: #ef5350; color: white; }
 
-                /* --- MOBILE FAB (Click-Based) --- */
+                /* MOBILE FAB */
                 .mobile-fab-container { display: none; }
-                
                 @media (max-width: 768px) {
                     .new-call-btn, .joint-meet-btn { display: none !important; }
-                    
-                    .mobile-fab-container { 
-                        display: flex; 
-                        align-items: center; 
-                        position: relative; 
-                        z-index: 200; 
-                    }
-                    
-                    .fab-trigger { 
-                        width: 40px; height: 40px; border-radius: 50%; 
-                        background-color: #00a884; color: white; 
-                        border: none; font-size: 1.4rem; 
-                        display: flex; align-items: center; justify-content: center; 
-                        box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
-                        transition: transform 0.3s ease, background 0.3s; 
-                        cursor: pointer; z-index: 202; 
-                    }
-                    
-                    .fab-options { 
-                        position: absolute; left: 10px; top: 0; height: 40px; 
-                        display: flex; align-items: center; gap: 8px; 
-                        opacity: 0; visibility: hidden; 
-                        transform: translateX(-10px) scale(0.9); 
-                        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-                        z-index: 201; 
-                        background: rgba(31, 41, 55, 0.95); 
-                        padding: 5px 10px 5px 35px; border-radius: 24px; margin-left: -5px; 
-                    }
-                    
-                    /* --- STATE BASED OPENING (Not Hover) --- */
-                    .mobile-fab-container.open .fab-options { 
-                        opacity: 1; visibility: visible; 
-                        transform: translateX(10px) scale(1); 
-                        left: 100%; margin-left: -35px; 
-                    }
-                    
-                    .mobile-fab-container.open .fab-trigger { 
-                        transform: rotate(45deg); 
-                        background-color: #202c33; 
-                    }
-                    
-                    .fab-mini-btn { 
-                        border: none; border-radius: 20px; padding: 6px 12px; 
-                        font-size: 0.75rem; font-weight: 600; color: white; 
-                        display: flex; align-items: center; gap: 5px; 
-                        cursor: pointer; white-space: nowrap; 
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
-                    }
+                    .mobile-fab-container { display: flex; align-items: center; position: relative; z-index: 200; }
+                    .fab-trigger { width: 40px; height: 40px; border-radius: 50%; background-color: #00a884; color: white; border: none; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.3s ease, background 0.3s; cursor: pointer; z-index: 202; }
+                    .fab-options { position: absolute; left: 10px; top: 0; height: 40px; display: flex; align-items: center; gap: 8px; opacity: 0; visibility: hidden; transform: translateX(-10px) scale(0.9); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 201; pointer-events: none; background: rgba(31, 41, 55, 0.9); padding: 5px 10px 5px 35px; border-radius: 24px; margin-left: -5px; }
+                    .mobile-fab-container:hover .fab-options, .mobile-fab-container:active .fab-options { opacity: 1; visibility: visible; transform: translateX(10px) scale(1); pointer-events: auto; left: 100%; margin-left: -35px; }
+                    .mobile-fab-container:hover .fab-trigger { transform: rotate(45deg); background-color: #202c33; }
+                    .fab-mini-btn { border: none; border-radius: 20px; padding: 6px 12px; font-size: 0.75rem; font-weight: 600; color: white; display: flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
                     .fab-btn-new { background-color: #00a884; }
                     .fab-btn-joint { background-color: #6f42c1; }
                 }
@@ -714,7 +666,6 @@ function RecentCalls() {
 
             <div className="sticky-header">
                 <div className="header-actions">
-                    {/* Desktop Buttons */}
                     <button className="new-call-btn" onClick={() => { setModalType('individual'); setShowAddContactModal(true); }}>
                         <i className="bi bi-person-plus-fill"></i> New Meeting
                     </button>
@@ -723,30 +674,13 @@ function RecentCalls() {
                         <i className="bi bi-people-fill"></i> Joint Meeting
                     </button>
 
-                    {/* Mobile FAB (Click Trigger) */}
-                    <div className={`mobile-fab-container ${mobileMenuOpen ? 'open' : ''}`}>
-                        <button className="fab-trigger" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                            <i className="bi bi-plus-lg"></i>
-                        </button>
+                    <div className="mobile-fab-container">
+                        <button className="fab-trigger"><i className="bi bi-plus-lg"></i></button>
                         <div className="fab-options">
-                            <button 
-                                className="fab-mini-btn fab-btn-new" 
-                                onClick={() => { 
-                                    setModalType('individual'); 
-                                    setShowAddContactModal(true); 
-                                    setMobileMenuOpen(false); // Close menu after click
-                                }}
-                            >
+                            <button className="fab-mini-btn fab-btn-new" onClick={() => { setModalType('individual'); setShowAddContactModal(true); }}>
                                 <i className="bi bi-person-plus-fill"></i> New
                             </button>
-                            <button 
-                                className="fab-mini-btn fab-btn-joint" 
-                                onClick={() => { 
-                                    setModalType('group'); 
-                                    setShowAddContactModal(true);
-                                    setMobileMenuOpen(false); // Close menu after click
-                                }}
-                            >
+                            <button className="fab-mini-btn fab-btn-joint" onClick={() => { setModalType('group'); setShowAddContactModal(true); }}>
                                 <i className="bi bi-people-fill"></i> Joint
                             </button>
                         </div>
