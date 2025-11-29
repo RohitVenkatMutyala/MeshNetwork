@@ -2,21 +2,55 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext'; // <-- 1. IMPORT THEME
+import { useTheme } from '../context/ThemeContext';
 import { Eye, EyeOff } from 'lucide-react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import Navbar from './navbar';
-import Footer from './Footer'; // <-- IMPORT FOOTER
+import Footer from './Footer';
 
 function LoginForm() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [hoveredFeature, setHoveredFeature] = useState(null); // <--- NEW: Track hovered card
+
   const navigate = useNavigate();
   const { setUser, user } = useAuth();
-  const { theme } = useTheme(); // <-- 2. GET THEME
+  const { theme } = useTheme();
+
+  // --- NEW: Feature Data Configuration ---
+  const features = [
+    {
+      id: 0,
+      icon: 'bi-shield-lock',
+      title: 'End-to-End Secure',
+      short: 'Private P2P connections',
+      detail: 'Achieved via WebRTC DTLS-SRTP protocols. Data flows directly between peers, encrypted with keys generated locally.'
+    },
+    {
+      id: 1,
+      icon: 'bi-broadcast',
+      title: 'Ultra-Low Latency',
+      short: 'Real-time interaction',
+      detail: 'Achieved by eliminating central media servers. We establish direct mesh routes to ensure sub-100ms delivery.'
+    },
+    {
+      id: 2,
+      icon: 'bi-mic-fill',
+      title: 'Crystal Audio',
+      short: 'Noise suppression',
+      detail: 'Achieved using the Opus codec with built-in AI noise suppression and echo cancellation algorithms running in-browser.'
+    },
+    {
+      id: 3,
+      icon: 'bi-hdd-network',
+      title: 'Decentralized',
+      short: 'No central servers',
+      detail: 'Achieved by storing zero user media. Signaling is ephemeral, meaning your calls leave no trace on our infrastructure.'
+    }
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,28 +75,18 @@ function LoginForm() {
     navigate("/new-call");
     return null;
   }
-return (
+
+  return (
     <>
       <Navbar />
       
       <style>{`
         :root {
-            /* --- THEME VARIABLES (Matching Navbar) --- */
-            --nav-bg: #202c33;         /* Deep Steel Blue */
-            --nav-accent: #00a884;     /* Teal Green */
-            --nav-text: #e9edef;       /* Light Text */
-            
-            /* Gradient: Steel Blue to Black-ish */
-            --brand-gradient: linear-gradient(135deg, #202c33 0%, #0b141a 100%);
-            
-            /* Background for the page */
-            --bg-page: #e2e6ea; 
-        }
-
-        /* Dark Mode Overrides for the Page Background */
-        [data-bs-theme="dark"] .auth-container {
-            background-color: #111b21; /* Dark background for the page */
-            background-image: radial-gradient(#2a3942 1px, transparent 1px);
+            --nav-bg: #202c33; 
+            --nav-accent: #00a884;
+            --nav-text: #e9edef;
+            --brand-gradient: linear-gradient(135deg, #202c33 0%, #111b21 100%);
+            --bg-subtle: #f0f2f5;
         }
 
         .auth-container {
@@ -70,19 +94,18 @@ return (
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: var(--bg-page);
-            background-image: radial-gradient(#cbd5e0 1px, transparent 1px);
+            background-color: var(--bg-subtle);
+            background-image: radial-gradient(#d1d7db 1px, transparent 1px);
             background-size: 20px 20px;
             padding: 2rem 1rem;
-            transition: background-color 0.3s ease;
         }
 
         .auth-card {
             border: none;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
             overflow: hidden;
-            background-color: #ffffff; /* Force White Card */
+            background-color: #fff;
             min-height: 600px;
         }
 
@@ -95,7 +118,6 @@ return (
             overflow: hidden;
         }
         
-        /* Decorative Circle */
         .auth-welcome-col::before {
             content: '';
             position: absolute;
@@ -103,7 +125,7 @@ return (
             right: -100px;
             width: 300px;
             height: 300px;
-            background: rgba(0, 168, 132, 0.15); /* Teal Tint */
+            background: rgba(0, 168, 132, 0.1);
             border-radius: 50%;
         }
 
@@ -120,61 +142,83 @@ return (
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 15px;
             padding: 1.5rem;
-            transition: transform 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             color: #e9edef;
+            cursor: default;
+            position: relative;
+            min-height: 160px; /* Ensure consistent height during hover */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
+        
+        /* Hover Effect for Feature Card */
         .feature-card:hover {
             transform: translateY(-5px);
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.15);
             border-color: var(--nav-accent);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
         }
 
         .feature-icon {
             font-size: 1.8rem;
             margin-bottom: 0.5rem;
             color: var(--nav-accent);
+            transition: transform 0.3s ease;
+        }
+        
+        .feature-card:hover .feature-icon {
+            transform: scale(1.1);
+        }
+
+        .feature-desc {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            transition: opacity 0.2s ease;
+        }
+        
+        .feature-detail {
+            font-size: 0.85rem;
+            line-height: 1.4;
+            color: #fff;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         /* --- Right Column (Form) --- */
         .auth-form-col {
             padding: 4rem;
-            background-color: #ffffff; /* Ensure white bg */
+            background-color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #111b21; /* Force dark text on white card */
         }
 
-        /* --- FORCE INPUTS TO LIGHT MODE STYLE --- */
         .form-control {
-            background-color: #ffffff !important;
-            color: #111b21 !important;
-            border: 1px solid #dfe6e9;
             border-left: none;
+            border-color: #e9edef;
             padding: 0.8rem 0.8rem 0.8rem 0;
             font-size: 1rem;
         }
-        .form-control::placeholder {
-            color: #8696a0 !important;
-        }
-        .input-group-text {
-            background-color: #ffffff !important;
-            border: 1px solid #dfe6e9;
-            border-right: none;
-            color: #54656f !important;
-        }
-        
-        /* Focus States */
         .form-control:focus {
             box-shadow: none;
             border-color: var(--nav-accent);
         }
+        .input-group-text {
+            background: transparent;
+            border-right: none;
+            border-color: #e9edef;
+            color: #8696a0;
+        }
         .input-group:focus-within .input-group-text {
             border-color: var(--nav-accent);
-            color: var(--nav-accent) !important;
+            color: var(--nav-accent);
         }
         
-        /* Buttons */
         .btn-primary {
             background: var(--nav-accent);
             border: none;
@@ -183,14 +227,12 @@ return (
             font-weight: 600;
             letter-spacing: 0.5px;
             transition: all 0.3s;
-            color: #fff;
         }
         .btn-primary:hover {
             background: #008f6f;
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 168, 132, 0.3);
         }
-
         .btn-outline-primary {
             color: var(--nav-bg);
             border-color: var(--nav-bg);
@@ -201,57 +243,56 @@ return (
             background-color: var(--nav-bg);
             color: #fff;
         }
+        .btn-outline-secondary { border-color: #e9edef; }
 
-        /* Mobile Padding */
         @media (max-width: 992px) {
             .auth-form-col { padding: 2rem; }
         }
       `}</style>
 
-      {/* Pass theme to container for background, but... */}
-      <div className="auth-container" data-bs-theme={theme}>
+      <div className="auth-container">
         <div className="container">
           <div className="row justify-content-center">
             <div className="col-xl-11">
-              
-              {/* ...FORCE 'light' theme on the card so inputs stay white */}
-              <div className="card auth-card" data-bs-theme="light">
+              <div className="card auth-card">
                 <div className="row g-0 h-100">
                   
-                  {/* LEFT COLUMN (Features) */}
+                  {/* LEFT COLUMN: Professional Features Display */}
                   <div className="col-lg-6 d-none d-lg-flex flex-column justify-content-center auth-welcome-col">
                     <div style={{ position: 'relative', zIndex: 2 }}>
                         <h1 className="display-6 fw-bold mb-3">Connect with Confidence</h1>
                         <p className="mb-4" style={{ opacity: 0.8, fontSize: '1.1rem', fontWeight: 300 }}>
-                            Experience the next generation of secure, high-fidelity audio and video communication.
+                            Experience the next generation of secure, high-fidelity audio and video communication designed for professionals.
                         </p>
 
                         <div className="feature-grid">
-                            <div className="feature-card">
-                                <div className="feature-icon"><i className="bi bi-shield-lock"></i></div>
-                                <h6 className="fw-bold">End-to-End Secure</h6>
-                                <small style={{ opacity: 0.7 }}>Private P2P connections</small>
-                            </div>
-                            <div className="feature-card">
-                                <div className="feature-icon"><i className="bi bi-broadcast"></i></div>
-                                <h6 className="fw-bold">Ultra-Low Latency</h6>
-                                <small style={{ opacity: 0.7 }}>Real-time interaction</small>
-                            </div>
-                            <div className="feature-card">
-                                <div className="feature-icon"><i className="bi bi-mic-fill"></i></div>
-                                <h6 className="fw-bold">Crystal Audio</h6>
-                                <small style={{ opacity: 0.7 }}>Noise suppression</small>
-                            </div>
-                            <div className="feature-card">
-                                <div className="feature-icon"><i className="bi bi-hdd-network"></i></div>
-                                <h6 className="fw-bold">Decentralized</h6>
-                                <small style={{ opacity: 0.7 }}>No central servers</small>
-                            </div>
+                            {features.map((feature, index) => (
+                                <div 
+                                    key={feature.id} 
+                                    className="feature-card"
+                                    onMouseEnter={() => setHoveredFeature(index)}
+                                    onMouseLeave={() => setHoveredFeature(null)}
+                                >
+                                    <div className="feature-icon">
+                                        <i className={`bi ${feature.icon}`}></i>
+                                    </div>
+                                    <h6 className="fw-bold mb-1">{feature.title}</h6>
+                                    
+                                    {/* CONDITIONAL RENDERING BASED ON HOVER */}
+                                    {hoveredFeature === index ? (
+                                        <div className="feature-detail">
+                                            {feature.detail}
+                                        </div>
+                                    ) : (
+                                        <small className="feature-desc">{feature.short}</small>
+                                    )}
+                                </div>
+                            ))}
                         </div>
                     </div>
                   </div>
 
-                  {/* RIGHT COLUMN (Form) */}
+                  {/* RIGHT COLUMN: Clean Login Form */}
                   <div className="col-lg-6 auth-form-col">
                     <div className="w-100" style={{ maxWidth: '380px' }}>
                       <form onSubmit={handleSubmit}>
@@ -262,7 +303,7 @@ return (
                           </div>
                           <h2 className="fw-bold" style={{ color: 'var(--nav-bg)' }}>Welcome Back</h2>
                           <p className="text-muted small">
-                            Use your <strong>Network ID</strong> to access the platform.
+                            Use your <strong>Randoman ID</strong> to access the network.
                           </p>
                         </div>
 
@@ -303,11 +344,11 @@ return (
                             <button
                               type="button"
                               className="btn btn-outline-secondary"
-                              style={{ borderLeft: 'none', borderRadius: '0 8px 8px 0', borderColor: '#dfe6e9' }}
+                              style={{ borderLeft: 'none', borderRadius: '0 8px 8px 0' }}
                               onClick={() => setShowPassword(!showPassword)}
                               tabIndex={-1}
                             >
-                              {showPassword ? <EyeOff size={18} color="#636e72" /> : <Eye size={18} color="#636e72" />}
+                              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                           </div>
                         </div>
