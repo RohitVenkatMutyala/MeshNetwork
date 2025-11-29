@@ -563,10 +563,11 @@ function RecentCalls() {
                 .recent-calls-container { 
                     background-color: #111b21; 
                     height: calc(100vh - 60px); /* Fill screen minus navbar */
-                    width: 100vw; margin: 0;
+                    width: 100%; margin: 0;
                     display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif; 
                 }
-                .sticky-header { position: sticky; top: 0; z-index: 100; background-color: #111b21; padding: 20px 20px 10px; border-bottom: 1px solid rgba(134, 150, 160, 0.15); }
+                .sticky-header { position: sticky; top: 0; z-index: 100; background-color: #111b21; padding: 20px 20px 10px; border-bottom: 1px solid rgba(134, 150, 160, 0.15);box-sizing: border-box; /* ADDED */
+        width: 100%; /* ADDED */ }
                 
                 .header-actions { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
                 
@@ -588,6 +589,8 @@ function RecentCalls() {
                 .search-input-group { 
                     background-color: #202c33; border-radius: 24px; display: flex; align-items: center; 
                     padding: 0 20px; height: 46px; border: 1px solid transparent; transition: 0.2s;
+                    width: 100%; /* ADDED: Ensures input group fills wrapper */
+        box-sizing: border-box; /* ADDED */
                 }
                 .search-input-group:focus-within { background-color: #2a3942; border-color: rgba(255,255,255,0.1); }
                 .search-input { background: transparent; border: none; color: #e9edef; width: 100%; margin-left: 10px; outline: none; font-size: 1rem; }
@@ -595,6 +598,8 @@ function RecentCalls() {
                 .recent-calls-grid { 
                     flex: 1; overflow-y: auto; padding: 20px; display: grid; 
                     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; align-content: start; 
+                    width: 100%; /* ADDED */
+        box-sizing: border-box; /* ADDED */
                 }
 
                 @media (max-width: 480px) {
