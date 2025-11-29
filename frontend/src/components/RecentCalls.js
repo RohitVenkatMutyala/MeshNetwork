@@ -118,7 +118,7 @@ const CallNotification = ({ callerName, callId, callType, onClose, navigate }) =
     );
 };
 
-// --- SORTABLE CARD COMPONENT ---
+// --- SORTABLE CARD COMPONENT (Handles Drag & Drop) ---
 const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat, setDeleteTarget, navigate, getAvatarColor }) => {
     const {
         attributes,
@@ -237,12 +237,12 @@ function RecentCalls() {
     const [isCalling, setIsCalling] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     
+    // --- STATE FOR MOBILE MENU ---
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [showAddContactModal, setShowAddContactModal] = useState(false);
     const [modalType, setModalType] = useState('individual');
-
-    // --- NEW: Mobile Menu State ---
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const [allNotifications, setAllNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -482,7 +482,6 @@ function RecentCalls() {
         const unsub = onSnapshot(q, (snap) => {
             const rawCalls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // Deduplication Logic
             const uniqueCalls = [];
             const seenKeys = new Set();
             for (const call of rawCalls) {
@@ -800,8 +799,7 @@ function RecentCalls() {
                 )}
             </div>
 
-            {/* Modals remain the same... (Add Contact, Delete, Notification) */}
-            {/* [Code truncated for brevity as Modals were unchanged in logic, just re-paste them here from previous correct version] */}
+            {/* Modals remain the same */}
             {showAddContactModal && (
                 <div className="modal-overlay" onClick={() => setShowAddContactModal(false)}>
                     <div className="modal-card" onClick={e => e.stopPropagation()}>
@@ -883,7 +881,11 @@ function RecentCalls() {
                                             <div style={{ fontSize: '0.75rem', color: '#8696a0' }}>{formatTimeAgo(n.createdAt)}</div>
                                         </div>
                                         {n.type === 'call' && (
-                                            <button className={`btn-modal ${n.callType === 'group' ? 'btn-joint-action' : 'btn-primary'}`} style={{ padding: '6px 12px', fontSize: '0.85rem' }} onClick={() => { navigate(`/call/${n.callId}`); setShowNotificationModal(false); }}>
+                                            <button 
+                                                className={`btn-modal ${n.callType === 'group' ? 'btn-joint-action' : 'btn-primary'}`} 
+                                                style={{ padding: '6px 12px', fontSize: '0.85rem' }} 
+                                                onClick={() => { navigate(`/call/${n.callId}`); setShowNotificationModal(false); }}
+                                            >
                                                 Join
                                             </button>
                                         )}
