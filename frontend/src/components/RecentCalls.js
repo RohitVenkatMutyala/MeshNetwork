@@ -483,7 +483,22 @@ function RecentCalls() {
 
                 @media (max-width: 480px) {
                     .recent-calls-grid { grid-template-columns: 1fr; padding: 15px; } 
-                    .header-actions { flex-direction: column; align-items: stretch; }
+                    .header-actions { 
+        flex-direction: row !important; /* Force them to stay side-by-side */
+        align-items: center; 
+        gap: 10px; /* Space between the + button and search bar */
+    }
+    
+    /* Ensure the search bar takes up all remaining space */
+    .search-wrapper {
+        width: auto; /* Reset any fixed width */
+        flex: 1; /* Grow to fill space */
+    }
+    
+    /* Ensure height matches for visual alignment */
+    .search-input-group {
+        height: 40px; /* Match the height of the + button (fab-trigger) */
+    }
                     .new-call-btn, .joint-meet-btn { justify-content: center; }
                 }
 
@@ -666,7 +681,7 @@ function RecentCalls() {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8696a0', fontSize: '0.85rem', padding: '0 5px' }}>
-                    <span>Daily Limit: {dailyCallCount}/{dailyCallLimit}</span>
+                    <span>Conducted Meetings (Normal & Joint): {dailyCallCount}/{dailyCallLimit}</span>
                     <div style={{ cursor: 'pointer', position: 'relative' }} onClick={openNotificationModal}>
                         <i className="bi bi-bell-fill" style={{ fontSize: '1.2rem', color: unreadCount ? '#e9edef' : '#8696a0' }}></i>
                         {unreadCount > 0 && (
