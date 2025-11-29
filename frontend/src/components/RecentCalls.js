@@ -149,7 +149,7 @@ function RecentCalls() {
         const templateID = 'template_apzjekq';
         const callLink = `${window.location.origin}/call/${callId}`;
 
-        // Send to all recipients (looping client-side isn't ideal for bulk, but works for small groups)
+        // Send to all recipients
         for (const email of invitedEmailsArray) {
             try {
                 await emailjs.send(serviceID, templateID, {
@@ -263,12 +263,6 @@ function RecentCalls() {
         const today = new Date().toISOString().split('T')[0];
         const limitDocRef = doc(db, 'userCallLimits', user._id);
         
-        // Use existing ID to "Re-Call" essentially invites everyone again
-        // Or create a fresh call ID. The prompt implies using the list to call. 
-        // We will keep the SAME ID for simplicity in group context, 
-        // or create a new instance but link it.
-        // *Logic adapted: We use the EXISTING call ID for the room.*
-
         try {
             await runTransaction(db, async (transaction) => {
                 const limitDoc = await transaction.get(limitDocRef);
@@ -309,6 +303,8 @@ function RecentCalls() {
     const confirmDelete = async () => {
         if (!deleteTarget) return;
         try {
+            // If it's a group, strictly only owner should reach here based on UI logic
+            // But we double check just in case
             await deleteDoc(doc(db, 'calls', deleteTarget.id));
             if(deleteTarget.type === 'group') {
                  // Optional: Delete the group chat doc too if you want cleanup
@@ -341,14 +337,12 @@ function RecentCalls() {
         if (!user) return;
         
         if (call.type === 'group') {
-            // ROUTE TO NEW GROUP CHAT
             navigate(`/chat/group_chats/${call.id}`, { 
                 state: { 
                     recipientName: call.description // Group Name
                 } 
             });
         } else {
-            // ROUTE TO EXISTING DIRECT CHAT
             const email = call.ownerId === user._id ? call.recipientEmail : call.ownerEmail;
             const name = call.ownerId === user._id ? call.recipientName : call.ownerName;
             const participants = [user.email, email].sort();
@@ -356,14 +350,43 @@ function RecentCalls() {
         }
     };
 
-    // --- EFFECTS (Data Fetching) ---
+    // --- EFFECTS (Data Fetching with Deduplication) ---
     useEffect(() => {
         if (!user) return setLoading(false);
-        const q = query(collection(db, 'calls'), where('allowedEmails', 'array-contains', user.email), orderBy('createdAt', 'desc'), limit(50));
+        // Query more items because we will filter out duplicates
+        const q = query(collection(db, 'calls'), where('allowedEmails', 'array-contains', user.email), orderBy('createdAt', 'desc'), limit(100));
+        
         const unsub = onSnapshot(q, (snap) => {
-            const calls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setAllCalls(calls);
-            setFilteredCalls(calls);
+            const rawCalls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // --- DEDUPLICATION LOGIC ---
+            const uniqueCalls = [];
+            const seenKeys = new Set();
+
+            for (const call of rawCalls) {
+                let uniqueKey;
+                if (call.type === 'group') {
+                    // For groups, uniqueness is the Call/Room ID itself
+                    uniqueKey = 'group_' + call.id;
+                } else {
+                    // For individual calls, uniqueness is the Contact's Email
+                    // Regardless of who started the call, we want one entry per person
+                    const otherEmail = call.ownerId === user._id ? call.recipientEmail : call.ownerEmail;
+                    if(otherEmail) {
+                        uniqueKey = 'user_' + otherEmail;
+                    } else {
+                        uniqueKey = 'unknown_' + call.id;
+                    }
+                }
+
+                if (!seenKeys.has(uniqueKey)) {
+                    seenKeys.add(uniqueKey);
+                    uniqueCalls.push(call);
+                }
+            }
+            
+            setAllCalls(uniqueCalls);
+            setFilteredCalls(uniqueCalls);
             setLoading(false);
         });
         return () => unsub();
@@ -561,12 +584,14 @@ function RecentCalls() {
                         const isGroup = call.type === 'group';
                         const isOwner = call.ownerId === user._id;
                         
-                        // Display Logic: 
-                        // If Group: Title is Description, Subtitle is 'Joint Meeting'
-                        // If Individual: Title is Name, Subtitle is Email
+                        // Display Logic
                         const displayTitle = isGroup ? call.description : (isOwner ? call.recipientName : call.ownerName);
                         const displaySubtitle = isGroup ? `${call.allowedEmails.length} Participants` : (isOwner ? call.recipientEmail : call.ownerEmail);
                         
+                        // Condition: Can delete?
+                        // If group: Only owner. If individual: Anyone (removes from history).
+                        const canDelete = isGroup ? isOwner : true;
+
                         if (!displayTitle) return null;
                         
                         return (
@@ -591,9 +616,12 @@ function RecentCalls() {
                                     <button className="action-btn" title="Chat" onClick={() => handleOpenChat(call)}>
                                         <i className="bi bi-chat-left-text-fill"></i>
                                     </button>
-                                    <button className="action-btn btn-delete" title="Delete" style={{marginLeft:'auto'}} onClick={() => setDeleteTarget({id: call.id, name: displayTitle, type: call.type})}>
-                                        <i className="bi bi-trash"></i>
-                                    </button>
+                                    {/* Updated Delete Logic */}
+                                    {canDelete && (
+                                        <button className="action-btn btn-delete" title="Delete" style={{marginLeft:'auto'}} onClick={() => setDeleteTarget({id: call.id, name: displayTitle, type: call.type})}>
+                                            <i className="bi bi-trash"></i>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );
