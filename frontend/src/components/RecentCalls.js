@@ -352,7 +352,6 @@ function RecentCalls() {
     if (loading) return <div className="p-5 text-center"><div className="spinner-border text-primary"></div></div>;
 
     return (
-        <>
         <div className="recent-calls-container">
             <style jsx>{`
                 .recent-calls-container { background-color: #111b21; height: 100%; display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif; }
@@ -461,7 +460,10 @@ function RecentCalls() {
             <div className="sticky-header">
                 <div className="header-actions">
                     {/* New Call Button (Google Meet Style) */}
-                  
+                    <button className="new-call-btn" onClick={() => setShowAddContactModal(true)}>
+                        <i className="bi bi-plus-lg"></i>
+                        New Meeting
+                    </button>
 
                     {/* Search Bar (Google Meet Style) */}
                     <div className="search-wrapper">
@@ -616,14 +618,6 @@ function RecentCalls() {
                 </div>
             )}
         </div>
-         <div className="header-actions">
-                    {/* New Call Button (Google Meet Style) */}
-                    <button className="new-call-btn" onClick={() => setShowAddContactModal(true)}>
-                        <i className="bi bi-plus-lg"></i>
-                        New Meeting
-                    </button> 
-                </div>
-                </>
     );
 }
 
