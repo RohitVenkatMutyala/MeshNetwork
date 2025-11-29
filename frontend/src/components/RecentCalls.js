@@ -97,18 +97,28 @@ const CallNotification = ({ callerName, callId, callType, onClose, navigate }) =
         onClose();
     };
 
-    const btnStyle = callType === 'group'
-        ? { backgroundColor: '#6f42c1', borderColor: '#6f42c1', color: 'white' }
-        : {};
+    // Notification buttons also get the glass effect logic inline
+    const isGroup = callType === 'group';
+    const btnClass = isGroup ? 'glass-btn-purple' : 'glass-btn-green';
 
     return (
         <div className="d-flex flex-column">
+            <style jsx>{`
+                .glass-btn-green {
+                    background: linear-gradient(135deg, rgba(0, 168, 132, 0.6), rgba(0, 143, 111, 0.8));
+                    border: 1px solid rgba(255, 255, 255, 0.2); color: white;
+                }
+                .glass-btn-purple {
+                    background: linear-gradient(135deg, rgba(111, 66, 193, 0.6), rgba(89, 53, 154, 0.8));
+                    border: 1px solid rgba(255, 255, 255, 0.2); color: white;
+                }
+            `}</style>
             <strong className="mb-1">{callerName} is calling!</strong>
             <div className="d-flex justify-content-end gap-2 mt-2">
                 <button className="btn btn-sm btn-secondary" onClick={onClose} style={{ fontSize: '0.8rem' }}>Dismiss</button>
                 <button
-                    className={`btn btn-sm ${callType === 'group' ? '' : 'btn-success'}`}
-                    style={{ fontSize: '0.8rem', ...btnStyle }}
+                    className={`btn btn-sm ${btnClass}`}
+                    style={{ fontSize: '0.8rem', padding: '5px 15px', borderRadius: '12px' }}
                     onClick={handleJoin}
                 >
                     Join
@@ -144,16 +154,20 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
     const displaySubtitle = isGroup ? `${call.allowedEmails.length} Participants` : (isOwner ? call.recipientEmail : call.ownerEmail);
     const canDelete = isGroup ? isOwner : true;
 
+    // Determine button class based on card type
+    const actionBtnClass = isGroup ? 'glass-icon-btn-purple' : 'glass-icon-btn-green';
+
     if (!displayTitle) return null;
 
     // --- VIDEO BUTTON LOGIC ---
     const handleVideoAction = (e) => {
-        e.stopPropagation(); // Stop drag event
+        // Essential for mobile: stop propagation so drag doesn't start
+        e.stopPropagation(); 
+        e.preventDefault();
+        
         if (isGroup && !isOwner) {
-            // Participants just join
             navigate(`/call/${call.id}`);
         } else {
-            // Owner starts call (notifications)
             handleReCall(call);
         }
     };
@@ -182,22 +196,22 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
             <div className="card-actions">
                 {/* 1. Main Call/Join Button */}
                 <button 
-                    className="action-btn btn-call" 
+                    className={`action-btn ${actionBtnClass}`}
                     title={isGroup && !isOwner ? "Join Meeting" : "Start Video Call"} 
                     disabled={isCalling === call.id} 
                     onPointerDown={(e) => e.stopPropagation()} 
                     onClick={handleVideoAction}
                 >
-                    {isCalling === call.id ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-camera-video-fill"></i>}
+                    {isCalling === call.id ? <span className="spinner-border spinner-border-sm" style={{width: '1rem', height: '1rem'}}></span> : <i className="bi bi-camera-video-fill"></i>}
                 </button>
 
                 {/* 2. Host Re-Login Button (Owner Only) */}
                 {isOwner && (
                     <button 
-                        className="action-btn" 
-                        title="Re-Enter Room (Silent)" 
+                        className={`action-btn ${actionBtnClass}`}
+                        title="Re-Enter Room" 
                         onPointerDown={(e) => e.stopPropagation()}
-                        onClick={() => navigate(`/call/${call.id}`)}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/call/${call.id}`); }}
                     >
                         <i className="bi bi-box-arrow-in-right"></i>
                     </button>
@@ -205,22 +219,22 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
 
                 {/* 3. Chat Button */}
                 <button 
-                    className="action-btn" 
+                    className={`action-btn ${actionBtnClass}`}
                     title="Chat" 
                     onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => handleOpenChat(call)}
+                    onClick={(e) => { e.stopPropagation(); handleOpenChat(call); }}
                 >
                     <i className="bi bi-chat-left-text-fill"></i>
                 </button>
                 
-                {/* 4. Delete Button */}
+                {/* 4. Delete Button (Always Red Glass) */}
                 {canDelete && (
                     <button 
-                        className="action-btn btn-delete" 
+                        className="action-btn glass-icon-btn-red" 
                         title="Delete" 
                         style={{ marginLeft: 'auto' }} 
                         onPointerDown={(e) => e.stopPropagation()}
-                        onClick={() => setDeleteTarget({ id: call.id, name: displayTitle, type: call.type })}
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: call.id, name: displayTitle, type: call.type }); }}
                     >
                         <i className="bi bi-trash"></i>
                     </button>
@@ -257,10 +271,17 @@ function RecentCalls() {
     const [groupEmails, setGroupEmails] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
-    // --- DRAG AND DROP SENSORS ---
+    // --- DRAG AND DROP SENSORS (FIXED FOR MOBILE) ---
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-        useSensor(TouchSensor),
+        // ADDED: Delay and Tolerance for touch.
+        // This ensures taps are registered as clicks, and only long-press/drags are registered as DnD.
+        useSensor(TouchSensor, {
+            activationConstraint: {
+                delay: 250,
+                tolerance: 5,
+            },
+        }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
 
@@ -560,37 +581,20 @@ function RecentCalls() {
     return (
         <div className="recent-calls-container">
             <style jsx>{`
+                /* --- BASE LAYOUT --- */
                 .recent-calls-container { 
                     background-color: #111b21; 
                     height: calc(100vh - 60px); 
-                    width: 100%; /* Fixed Width Bug */
+                    width: 100%; 
                     margin: 0;
                     display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif;
-                    box-sizing: border-box; /* Fixed Width Bug */
-                    overflow-x: hidden;
+                    box-sizing: border-box; overflow-x: hidden;
                 }
-                
                 .sticky-header { 
                     position: sticky; top: 0; z-index: 100; background-color: #111b21; padding: 20px 20px 10px; border-bottom: 1px solid rgba(134, 150, 160, 0.15);
                     box-sizing: border-box; width: 100%;
                 }
-                
                 .header-actions { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
-                
-                .new-call-btn {
-                    background-color: #00a884; color: white; border: none; border-radius: 24px; padding: 10px 20px;
-                    font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.2s;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.2); white-space: nowrap;
-                }
-                .new-call-btn:hover { background-color: #008f6f; transform: translateY(-1px); }
-
-                .joint-meet-btn {
-                    background-color: #6f42c1; color: white; border: none; border-radius: 24px; padding: 10px 20px;
-                    font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.2s;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.2); white-space: nowrap;
-                }
-                .joint-meet-btn:hover { background-color: #59359a; transform: translateY(-1px); }
-
                 .search-wrapper { flex-grow: 1; min-width: 200px; }
                 .search-input-group { 
                     background-color: #202c33; border-radius: 24px; display: flex; align-items: center; 
@@ -611,84 +615,108 @@ function RecentCalls() {
                     .header-actions { flex-direction: row !important; align-items: center; gap: 10px; }
                     .search-wrapper { width: auto; flex: 1; }
                     .search-input-group { height: 40px; }
-                    .new-call-btn, .joint-meet-btn { justify-content: center; }
                 }
 
-                /* --- GLASSY CARDS CSS START --- */
-                
-                /* Standard Card (Individual): Dark Blue-Gray Glass */
-                .call-card { 
-                    background: rgba(31, 41, 55, 0.7); /* Base #1F2937 at 70% opacity */
-                    backdrop-filter: blur(12px);
-                    -webkit-backdrop-filter: blur(12px);
-                    border: 1px solid rgba(255, 255, 255, 0.08); /* Subtle glass border */
-                    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-                    border-radius: 16px; 
-                    padding: 20px; 
-                    display: flex; flex-direction: column; 
-                    min-height: 220px; 
-                    transition: 0.3s all ease; 
-                    position: relative; 
-                    overflow: hidden;
+                /* --- PREMIUM GLASSY BUTTONS (Creation Buttons) --- */
+                .glass-btn-green, .glass-btn-purple {
+                    border: none; border-radius: 24px; padding: 10px 20px;
+                    font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.3s;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.2); white-space: nowrap;
+                    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
                 }
                 
-                /* Joint Meeting Card (Group): Premium Gradient Glass */
+                /* Teal Glass (Normal) */
+                .glass-btn-green {
+                    background: linear-gradient(135deg, rgba(0, 168, 132, 0.7), rgba(0, 143, 111, 0.9));
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: white;
+                }
+                .glass-btn-green:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0, 168, 132, 0.4); }
+
+                /* Purple Glass (Joint) */
+                .glass-btn-purple {
+                    background: linear-gradient(135deg, rgba(111, 66, 193, 0.7), rgba(89, 53, 154, 0.9));
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: white;
+                }
+                .glass-btn-purple:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(111, 66, 193, 0.4); }
+
+                /* --- GLASSY CARDS --- */
+                .call-card { 
+                    background: rgba(31, 41, 55, 0.7); 
+                    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+                    border-radius: 16px; padding: 20px; 
+                    display: flex; flex-direction: column; min-height: 220px; 
+                    transition: 0.3s all ease; position: relative; overflow: hidden;
+                }
                 .call-card.joint-meet { 
-                    /* Diagonal Gradient: Lighter Slate -> Deep Dark */
                     background: linear-gradient(145deg, rgba(55, 65, 81, 0.7) 0%, rgba(17, 24, 39, 0.85) 100%);
-                    border: 1px solid rgba(255, 255, 255, 0.15); /* Slightly brighter border for premium feel */
+                    border: 1px solid rgba(255, 255, 255, 0.15);
                     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
                 }
-
-                /* Hover Effects for Shine & Depth */
-                .call-card:hover { 
-                    transform: translateY(-5px); 
-                    border-color: rgba(255, 255, 255, 0.2); 
-                    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
-                }
-                
-                .call-card.joint-meet:hover {
-                    border-color: rgba(111, 66, 193, 0.4); /* Subtle purple hint on hover border */
-                    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
-                }
-
-                /* Glass Shine Reflection (Top down) */
+                .call-card:hover { transform: translateY(-5px); border-color: rgba(255, 255, 255, 0.2); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
                 .call-card::before {
-                    content: '';
-                    position: absolute;
-                    top: 0; left: 0; right: 0;
-                    height: 100%;
-                    background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%);
-                    pointer-events: none;
+                    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 100%;
+                    background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%); pointer-events: none;
                 }
-                /* --- GLASSY CARDS CSS END --- */
+
+                /* --- GLASSY CARD ACTION BUTTONS (Icons) --- */
+                .card-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); z-index: 10; position: relative; }
                 
+                .action-btn { 
+                    width: 38px; height: 38px; 
+                    border-radius: 50%; 
+                    display: flex; align-items: center; justify-content: center;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    cursor: pointer; transition: 0.2s;
+                    backdrop-filter: blur(4px);
+                    font-size: 1.1rem;
+                    z-index: 20; /* Ensure clickable */
+                }
+
+                /* Green Glass Icons (Normal Card) */
+                .glass-icon-btn-green {
+                    background: rgba(0, 168, 132, 0.15);
+                    color: #00a884;
+                }
+                .glass-icon-btn-green:hover { background: rgba(0, 168, 132, 0.4); color: white; transform: scale(1.1); }
+
+                /* Purple Glass Icons (Joint Card) */
+                .glass-icon-btn-purple {
+                    background: rgba(111, 66, 193, 0.2);
+                    color: #b185f7;
+                }
+                .glass-icon-btn-purple:hover { background: rgba(111, 66, 193, 0.5); color: white; transform: scale(1.1); }
+
+                /* Red Glass Icon (Delete) */
+                .glass-icon-btn-red {
+                    background: rgba(220, 53, 69, 0.15);
+                    color: #ef5350;
+                }
+                .glass-icon-btn-red:hover { background: rgba(220, 53, 69, 0.4); color: white; transform: scale(1.1); }
+
+
                 .card-header-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: bold; color: white; margin-bottom: 12px; z-index: 2; }
                 .card-title { font-size: 1.1rem; font-weight: 600; color: #e9edef; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
                 .card-subtitle { font-size: 0.85rem; color: #8696a0; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
                 .card-date { font-size: 0.75rem; color: #556066; margin-bottom: 12px; z-index: 2; }
                 
-                .card-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); z-index: 2; position: relative; }
-                .action-btn { background: transparent; border: none; color: #8696a0; font-size: 1.2rem; padding: 4px; cursor: pointer; transition: 0.2s; }
-                .action-btn:hover { color: #e9edef; transform: scale(1.1); }
-                .btn-call:hover { color: #00a884; } .btn-delete:hover { color: #ef5350; }
-
                 .badge { position: absolute; top: 15px; right: 15px; font-size: 0.65rem; padding: 4px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; z-index: 2; }
                 .badge-meeting { background: rgba(0, 168, 132, 0.2); color: #00a884; }
                 .badge-joint { background: rgba(111, 66, 193, 0.2); color: #b185f7; }
 
-                /* Modal */
+                /* Modal & Form Styles (Unchanged) */
                 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
                 .modal-card { background: #1f2937; color: #e9edef; width: 90%; max-width: 420px; padding: 24px; border-radius: 16px; border: 1px solid #374051; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
                 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
                 .modal-title { margin: 0; font-size: 1.25rem; font-weight: 600; }
                 .close-btn { background: none; border: none; color: #8696a0; font-size: 1.2rem; cursor: pointer; }
-                
                 .form-group { margin-bottom: 15px; }
                 .form-label { display: block; color: #8696a0; font-size: 0.85rem; margin-bottom: 6px; }
                 .form-control { width: 100%; background: #2a3942; border: 1px solid #374051; color: white; padding: 10px 14px; border-radius: 8px; outline: none; transition: 0.2s; }
                 .form-control:focus { border-color: #00a884; }
-
                 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
                 .btn-modal { padding: 10px 20px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; }
                 .btn-primary { background: #00a884; color: white; }
@@ -700,7 +728,7 @@ function RecentCalls() {
                 /* MOBILE FAB */
                 .mobile-fab-container { display: none; }
                 @media (max-width: 768px) {
-                    .new-call-btn, .joint-meet-btn { display: none !important; }
+                    .glass-btn-green, .glass-btn-purple { display: none !important; } /* Hide main buttons on mobile */
                     .mobile-fab-container { display: flex; align-items: center; position: relative; z-index: 200; }
                     .fab-trigger { width: 40px; height: 40px; border-radius: 50%; background-color: #00a884; color: white; border: none; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.3s ease, background 0.3s; cursor: pointer; z-index: 202; }
                     .fab-options { position: absolute; left: 10px; top: 0; height: 40px; display: flex; align-items: center; gap: 8px; opacity: 0; visibility: hidden; transform: translateX(-10px) scale(0.9); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 201; pointer-events: none; background: rgba(31, 41, 55, 0.9); padding: 5px 10px 5px 35px; border-radius: 24px; margin-left: -5px; }
@@ -710,17 +738,15 @@ function RecentCalls() {
                     .fab-btn-new { background-color: #00a884; }
                     .fab-btn-joint { background-color: #6f42c1; }
                 }
-                .btn-joint-action { background: #6f42c1; color: white; }
-                .btn-joint-action:hover { background: #59359a; }
             `}</style>
 
             <div className="sticky-header">
                 <div className="header-actions">
-                    <button className="new-call-btn" onClick={() => { setModalType('individual'); setShowAddContactModal(true); }}>
+                    <button className="glass-btn-green" onClick={() => { setModalType('individual'); setShowAddContactModal(true); }}>
                         <i className="bi bi-person-plus-fill"></i> New Meeting
                     </button>
 
-                    <button className="joint-meet-btn" onClick={() => { setModalType('group'); setShowAddContactModal(true); }}>
+                    <button className="glass-btn-purple" onClick={() => { setModalType('group'); setShowAddContactModal(true); }}>
                         <i className="bi bi-people-fill"></i> Joint Meeting
                     </button>
 
@@ -866,7 +892,7 @@ function RecentCalls() {
                                         </div>
                                         {n.type === 'call' && (
                                             <button 
-                                                className={`btn-modal ${n.callType === 'group' ? 'btn-joint-action' : 'btn-primary'}`} 
+                                                className={`btn-modal ${n.callType === 'group' ? 'glass-btn-purple' : 'glass-btn-green'}`} 
                                                 style={{ padding: '6px 12px', fontSize: '0.85rem' }} 
                                                 onClick={() => { navigate(`/call/${n.callId}`); setShowNotificationModal(false); }}
                                             >
