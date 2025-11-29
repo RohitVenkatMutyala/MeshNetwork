@@ -43,14 +43,15 @@ function LoginForm() {
   }
 
   // Feature Data for the Grid
-  const features = [
-    { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming for any connection speed.", color: "text-teal" },
-    { icon: <Shield size={32} />, title: "End-to-End Secure", desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols. No data storage.", color: "text-purple" },
-    { icon: <Users size={32} />, title: "Joint Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
-    { icon: <Mic size={32} />, title: "Noise Cancellation", desc: "Advanced audio processing to filter out background noise for crisp voice clarity.", color: "text-purple" },
-    { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
-    { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
-  ];
+ const features = [
+      { icon: <Users size={32} />, title: " Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
+     { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming.", color: "text-teal" },
+     { icon: <Shield size={32} />, title: "End-to-End Secure", desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.", color: "text-purple" },
+     { icon: <Users size={32} />, title: "Group Calls", desc: "Host meetings with up to 10 participants with ease and stability.", color: "text-teal" },
+    // { icon: <Mic size={32} />, title: "Noise Cancellation", desc: "Advanced audio processing to filter out background noise.", color: "text-purple" },
+     { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
+     { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
+   ];
 
   return (
     <>
