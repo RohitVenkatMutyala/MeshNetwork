@@ -416,7 +416,7 @@ function RecentCalls() {
                     padding: 20px; 
                     display: flex; 
                     flex-direction: column; 
-                    min-height: 170px; 
+                    min-height: 210px; 
                     border: 1px solid rgba(134,150,160,0.15); 
                     transition: 0.3s; 
                     position: relative; 
@@ -462,7 +462,7 @@ function RecentCalls() {
                     {/* New Call Button (Google Meet Style) */}
                     <button className="new-call-btn" onClick={() => setShowAddContactModal(true)}>
                         <i className="bi bi-plus-lg"></i>
-                        New Call
+                        New Meeting
                     </button>
 
                     {/* Search Bar (Google Meet Style) */}
