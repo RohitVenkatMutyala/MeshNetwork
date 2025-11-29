@@ -825,7 +825,7 @@ function RecentCalls({ searchTerm }) {
 
                                             {/* Action Icons (Hover to see) */}
                                             <div className="call-actions" onClick={(e) => e.stopPropagation()}>
-                                                <button
+                                               {/* <button
                                                     className="action-icon icon-call"
                                                     title="Voice Call"
                                                     disabled={isCalling === call.id}
@@ -836,7 +836,7 @@ function RecentCalls({ searchTerm }) {
                                                     onClick={() => navigate(`/audio-call/${call.id}`)}
                                                 >
                                                     <i className="bi bi-telephone-fill"></i>
-                                                </button>
+                                                </button>*/}
                                                 <button
                                                     className="action-icon icon-call"
                                                     title="Video Call"
