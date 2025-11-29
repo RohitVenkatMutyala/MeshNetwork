@@ -47,31 +47,42 @@ return (
       
       <style>{`
         :root {
-            /* Matches Navbar & Chat Theme */
-            --nav-bg: #202c33; 
-            --nav-accent: #00a884;
-            --nav-text: #e9edef;
-            --brand-gradient: linear-gradient(135deg, #202c33 0%, #111b21 100%);
-            --bg-subtle: #f0f2f5;
+            /* --- THEME VARIABLES (Matching Navbar) --- */
+            --nav-bg: #202c33;         /* Deep Steel Blue */
+            --nav-accent: #00a884;     /* Teal Green */
+            --nav-text: #e9edef;       /* Light Text */
+            
+            /* Gradient: Steel Blue to Black-ish */
+            --brand-gradient: linear-gradient(135deg, #202c33 0%, #0b141a 100%);
+            
+            /* Background for the page */
+            --bg-page: #e2e6ea; 
+        }
+
+        /* Dark Mode Overrides for the Page Background */
+        [data-bs-theme="dark"] .auth-container {
+            background-color: #111b21; /* Dark background for the page */
+            background-image: radial-gradient(#2a3942 1px, transparent 1px);
         }
 
         .auth-container {
-            min-height: calc(100vh - 64px); /* 64px is navbar height */
+            min-height: calc(100vh - 64px);
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: var(--bg-subtle);
-            background-image: radial-gradient(#d1d7db 1px, transparent 1px);
+            background-color: var(--bg-page);
+            background-image: radial-gradient(#cbd5e0 1px, transparent 1px);
             background-size: 20px 20px;
             padding: 2rem 1rem;
+            transition: background-color 0.3s ease;
         }
 
         .auth-card {
             border: none;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
             overflow: hidden;
-            background-color: #fff;
+            background-color: #ffffff; /* Force White Card */
             min-height: 600px;
         }
 
@@ -84,6 +95,7 @@ return (
             overflow: hidden;
         }
         
+        /* Decorative Circle */
         .auth-welcome-col::before {
             content: '';
             position: absolute;
@@ -91,7 +103,7 @@ return (
             right: -100px;
             width: 300px;
             height: 300px;
-            background: rgba(0, 168, 132, 0.1); /* Subtle Green Tint */
+            background: rgba(0, 168, 132, 0.15); /* Teal Tint */
             border-radius: 50%;
         }
 
@@ -120,51 +132,61 @@ return (
         .feature-icon {
             font-size: 1.8rem;
             margin-bottom: 0.5rem;
-            color: var(--nav-accent); /* Green Accent */
+            color: var(--nav-accent);
         }
 
         /* --- Right Column (Form) --- */
         .auth-form-col {
             padding: 4rem;
-            background-color: #fff;
+            background-color: #ffffff; /* Ensure white bg */
             display: flex;
             align-items: center;
             justify-content: center;
+            color: #111b21; /* Force dark text on white card */
         }
 
-        /* Modern Inputs */
-        .input-group-text {
-            background: transparent;
-            border-right: none;
-            border-color: #e9edef;
-            color: #8696a0;
-        }
+        /* --- FORCE INPUTS TO LIGHT MODE STYLE --- */
         .form-control {
+            background-color: #ffffff !important;
+            color: #111b21 !important;
+            border: 1px solid #dfe6e9;
             border-left: none;
-            border-color: #e9edef;
             padding: 0.8rem 0.8rem 0.8rem 0;
             font-size: 1rem;
         }
+        .form-control::placeholder {
+            color: #8696a0 !important;
+        }
+        .input-group-text {
+            background-color: #ffffff !important;
+            border: 1px solid #dfe6e9;
+            border-right: none;
+            color: #54656f !important;
+        }
+        
+        /* Focus States */
         .form-control:focus {
             box-shadow: none;
             border-color: var(--nav-accent);
         }
         .input-group:focus-within .input-group-text {
             border-color: var(--nav-accent);
-            color: var(--nav-accent);
+            color: var(--nav-accent) !important;
         }
         
+        /* Buttons */
         .btn-primary {
             background: var(--nav-accent);
             border: none;
             padding: 0.8rem;
-            border-radius: 24px; /* Pill shape like navbar tabs */
+            border-radius: 24px;
             font-weight: 600;
             letter-spacing: 0.5px;
             transition: all 0.3s;
+            color: #fff;
         }
         .btn-primary:hover {
-            background: #008f6f; /* Darker Green */
+            background: #008f6f;
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 168, 132, 0.3);
         }
@@ -179,29 +201,29 @@ return (
             background-color: var(--nav-bg);
             color: #fff;
         }
-        
-        .btn-outline-secondary {
-             border-color: #e9edef;
-        }
 
+        /* Mobile Padding */
         @media (max-width: 992px) {
             .auth-form-col { padding: 2rem; }
         }
       `}</style>
 
-      <div className="auth-container">
+      {/* Pass theme to container for background, but... */}
+      <div className="auth-container" data-bs-theme={theme}>
         <div className="container">
           <div className="row justify-content-center">
             <div className="col-xl-11">
-              <div className="card auth-card">
+              
+              {/* ...FORCE 'light' theme on the card so inputs stay white */}
+              <div className="card auth-card" data-bs-theme="light">
                 <div className="row g-0 h-100">
                   
-                  {/* LEFT COLUMN: Professional Features Display */}
+                  {/* LEFT COLUMN (Features) */}
                   <div className="col-lg-6 d-none d-lg-flex flex-column justify-content-center auth-welcome-col">
                     <div style={{ position: 'relative', zIndex: 2 }}>
                         <h1 className="display-6 fw-bold mb-3">Connect with Confidence</h1>
                         <p className="mb-4" style={{ opacity: 0.8, fontSize: '1.1rem', fontWeight: 300 }}>
-                            Experience the next generation of secure, high-fidelity audio and video communication designed for professionals.
+                            Experience the next generation of secure, high-fidelity audio and video communication.
                         </p>
 
                         <div className="feature-grid">
@@ -229,7 +251,7 @@ return (
                     </div>
                   </div>
 
-                  {/* RIGHT COLUMN: Clean Login Form */}
+                  {/* RIGHT COLUMN (Form) */}
                   <div className="col-lg-6 auth-form-col">
                     <div className="w-100" style={{ maxWidth: '380px' }}>
                       <form onSubmit={handleSubmit}>
@@ -240,7 +262,7 @@ return (
                           </div>
                           <h2 className="fw-bold" style={{ color: 'var(--nav-bg)' }}>Welcome Back</h2>
                           <p className="text-muted small">
-                            Use your <strong>Randoman ID</strong> to access the network.
+                            Use your <strong>Network ID</strong> to access the platform.
                           </p>
                         </div>
 
@@ -281,11 +303,11 @@ return (
                             <button
                               type="button"
                               className="btn btn-outline-secondary"
-                              style={{ borderLeft: 'none', borderRadius: '0 8px 8px 0' }}
+                              style={{ borderLeft: 'none', borderRadius: '0 8px 8px 0', borderColor: '#dfe6e9' }}
                               onClick={() => setShowPassword(!showPassword)}
                               tabIndex={-1}
                             >
-                              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                              {showPassword ? <EyeOff size={18} color="#636e72" /> : <Eye size={18} color="#636e72" />}
                             </button>
                           </div>
                         </div>
