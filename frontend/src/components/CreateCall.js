@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import RecentCalls from './RecentCalls';
 import Navbar from './navbar';
-import Footer from './Footer';
+
 function CreateCall() {
     const { user } = useAuth();
     const [step, setStep] = useState(0); // 0 = Main list, 1 = Description, 2 = Invite
@@ -147,7 +147,6 @@ function CreateCall() {
                     {renderStep()}
                 </div>
             </div>
-            <Footer />
         </>
     );
 }
