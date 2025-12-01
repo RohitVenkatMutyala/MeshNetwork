@@ -1,7 +1,12 @@
 /* --- 1. Global Reset (CRITICAL for Padding to work correctly) --- */
 * {
   box-sizing: border-box;
+   user-select: none;
+  -webkit-user-select: none; /* Chrome, Safari */
+  -moz-user-select: none;    /* Firefox */
+  -ms-user-select: none;     /* IE/Edge */
 }
+
 
 body {
   margin: 0;
