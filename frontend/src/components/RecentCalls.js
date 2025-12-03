@@ -878,7 +878,6 @@ function RecentCalls() {
             )}
         </div>
     );
-    
 }
 
 export default RecentCalls;
