@@ -237,7 +237,15 @@ function Call() {
     const screenStreamRef = useRef(null);
     const cameraTrackRef = useRef(null);
     const micTrackRef = useRef(null);
-
+    const iceServers = [
+        { urls: 'stun:stun.l.google.com:19302' }, // Google's free STUN
+        { 
+            // YOUR EC2 TURN SERVER
+            urls: '13.234.77.246', // <--- REPLACE THIS WITH YOUR EC2 PUBLIC IP
+            username: 'secure_video_user', 
+            credential: '9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b' 
+        }
+    ];
 
     // --- MODIFIED: Renamed states for clarity ---
     const [participants, setParticipants] = useState([]); // Users *in* the call
@@ -415,7 +423,14 @@ function Call() {
         // --- NEW: createPeer function (Initiator) ---
         const createPeer = (recipientId, senderId, stream) => {
             console.log(`Creating peer for ${recipientId}`);
-            const peer = new Peer({ initiator: true, trickle: false, stream });
+           // --- UPDATE THIS PART ---
+            const peer = new Peer({ 
+                initiator: true, 
+                trickle: false, 
+                stream,
+                config: { iceServers: iceServers } // <--- Add this line
+            });
+            // ------------------------
 
             peer.on('signal', signal => {
                 addDoc(signalingColRef, { recipientId, senderId, signal });
@@ -441,7 +456,14 @@ function Call() {
         // --- NEW: addPeer function (Non-Initiator) ---
         const addPeer = (incoming, recipientId, stream) => {
             console.log(`Accepting peer from ${incoming.senderId}`);
-            const peer = new Peer({ initiator: false, trickle: false, stream });
+           // --- UPDATE THIS PART ---
+            const peer = new Peer({ 
+                initiator: false, 
+                trickle: false, 
+                stream,
+                config: { iceServers: iceServers } // <--- Add this line
+            });
+            // ------------------------
 
             peer.on('signal', signal => {
                 addDoc(signalingColRef, { recipientId: incoming.senderId, senderId: recipientId, signal });
