@@ -19,7 +19,13 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import Navbar from './navbar';
 import emailjs from '@emailjs/browser';
-
+// FIX: Polyfill for simple-peer in modern browsers
+if (typeof process === 'undefined') {
+    window.process = {
+        nextTick: (cb) => setTimeout(cb, 0),
+        env: { NODE_ENV: 'production' } // strict mode fix
+    };
+}
 // --- NEW: Quality Definitions ---
 const QUALITY_PROFILES = {
     high: {
@@ -187,7 +193,15 @@ function SlideToActionButton({ onAction, text, iconClass, colorClass, actionType
         </div>
     );
 }
-
+const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    {
+        // FIX: Added 'turn:' prefix and port ':3478'
+        urls: 'turn:13.234.77.246:3478', 
+        username: 'secure_video_user',
+        credential: '9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b'
+    }
+];
 
 function Call() {
     const { user, loading } = useAuth();
@@ -237,15 +251,7 @@ function Call() {
     const screenStreamRef = useRef(null);
     const cameraTrackRef = useRef(null);
     const micTrackRef = useRef(null);
-    const iceServers = [
-        { urls: 'stun:stun.l.google.com:19302' }, // Google's free STUN
-        { 
-            // YOUR EC2 TURN SERVER
-            urls: '13.234.77.246', // <--- REPLACE THIS WITH YOUR EC2 PUBLIC IP
-            username: 'secure_video_user', 
-            credential: '9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b' 
-        }
-    ];
+ 
 
     // --- MODIFIED: Renamed states for clarity ---
     const [participants, setParticipants] = useState([]); // Users *in* the call
