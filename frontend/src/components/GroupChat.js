@@ -3,14 +3,16 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { db, storage } from '../firebaseConfig';
 import { 
     collection, query, orderBy, onSnapshot, addDoc, 
-    serverTimestamp, doc, setDoc, deleteDoc, getDoc
+    serverTimestamp, doc, setDoc, deleteDoc, getDoc, updateDoc, arrayUnion
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { v4 as uuidv4 } from 'uuid';
+import CryptoJS from 'crypto-js';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+const SECRET_KEY = "your_secure_secret_key_here"; 
 
 const GroupChat = () => {
     const { user } = useAuth();
@@ -42,6 +44,18 @@ const GroupChat = () => {
 
     const handleClose = () => navigate(-1);
 
+    // --- Encryption Helpers ---
+    const encryptMessage = (text) => CryptoJS.AES.encrypt(text, SECRET_KEY).toString();
+    const decryptMessage = (cipherText) => {
+        try {
+            const bytes = CryptoJS.AES.decrypt(cipherText, SECRET_KEY);
+            const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+            return decrypted || cipherText;
+        } catch (error) {
+            return cipherText;
+        }
+    };
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
@@ -50,7 +64,7 @@ const GroupChat = () => {
         scrollToBottom();
     }, [messages, typingUsers, isRecording]);
 
-    // --- 1. Fetch Group Details & Messages ---
+    // --- 1. Fetch Group Details & Messages & Read Receipts ---
     useEffect(() => {
         if (!chatId || !user) return;
 
@@ -65,7 +79,6 @@ const GroupChat = () => {
         fetchGroupDetails();
 
         // Listen for Messages
-        // We assume messages are stored in subcollection 'messages' inside the group doc
         const messagesRef = collection(db, 'group_chats', chatId, 'messages');
         const q = query(messagesRef, orderBy('timestamp', 'asc'));
 
@@ -75,6 +88,24 @@ const GroupChat = () => {
                 ...doc.data()
             }));
             setMessages(msgs);
+
+            // --- Read Receipt Logic (Blue Ticks) ---
+            // If I am reading this message (and I am not the sender), add my ID to 'readBy'
+            snapshot.docs.forEach(async (docSnap) => {
+                const data = docSnap.data();
+                const readBy = data.readBy || [];
+                
+                // If I haven't marked as read yet and I am NOT the sender
+                if (data.senderId !== user._id && !readBy.includes(user._id)) {
+                    try {
+                        await updateDoc(docSnap.ref, {
+                            readBy: arrayUnion(user._id)
+                        });
+                    } catch (err) {
+                        console.error("Error updating group read receipt:", err);
+                    }
+                }
+            });
         });
 
         return () => unsubscribe();
@@ -109,7 +140,6 @@ const GroupChat = () => {
         if (!isTyping) {
             setIsTyping(true);
             const chatDocRef = doc(db, 'group_chats', chatId);
-            // Store name with typing status so we can show "Alice is typing..."
             await setDoc(chatDocRef, { 
                 typing: { 
                     [user._id]: { isTyping: true, name: user.firstname } 
@@ -130,7 +160,7 @@ const GroupChat = () => {
         }, 2000);
     };
 
-    // --- 3. Send Message ---
+    // --- 3. Send Message (Encrypted) ---
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!newMessage.trim()) return;
@@ -142,14 +172,17 @@ const GroupChat = () => {
             }, { merge: true });
             setIsTyping(false);
 
+            // Encrypt Text
+            const encryptedText = encryptMessage(newMessage);
+
             await addDoc(collection(db, 'group_chats', chatId, 'messages'), {
-                text: newMessage,
+                text: encryptedText, // Store Encrypted
                 type: 'text',
                 senderName: `${user.firstname} ${user.lastname}`,
                 senderId: user._id,
                 senderEmail: user.email,
                 timestamp: serverTimestamp(),
-                readBy: [user._id] // Simple array to track who saw it (optional logic needed to update this)
+                readBy: [user._id] // Initially read by sender
             });
             setNewMessage('');
         } catch (error) {
@@ -158,7 +191,7 @@ const GroupChat = () => {
         }
     };
 
-    // --- 4. File/Audio Logic (Same as Chat.js but pointed to group_chats) ---
+    // --- 4. File/Audio Logic ---
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -187,6 +220,7 @@ const GroupChat = () => {
                 senderId: user._id,
                 senderEmail: user.email,
                 timestamp: serverTimestamp(),
+                readBy: [user._id]
             });
 
         } catch (error) {
@@ -247,6 +281,7 @@ const GroupChat = () => {
                 senderId: user._id,
                 senderEmail: user.email,
                 timestamp: serverTimestamp(),
+                readBy: [user._id]
             });
 
         } catch (error) {
@@ -311,6 +346,8 @@ const GroupChat = () => {
                     --wa-text-primary: #e9edef;
                     --wa-text-secondary: #8696a0;
                     --wa-accent: #34b7f1; 
+                    --wa-tick-read: #53bdeb; /* Blue for read */
+                    --wa-tick-sent: #8696a0; /* Grey for sent */
                 }
 
                 .chat-page-container {
@@ -421,6 +458,11 @@ const GroupChat = () => {
                 .msg-time { font-size: 0.68rem; color: var(--wa-text-secondary); }
                 .bubble-own .msg-time { color: rgba(255,255,255,0.7); }
 
+                /* Ticks CSS */
+                .read-ticks { font-size: 0.9rem; margin-left: 3px; }
+                .read-ticks.blue { color: var(--wa-tick-read); }
+                .read-ticks.grey { color: var(--wa-tick-sent); }
+
                 /* Footer */
                 .chat-footer {
                     padding: 8px 10px; background-color: var(--wa-header); 
@@ -518,6 +560,15 @@ const GroupChat = () => {
                         const prevDateLabel = prevMsg ? getDateLabel(prevMsg.timestamp) : null;
                         const showDate = dateLabel && dateLabel !== prevDateLabel;
 
+                        // Decrypt Text
+                        let displayContent = msg.text;
+                        if(msg.type === 'text') {
+                            displayContent = decryptMessage(msg.text);
+                        }
+
+                        // Check if read by others (length > 1 means sender + at least one other person)
+                        const readByOthers = msg.readBy && msg.readBy.length > 1;
+
                         return (
                             <React.Fragment key={msg.id}>
                                 {showDate && (
@@ -535,12 +586,10 @@ const GroupChat = () => {
                                             </div>
                                         )}
 
-                                        {/* Always show Sender Name in Group Chat if not own message */}
                                         {!isOwn && (
                                             <div className="sender-name">{msg.senderName}</div>
                                         )}
 
-                                        {/* Content Types */}
                                         {msg.type === 'image' && (
                                             <a href={msg.fileUrl} target="_blank" rel="noreferrer">
                                                 <img src={msg.fileUrl} alt="attachment" className="msg-image" />
@@ -565,10 +614,16 @@ const GroupChat = () => {
                                             </div>
                                         )}
 
-                                        {msg.type === 'text' && <span>{msg.text}</span>}
+                                        {msg.type === 'text' && <span>{displayContent}</span>}
 
                                         <div className="msg-meta">
                                             <span className="msg-time">{formatTime(msg.timestamp)}</span>
+                                            {/* BLUE TICKS FOR GROUP */}
+                                            {isOwn && (
+                                                <span className={`read-ticks ${readByOthers ? 'blue' : 'grey'}`}>
+                                                    <i className="bi bi-check2-all"></i>
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -622,7 +677,6 @@ const GroupChat = () => {
                 </div>
             </div>
 
-            {/* --- CUSTOM DELETE MODAL --- */}
             {deleteTargetId && (
                 <div className="delete-modal-overlay" onClick={() => setDeleteTargetId(null)}>
                     <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
