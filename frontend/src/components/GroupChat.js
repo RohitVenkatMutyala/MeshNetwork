@@ -23,6 +23,7 @@ const GroupChat = () => {
     
     // State
     const [groupName, setGroupName] = useState(location.state?.recipientName || 'Group Chat');
+    const [totalParticipants, setTotalParticipants] = useState(0); // For Blue Tick Logic
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -34,8 +35,11 @@ const GroupChat = () => {
     const [mediaRecorder, setMediaRecorder] = useState(null);
     const [audioChunks, setAudioChunks] = useState([]);
 
-    // Delete Modal
+    // Modals State
     const [deleteTargetId, setDeleteTargetId] = useState(null);
+    const [infoTargetMessage, setInfoTargetMessage] = useState(null); // Message selected for info
+    const [readByUsersData, setReadByUsersData] = useState([]); // Stores names of who read the msg
+    const [isLoadingInfo, setIsLoadingInfo] = useState(false);
 
     // Refs
     const messagesEndRef = useRef(null);
@@ -68,12 +72,17 @@ const GroupChat = () => {
     useEffect(() => {
         if (!chatId || !user) return;
 
-        // Fetch Group Name if not in state
+        // Fetch Group Name & Participant Count
         const fetchGroupDetails = async () => {
             const docRef = doc(db, 'group_chats', chatId);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
-                setGroupName(docSnap.data().groupName);
+                const data = docSnap.data();
+                setGroupName(data.groupName);
+                // Assume 'participants' is an array of UIDs in the group document
+                // If specific participant count isn't stored, default to 2 or calculate differently
+                const participants = data.participants || []; 
+                setTotalParticipants(participants.length);
             }
         };
         fetchGroupDetails();
@@ -305,6 +314,43 @@ const GroupChat = () => {
         }
     };
 
+    // --- Message Info Logic ---
+    const handleShowInfo = async (msg) => {
+        setInfoTargetMessage(msg);
+        setReadByUsersData([]);
+        setIsLoadingInfo(true);
+
+        // Filter out sender from read list to show only recipients
+        const readerIds = (msg.readBy || []).filter(id => id !== msg.senderId);
+
+        if (readerIds.length > 0) {
+            try {
+                // Fetch user details for each ID in readerIds
+                // Note: In a large app, you'd use 'in' queries or cache this data.
+                const promises = readerIds.map(uid => getDoc(doc(db, 'users', uid)));
+                const docs = await Promise.all(promises);
+                
+                const readers = docs.map(d => {
+                    if (d.exists()) {
+                        const data = d.data();
+                        return { id: d.id, name: `${data.firstname} ${data.lastname}` };
+                    }
+                    return { id: d.id, name: 'Unknown User' };
+                });
+                setReadByUsersData(readers);
+            } catch (error) {
+                console.error("Error fetching reader info:", error);
+                toast.error("Could not fetch read receipts");
+            }
+        }
+        setIsLoadingInfo(false);
+    };
+
+    const closeInfoModal = () => {
+        setInfoTargetMessage(null);
+        setReadByUsersData([]);
+    };
+
     // --- Helpers ---
     const formatTime = (timestamp) => {
         if (!timestamp) return '...';
@@ -424,14 +470,28 @@ const GroupChat = () => {
                 .bubble-own { background-color: var(--wa-outgoing); border-bottom-right-radius: 0; }
                 .bubble-other { background-color: var(--wa-incoming); border-bottom-left-radius: 0; }
 
-                .delete-btn {
+                /* --- ACTION BUTTONS (DELETE & INFO) --- */
+                .action-btns {
                     position: absolute; top: -8px; right: -8px;
-                    background: #202c33; color: #ef5350;
-                    border-radius: 50%; width: 20px; height: 20px;
-                    display: none; align-items: center; justify-content: center;
-                    font-size: 10px; cursor: pointer; border: 1px solid #333; z-index: 2;
+                    background: #202c33; 
+                    border-radius: 15px; 
+                    padding: 2px 5px;
+                    display: none; align-items: center; justify-content: center; gap: 5px;
+                    border: 1px solid #333; z-index: 2;
                 }
-                .message-row:hover .delete-btn { display: flex; }
+                .message-row:hover .action-btns { display: flex; }
+                
+                .action-icon {
+                    color: var(--wa-text-secondary);
+                    width: 20px; height: 20px;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 11px; cursor: pointer;
+                    border-radius: 50%;
+                    transition: 0.2s;
+                }
+                .action-icon:hover { background: rgba(255,255,255,0.1); color: var(--wa-text-primary); }
+                .action-icon.delete:hover { color: #ef5350; }
+                .action-icon.info:hover { color: #34b7f1; }
 
                 /* Group Chat specific: Always show sender name for others */
                 .sender-name { font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; color: #d63384; opacity: 0.9; }
@@ -501,29 +561,42 @@ const GroupChat = () => {
                 .chat-body::-webkit-scrollbar-track { background: transparent; }
                 .chat-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 
-                /* Modals */
-                .delete-modal-overlay {
+                /* Modals (Delete & Info) */
+                .modal-overlay {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
                     background: rgba(0,0,0,0.7); z-index: 2000;
                     display: flex; align-items: center; justify-content: center;
                     backdrop-filter: blur(2px);
                 }
-                .delete-modal {
+                .custom-modal {
                     background: var(--wa-header); color: var(--wa-text-primary);
-                    padding: 20px; border-radius: 12px; width: 300px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;
+                    padding: 20px; border-radius: 12px; width: 320px; max-width: 90%;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
                 }
-                .delete-actions { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
+                .modal-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 10px; }
+                .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
                 .btn-modal { padding: 8px 16px; border: none; border-radius: 20px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
                 .btn-modal-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-accent); }
                 .btn-modal-confirm { background: #ef5350; color: white; }
+
+                /* Info Modal Specifics */
+                .reader-list {
+                    max-height: 250px; overflow-y: auto; margin-top: 10px;
+                }
+                .reader-item {
+                    display: flex; align-items: center; justify-content: space-between;
+                    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1);
+                }
+                .reader-item:last-child { border-bottom: none; }
+                .reader-name { font-weight: 500; }
+                .read-status { color: var(--wa-tick-read); font-size: 0.8rem; display: flex; align-items: center; gap: 4px; }
             `}</style>
 
             <div className="chat-window">
                 <div className="chat-header">
                     <div className="recipient-info">
                         <button className="icon-btn me-2" onClick={handleClose}>
-                             <i className="bi bi-arrow-left"></i>
+                            <i className="bi bi-arrow-left"></i>
                         </button>
                         
                         <div className="avatar-circle">
@@ -566,8 +639,10 @@ const GroupChat = () => {
                             displayContent = decryptMessage(msg.text);
                         }
 
-                        // Check if read by others (length > 1 means sender + at least one other person)
-                        const readByOthers = msg.readBy && msg.readBy.length > 1;
+                        // --- NEW BLUE TICK LOGIC ---
+                        // Only turn blue if readBy count equals total participants (meaning everyone read it)
+                        // Note: readBy includes the sender, so logic holds.
+                        const isReadByAll = msg.readBy && totalParticipants > 0 && msg.readBy.length >= totalParticipants;
 
                         return (
                             <React.Fragment key={msg.id}>
@@ -580,9 +655,15 @@ const GroupChat = () => {
                                 <div className={`message-row ${isOwn ? 'row-own' : 'row-other'}`}>
                                     <div className={`message-bubble ${isOwn ? 'bubble-own' : 'bubble-other'}`}>
                                         
+                                        {/* --- UPDATED ACTION BUTTONS (DELETE & INFO) --- */}
                                         {isOwn && (
-                                            <div className="delete-btn" onClick={() => promptDelete(msg.id)} title="Delete Message">
-                                                <i className="bi bi-trash"></i>
+                                            <div className="action-btns">
+                                                <div className="action-icon info" onClick={() => handleShowInfo(msg)} title="Message Info">
+                                                    <i className="bi bi-info-circle"></i>
+                                                </div>
+                                                <div className="action-icon delete" onClick={() => promptDelete(msg.id)} title="Delete Message">
+                                                    <i className="bi bi-trash"></i>
+                                                </div>
                                             </div>
                                         )}
 
@@ -618,9 +699,9 @@ const GroupChat = () => {
 
                                         <div className="msg-meta">
                                             <span className="msg-time">{formatTime(msg.timestamp)}</span>
-                                            {/* BLUE TICKS FOR GROUP */}
+                                            {/* BLUE TICKS FOR GROUP (Updated Logic) */}
                                             {isOwn && (
-                                                <span className={`read-ticks ${readByOthers ? 'blue' : 'grey'}`}>
+                                                <span className={`read-ticks ${isReadByAll ? 'blue' : 'grey'}`}>
                                                     <i className="bi bi-check2-all"></i>
                                                 </span>
                                             )}
@@ -677,14 +758,50 @@ const GroupChat = () => {
                 </div>
             </div>
 
+            {/* DELETE MODAL */}
             {deleteTargetId && (
-                <div className="delete-modal-overlay" onClick={() => setDeleteTargetId(null)}>
-                    <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
-                        <h5>Delete Message?</h5>
+                <div className="modal-overlay" onClick={() => setDeleteTargetId(null)}>
+                    <div className="custom-modal text-center" onClick={(e) => e.stopPropagation()}>
+                        <h5 className="modal-title">Delete Message?</h5>
                         <p>This message will be deleted for everyone in this group.</p>
-                        <div className="delete-actions">
+                        <div className="modal-actions justify-content-center">
                             <button className="btn-modal btn-modal-cancel" onClick={() => setDeleteTargetId(null)}>Cancel</button>
                             <button className="btn-modal btn-modal-confirm" onClick={confirmDeleteMessage}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MESSAGE INFO MODAL (READ RECEIPTS) */}
+            {infoTargetMessage && (
+                <div className="modal-overlay" onClick={closeInfoModal}>
+                    <div className="custom-modal" onClick={(e) => e.stopPropagation()}>
+                        <h5 className="modal-title">Message Info</h5>
+                        <div style={{fontSize: '0.9rem', opacity: 0.8}}>Read by:</div>
+                        
+                        {isLoadingInfo ? (
+                            <div className="text-center p-3">
+                                <span className="spinner-border spinner-border-sm"></span> Loading...
+                            </div>
+                        ) : (
+                            <div className="reader-list">
+                                {readByUsersData.length === 0 ? (
+                                    <div className="p-2 text-center text-muted">Not read by anyone else yet.</div>
+                                ) : (
+                                    readByUsersData.map((reader) => (
+                                        <div key={reader.id} className="reader-item">
+                                            <span className="reader-name">{reader.name}</span>
+                                            <span className="read-status">
+                                                <i className="bi bi-check2-all"></i> Read
+                                            </span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        )}
+
+                        <div className="modal-actions">
+                            <button className="btn-modal btn-modal-cancel" onClick={closeInfoModal}>Close</button>
                         </div>
                     </div>
                 </div>
