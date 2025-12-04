@@ -13,7 +13,7 @@ import CryptoJS from 'crypto-js'; // Import Crypto-JS
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 // In production, this key should be an environment variable or derived via key exchange
-const SECRET_KEY = "my_super_secret_chat_key_123"; 
+const SECRET_KEY = process.env.REACT_APP_KEY; 
 
 const Chat = () => {
     const { user } = useAuth();
