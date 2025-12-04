@@ -3,7 +3,7 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { db, storage } from '../firebaseConfig';
 import { 
     collection, query, orderBy, onSnapshot, addDoc, 
-    serverTimestamp, doc, setDoc, deleteDoc, getDoc, updateDoc, arrayUnion, where, documentId, getDocs
+    serverTimestamp, doc, setDoc, deleteDoc, getDoc, updateDoc, arrayUnion
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../context/AuthContext';
@@ -12,10 +12,11 @@ import { v4 as uuidv4 } from 'uuid';
 import CryptoJS from 'crypto-js';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
-const SECRET_KEY = process.env.REACT_APP_KEY; 
+const SECRET_KEY = "your_secure_secret_key_here"; 
 
 const GroupChat = () => {
     const { user } = useAuth();
+    // chatId is the Call ID used to create the group
     const { chatId } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
@@ -27,19 +28,14 @@ const GroupChat = () => {
     const [isTyping, setIsTyping] = useState(false);
     const [typingUsers, setTypingUsers] = useState([]);
     
-    // --- NEW: Group Members Logic ---
-    const [totalMembers, setTotalMembers] = useState(0); // Count for Blue Ticks
-    const [memberNames, setMemberNames] = useState({}); // Map ID -> Name for "Info" modal
-
     // Upload & Recording State
     const [isUploading, setIsUploading] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [mediaRecorder, setMediaRecorder] = useState(null);
     const [audioChunks, setAudioChunks] = useState([]);
 
-    // Modals
+    // Delete Modal
     const [deleteTargetId, setDeleteTargetId] = useState(null);
-    const [infoTargetMsg, setInfoTargetMsg] = useState(null); // New: For "Who seen this"
 
     // Refs
     const messagesEndRef = useRef(null);
@@ -68,57 +64,19 @@ const GroupChat = () => {
         scrollToBottom();
     }, [messages, typingUsers, isRecording]);
 
-    // --- 1. Fetch Group Details, Members & Messages ---
+    // --- 1. Fetch Group Details & Messages & Read Receipts ---
     useEffect(() => {
         if (!chatId || !user) return;
 
-        const initGroupData = async () => {
-            const groupRef = doc(db, 'group_chats', chatId);
-            const groupSnap = await getDoc(groupRef);
-            
-            if (groupSnap.exists()) {
-                const data = groupSnap.data();
-                setGroupName(data.groupName);
-                
-                // Get Participants to calculate Total & Fetch Names
-                const participantIds = data.participants || [];
-                setTotalMembers(participantIds.length);
-
-                // Fetch Names of all participants for the "Info" Modal
-                if (participantIds.length > 0) {
-                    try {
-                        // Firestore 'in' query supports max 10. If group > 10, logic needs chunking.
-                        // For simplicity, assuming < 10 or fetching via individual logic if needed.
-                        // Here is a robust way: fetch all users in group
-                        const usersRef = collection(db, 'users');
-                        // Note: If you have >10 members, you cannot use "where documentId in array"
-                        // You might need to fetch individually or store names in group doc.
-                        // Assuming simple fetch loop for robustness here:
-                        const nameMap = {};
-                        
-                        // Parallel fetch for speed
-                        await Promise.all(participantIds.map(async (uid) => {
-                            if(uid === user._id) {
-                                nameMap[uid] = "You";
-                            } else {
-                                const uSnap = await getDoc(doc(db, 'users', uid));
-                                if(uSnap.exists()) {
-                                    const uData = uSnap.data();
-                                    nameMap[uid] = `${uData.firstname} ${uData.lastname}`;
-                                } else {
-                                    nameMap[uid] = "Unknown User";
-                                }
-                            }
-                        }));
-                        setMemberNames(nameMap);
-                    } catch (error) {
-                        console.error("Error fetching member names:", error);
-                    }
-                }
+        // Fetch Group Name if not in state
+        const fetchGroupDetails = async () => {
+            const docRef = doc(db, 'group_chats', chatId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                setGroupName(docSnap.data().groupName);
             }
         };
-
-        initGroupData();
+        fetchGroupDetails();
 
         // Listen for Messages
         const messagesRef = collection(db, 'group_chats', chatId, 'messages');
@@ -131,12 +89,13 @@ const GroupChat = () => {
             }));
             setMessages(msgs);
 
-            // --- Read Receipt Logic ---
-            // If I am NOT the sender, and I haven't been added to readBy yet, add me.
+            // --- Read Receipt Logic (Blue Ticks) ---
+            // If I am reading this message (and I am not the sender), add my ID to 'readBy'
             snapshot.docs.forEach(async (docSnap) => {
                 const data = docSnap.data();
                 const readBy = data.readBy || [];
                 
+                // If I haven't marked as read yet and I am NOT the sender
                 if (data.senderId !== user._id && !readBy.includes(user._id)) {
                     try {
                         await updateDoc(docSnap.ref, {
@@ -152,20 +111,25 @@ const GroupChat = () => {
         return () => unsubscribe();
     }, [chatId, user]);
 
-    // --- 2. Typing Logic ---
+    // --- 2. Typing Logic (Group aware) ---
     useEffect(() => {
         if (!chatId || !user) return;
+
         const chatDocRef = doc(db, 'group_chats', chatId);
         const unsubChat = onSnapshot(chatDocRef, (snapshot) => {
             if (snapshot.exists()) {
                 const data = snapshot.data();
                 const typingData = data.typing || {};
+                
+                // Get list of names/emails who are typing (excluding self)
                 const typingList = Object.keys(typingData)
                     .filter(userId => userId !== user._id && typingData[userId]?.isTyping)
                     .map(userId => typingData[userId].name);
+                
                 setTypingUsers(typingList);
             }
         });
+
         return () => unsubChat();
     }, [chatId, user]);
 
@@ -177,20 +141,26 @@ const GroupChat = () => {
             setIsTyping(true);
             const chatDocRef = doc(db, 'group_chats', chatId);
             await setDoc(chatDocRef, { 
-                typing: { [user._id]: { isTyping: true, name: user.firstname } } 
+                typing: { 
+                    [user._id]: { isTyping: true, name: user.firstname } 
+                } 
             }, { merge: true });
         }
+
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        
         typingTimeoutRef.current = setTimeout(async () => {
             setIsTyping(false);
             const chatDocRef = doc(db, 'group_chats', chatId);
             await setDoc(chatDocRef, { 
-                typing: { [user._id]: { isTyping: false, name: user.firstname } } 
+                typing: { 
+                    [user._id]: { isTyping: false, name: user.firstname } 
+                } 
             }, { merge: true });
         }, 2000);
     };
 
-    // --- 3. Send Message ---
+    // --- 3. Send Message (Encrypted) ---
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!newMessage.trim()) return;
@@ -202,16 +172,17 @@ const GroupChat = () => {
             }, { merge: true });
             setIsTyping(false);
 
+            // Encrypt Text
             const encryptedText = encryptMessage(newMessage);
 
             await addDoc(collection(db, 'group_chats', chatId, 'messages'), {
-                text: encryptedText,
+                text: encryptedText, // Store Encrypted
                 type: 'text',
                 senderName: `${user.firstname} ${user.lastname}`,
                 senderId: user._id,
                 senderEmail: user.email,
                 timestamp: serverTimestamp(),
-                readBy: [user._id] // Sender has "read" it
+                readBy: [user._id] // Initially read by sender
             });
             setNewMessage('');
         } catch (error) {
@@ -220,7 +191,7 @@ const GroupChat = () => {
         }
     };
 
-    // --- 4. File/Audio ---
+    // --- 4. File/Audio Logic ---
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -228,6 +199,7 @@ const GroupChat = () => {
             toast.error("File is too large. Max size is 10MB.");
             return;
         }
+
         setIsUploading(true);
         try {
             const isImage = file.type.startsWith('image/');
@@ -250,6 +222,7 @@ const GroupChat = () => {
                 timestamp: serverTimestamp(),
                 readBy: [user._id]
             });
+
         } catch (error) {
             console.error("Upload failed:", error);
             toast.error("Failed to upload file.");
@@ -265,14 +238,17 @@ const GroupChat = () => {
             const recorder = new MediaRecorder(stream);
             setMediaRecorder(recorder);
             setAudioChunks([]);
+
             recorder.ondataavailable = (event) => {
                 if (event.data.size > 0) setAudioChunks((prev) => [...prev, event.data]);
             };
+
             recorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
                 await uploadAudio(audioBlob);
                 stream.getTracks().forEach(track => track.stop());
             };
+
             recorder.start();
             setIsRecording(true);
         } catch (err) {
@@ -293,6 +269,7 @@ const GroupChat = () => {
             const fileId = uuidv4();
             const filePath = `groupChatVoice/${chatId}/${fileId}.webm`;
             const storageRef = ref(storage, filePath);
+            
             const snapshot = await uploadBytes(storageRef, blob);
             const downloadURL = await getDownloadURL(snapshot.ref);
 
@@ -306,6 +283,7 @@ const GroupChat = () => {
                 timestamp: serverTimestamp(),
                 readBy: [user._id]
             });
+
         } catch (error) {
             toast.error("Failed to send voice message.");
         } finally {
@@ -313,13 +291,7 @@ const GroupChat = () => {
         }
     };
 
-    // --- Action Handlers ---
     const promptDelete = (messageId) => setDeleteTargetId(messageId);
-    
-    // New: Open Info Modal
-    const showMessageInfo = (msg) => {
-        setInfoTargetMsg(msg);
-    };
 
     const confirmDeleteMessage = async () => {
         if (!deleteTargetId) return;
@@ -342,8 +314,8 @@ const GroupChat = () => {
     const formatBytes = (bytes, decimals = 2) => {
         if (!+bytes) return '0 Bytes';
         const k = 1024;
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`;
     };
 
@@ -353,6 +325,7 @@ const GroupChat = () => {
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
+
         if (date.toDateString() === today.toDateString()) return 'Today';
         else if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
         else return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
@@ -363,107 +336,187 @@ const GroupChat = () => {
     return (
         <div className="chat-page-container">
              <style jsx>{`
+                /* Reuse existing WhatsApp Theme variables */
                 :root {
-                    --wa-bg: #0b141a; --wa-header: #202c33; --wa-outgoing: #0c3e59; --wa-incoming: #202c33;
-                    --wa-input-bg: #2a3942; --wa-text-primary: #e9edef; --wa-text-secondary: #8696a0;
-                    --wa-accent: #34b7f1; --wa-tick-read: #53bdeb; --wa-tick-sent: #8696a0; 
+                    --wa-bg: #0b141a;
+                    --wa-header: #202c33;
+                    --wa-outgoing: #0c3e59; 
+                    --wa-incoming: #202c33;
+                    --wa-input-bg: #2a3942;
+                    --wa-text-primary: #e9edef;
+                    --wa-text-secondary: #8696a0;
+                    --wa-accent: #34b7f1; 
+                    --wa-tick-read: #53bdeb; /* Blue for read */
+                    --wa-tick-sent: #8696a0; /* Grey for sent */
                 }
-                .chat-page-container { width: 100%; height: 100vh; background-color: var(--wa-bg); display: flex; flex-direction: column; }
-                .chat-window { width: 100%; height: 100%; background-color: var(--wa-bg); background-image: radial-gradient(#2a3942 1.5px, transparent 1.5px); background-size: 24px 24px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+                .chat-page-container {
+                    width: 100%; height: 100vh;
+                    background-color: var(--wa-bg);
+                    display: flex; flex-direction: column;
+                }
+
+                .chat-window {
+                    width: 100%; height: 100%;
+                    background-color: var(--wa-bg);
+                    background-image: radial-gradient(#2a3942 1.5px, transparent 1.5px);
+                    background-size: 24px 24px;
+                    display: flex; flex-direction: column; overflow: hidden;
+                    position: relative;
+                }
                 
-                .chat-header { padding: 10px 16px; background-color: var(--wa-header); display: flex; align-items: center; justify-content: space-between; color: var(--wa-text-primary); z-index: 10; box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 60px; flex-shrink: 0; }
+                .chat-header {
+                    padding: 10px 16px; 
+                    background-color: var(--wa-header); 
+                    display: flex; align-items: center; justify-content: space-between; 
+                    color: var(--wa-text-primary);
+                    z-index: 10;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    height: 60px; flex-shrink: 0;
+                }
                 .recipient-info { display: flex; align-items: center; gap: 12px; cursor: pointer; }
-                .avatar-circle { width: 40px; height: 40px; background: #6f42c1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 1.1rem; }
-                .status-text { font-size: 0.8rem; color: var(--wa-text-secondary); margin-top: 2px; min-height: 1.2em; display: flex; align-items: center; gap: 5px; }
+                .avatar-circle {
+                    width: 40px; height: 40px; background: #6f42c1; border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center;
+                    font-weight: bold; color: white; font-size: 1.1rem;
+                }
+                .status-text {
+                    font-size: 0.8rem; color: var(--wa-text-secondary); margin-top: 2px;
+                    min-height: 1.2em; display: flex; align-items: center; gap: 5px;
+                }
                 .status-typing { color: var(--wa-accent); font-weight: 500; }
 
-                .chat-body { flex: 1; padding: 20px 5%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; background-color: rgba(11, 20, 26, 0.95); }
-                .date-separator { display: flex; justify-content: center; margin: 15px 0; position: sticky; top: 5px; z-index: 5; }
-                .date-badge { background-color: #1f2c34; color: #8696a0; font-size: 0.75rem; padding: 5px 12px; border-radius: 8px; text-transform: uppercase; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+                .chat-body {
+                    flex: 1; padding: 20px 5%; 
+                    overflow-y: auto;
+                    display: flex; flex-direction: column; gap: 6px;
+                    background-color: rgba(11, 20, 26, 0.95); 
+                }
+
+                .date-separator {
+                    display: flex; justify-content: center; margin: 15px 0;
+                    position: sticky; top: 5px; z-index: 5;
+                }
+                .date-badge {
+                    background-color: #1f2c34; color: #8696a0;
+                    font-size: 0.75rem; padding: 5px 12px; border-radius: 8px;
+                    text-transform: uppercase; font-weight: 500;
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+                }
 
                 .message-row { display: flex; width: 100%; position: relative; }
                 .row-own { justify-content: flex-end; }
                 .row-other { justify-content: flex-start; }
 
-                .message-bubble { max-width: 85%; padding: 6px 7px 8px 9px; border-radius: 12px; font-size: 0.95rem; line-height: 1.35; position: relative; color: var(--wa-text-primary); box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); display: flex; flex-direction: column; }
+                .message-bubble {
+                    max-width: 85%;
+                    padding: 6px 7px 8px 9px; 
+                    border-radius: 12px; 
+                    font-size: 0.95rem; 
+                    line-height: 1.35; 
+                    position: relative;
+                    color: var(--wa-text-primary);
+                    box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+                    display: flex; flex-direction: column;
+                }
                 @media(min-width: 768px) { .message-bubble { max-width: 60%; } }
+
                 .bubble-own { background-color: var(--wa-outgoing); border-bottom-right-radius: 0; }
                 .bubble-other { background-color: var(--wa-incoming); border-bottom-left-radius: 0; }
 
-                /* Action Buttons (Delete & Info) */
-                .msg-actions {
-                    position: absolute; top: -10px; right: -10px;
-                    display: none; gap: 5px; z-index: 2;
+                .delete-btn {
+                    position: absolute; top: -8px; right: -8px;
+                    background: #202c33; color: #ef5350;
+                    border-radius: 50%; width: 20px; height: 20px;
+                    display: none; align-items: center; justify-content: center;
+                    font-size: 10px; cursor: pointer; border: 1px solid #333; z-index: 2;
                 }
-                .message-row:hover .msg-actions { display: flex; }
-                
-                .action-btn {
-                    background: #202c33; color: var(--wa-text-secondary);
-                    border-radius: 50%; width: 24px; height: 24px;
-                    display: flex; align-items: center; justify-content: center;
-                    font-size: 12px; cursor: pointer; border: 1px solid #333;
-                    transition: 0.2s;
-                }
-                .action-btn:hover { background: #333; color: white; }
-                .btn-delete:hover { color: #ef5350; }
-                .btn-info:hover { color: var(--wa-accent); }
+                .message-row:hover .delete-btn { display: flex; }
 
+                /* Group Chat specific: Always show sender name for others */
                 .sender-name { font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; color: #d63384; opacity: 0.9; }
+
                 .msg-image { max-width: 100%; border-radius: 6px; margin-bottom: 4px; cursor: pointer; }
                 .msg-audio { width: 220px; margin: 5px 0; }
                 
-                .msg-file-card { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; text-decoration: none; color: var(--wa-text-primary); transition: background 0.2s; }
+                .msg-file-card {
+                    display: flex; align-items: center; gap: 10px;
+                    background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;
+                    text-decoration: none; color: var(--wa-text-primary);
+                    transition: background 0.2s;
+                }
                 .msg-file-card:hover { background: rgba(0,0,0,0.3); }
                 .file-icon-box { font-size: 1.8rem; color: #ff5252; }
                 .file-info { display: flex; flex-direction: column; overflow: hidden; }
                 .file-name { font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .file-size { font-size: 0.75rem; color: var(--wa-text-secondary); }
 
-                .msg-meta { display: flex; justify-content: flex-end; align-items: center; margin-top: 2px; gap: 4px; }
+                .msg-meta {
+                    display: flex; justify-content: flex-end; align-items: center;
+                    margin-top: 2px; gap: 4px;
+                }
                 .msg-time { font-size: 0.68rem; color: var(--wa-text-secondary); }
+                .bubble-own .msg-time { color: rgba(255,255,255,0.7); }
+
+                /* Ticks CSS */
                 .read-ticks { font-size: 0.9rem; margin-left: 3px; }
                 .read-ticks.blue { color: var(--wa-tick-read); }
                 .read-ticks.grey { color: var(--wa-tick-sent); }
-                .bubble-own .msg-time { color: rgba(255,255,255,0.7); }
 
-                .chat-footer { padding: 8px 10px; background-color: var(--wa-header); display: flex; align-items: center; gap: 10px; z-index: 10; flex-shrink: 0; }
-                .chat-input-bar { flex: 1; background-color: var(--wa-input-bg); border-radius: 20px; padding: 10px 16px; border: none; color: var(--wa-text-primary); font-size: 1rem; outline: none; }
+                /* Footer */
+                .chat-footer {
+                    padding: 8px 10px; background-color: var(--wa-header); 
+                    display: flex; align-items: center; gap: 10px; z-index: 10; flex-shrink: 0;
+                }
+                .chat-input-bar {
+                    flex: 1; background-color: var(--wa-input-bg);
+                    border-radius: 20px; padding: 10px 16px;
+                    border: none; color: var(--wa-text-primary);
+                    font-size: 1rem; outline: none;
+                }
                 .chat-input-bar::placeholder { color: var(--wa-text-secondary); }
-                .icon-btn { background: transparent; border: none; color: var(--wa-text-secondary); font-size: 1.4rem; cursor: pointer; padding: 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+
+                .icon-btn {
+                    background: transparent; border: none; 
+                    color: var(--wa-text-secondary); font-size: 1.4rem; cursor: pointer; padding: 8px;
+                    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                    transition: 0.2s;
+                }
                 .icon-btn:hover { background: rgba(255,255,255,0.05); color: var(--wa-text-primary); }
+                
                 .btn-send { color: var(--wa-accent); }
                 .btn-mic { color: var(--wa-text-secondary); }
-                .btn-mic.recording { color: #ff3b30; background: rgba(255, 59, 48, 0.1); animation: pulse 1.5s infinite; }
-                @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(255, 59, 48, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); } }
+                .btn-mic.recording { 
+                    color: #ff3b30; background: rgba(255, 59, 48, 0.1); 
+                    animation: pulse 1.5s infinite;
+                }
+
+                @keyframes pulse {
+                    0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); }
+                    70% { box-shadow: 0 0 0 10px rgba(255, 59, 48, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+                }
 
                 .chat-body::-webkit-scrollbar { width: 6px; }
                 .chat-body::-webkit-scrollbar-track { background: transparent; }
                 .chat-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 
-                /* MODALS CSS */
-                .modal-overlay {
+                /* Modals */
+                .delete-modal-overlay {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
                     background: rgba(0,0,0,0.7); z-index: 2000;
                     display: flex; align-items: center; justify-content: center;
                     backdrop-filter: blur(2px);
                 }
-                .modal-box {
+                .delete-modal {
                     background: var(--wa-header); color: var(--wa-text-primary);
-                    padding: 20px; border-radius: 12px; width: 320px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                    max-height: 80vh; overflow-y: auto;
+                    padding: 20px; border-radius: 12px; width: 300px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;
                 }
-                .modal-box h5 { margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
-                .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-                .btn-modal { padding: 6px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; }
-                .btn-cancel { background: transparent; color: var(--wa-accent); }
-                .btn-delete { background: #ef5350; color: white; }
-
-                /* Info List */
-                .read-by-list { display: flex; flex-direction: column; gap: 8px; }
-                .read-by-item { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
-                .read-by-avatar { width: 32px; height: 32px; background: #6a7f8a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; }
-                .read-by-name { font-size: 0.95rem; }
+                .delete-actions { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
+                .btn-modal { padding: 8px 16px; border: none; border-radius: 20px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+                .btn-modal-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-accent); }
+                .btn-modal-confirm { background: #ef5350; color: white; }
             `}</style>
 
             <div className="chat-window">
@@ -513,10 +566,8 @@ const GroupChat = () => {
                             displayContent = decryptMessage(msg.text);
                         }
 
-                        // --- CHANGED LOGIC: BLUE TICKS ONLY IF ALL HAVE READ ---
-                        // Note: totalMembers includes self. 
-                        const readByCount = msg.readBy ? msg.readBy.length : 0;
-                        const isReadByAll = totalMembers > 0 && readByCount >= totalMembers;
+                        // Check if read by others (length > 1 means sender + at least one other person)
+                        const readByOthers = msg.readBy && msg.readBy.length > 1;
 
                         return (
                             <React.Fragment key={msg.id}>
@@ -529,15 +580,9 @@ const GroupChat = () => {
                                 <div className={`message-row ${isOwn ? 'row-own' : 'row-other'}`}>
                                     <div className={`message-bubble ${isOwn ? 'bubble-own' : 'bubble-other'}`}>
                                         
-                                        {/* Action Buttons (Delete + Info) */}
                                         {isOwn && (
-                                            <div className="msg-actions">
-                                                <div className="action-btn btn-info" onClick={() => showMessageInfo(msg)} title="Message Info">
-                                                    <i className="bi bi-info-circle-fill"></i>
-                                                </div>
-                                                <div className="action-btn btn-delete" onClick={() => promptDelete(msg.id)} title="Delete Message">
-                                                    <i className="bi bi-trash-fill"></i>
-                                                </div>
+                                            <div className="delete-btn" onClick={() => promptDelete(msg.id)} title="Delete Message">
+                                                <i className="bi bi-trash"></i>
                                             </div>
                                         )}
 
@@ -573,9 +618,9 @@ const GroupChat = () => {
 
                                         <div className="msg-meta">
                                             <span className="msg-time">{formatTime(msg.timestamp)}</span>
-                                            {/* Logic: Only Blue if ALL have read */}
+                                            {/* BLUE TICKS FOR GROUP */}
                                             {isOwn && (
-                                                <span className={`read-ticks ${isReadByAll ? 'blue' : 'grey'}`}>
+                                                <span className={`read-ticks ${readByOthers ? 'blue' : 'grey'}`}>
                                                     <i className="bi bi-check2-all"></i>
                                                 </span>
                                             )}
@@ -632,44 +677,14 @@ const GroupChat = () => {
                 </div>
             </div>
 
-            {/* --- DELETE MODAL --- */}
             {deleteTargetId && (
-                <div className="modal-overlay" onClick={() => setDeleteTargetId(null)}>
-                    <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+                <div className="delete-modal-overlay" onClick={() => setDeleteTargetId(null)}>
+                    <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
                         <h5>Delete Message?</h5>
-                        <p>This message will be deleted for everyone.</p>
-                        <div className="modal-actions">
-                            <button className="btn-modal btn-cancel" onClick={() => setDeleteTargetId(null)}>Cancel</button>
-                            <button className="btn-modal btn-delete" onClick={confirmDeleteMessage}>Delete</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* --- NEW: MESSAGE INFO MODAL (Who has seen) --- */}
-            {infoTargetMsg && (
-                <div className="modal-overlay" onClick={() => setInfoTargetMsg(null)}>
-                    <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-                        <h5>Read By</h5>
-                        <div className="read-by-list">
-                            {infoTargetMsg.readBy && infoTargetMsg.readBy.length > 0 ? (
-                                infoTargetMsg.readBy.map((uid) => (
-                                    <div key={uid} className="read-by-item">
-                                        <div className="read-by-avatar">
-                                            {memberNames[uid]?.charAt(0).toUpperCase() || '?'}
-                                        </div>
-                                        <span className="read-by-name">
-                                            {memberNames[uid] || "Unknown User"}
-                                        </span>
-                                        {uid === infoTargetMsg.senderId && <small style={{color: 'var(--wa-text-secondary)', marginLeft: 'auto'}}>Sender</small>}
-                                    </div>
-                                ))
-                            ) : (
-                                <p style={{color: '#8696a0', fontSize: '0.9rem'}}>No one has read this yet.</p>
-                            )}
-                        </div>
-                        <div className="modal-actions">
-                            <button className="btn-modal btn-cancel" onClick={() => setInfoTargetMsg(null)}>Close</button>
+                        <p>This message will be deleted for everyone in this group.</p>
+                        <div className="delete-actions">
+                            <button className="btn-modal btn-modal-cancel" onClick={() => setDeleteTargetId(null)}>Cancel</button>
+                            <button className="btn-modal btn-modal-confirm" onClick={confirmDeleteMessage}>Delete</button>
                         </div>
                     </div>
                 </div>
