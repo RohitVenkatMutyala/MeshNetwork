@@ -21,9 +21,19 @@ const GroupChat = () => {
     const location = useLocation();
     const navigate = useNavigate();
     
+    // --- SAFE NAME LOGIC ---
+    // Create a robust name string to prevent "undefined undefined"
+    const currentUserName = user ? (
+        user.name || 
+        user.displayName || 
+        (user.firstname && user.lastname ? `${user.firstname} ${user.lastname}` : null) || 
+        user.email || 
+        "Unknown User"
+    ) : "Unknown User";
+
     // State
     const [groupName, setGroupName] = useState(location.state?.recipientName || 'Group Chat');
-    const [totalParticipants, setTotalParticipants] = useState(0); // For Blue Tick Logic
+    const [totalParticipants, setTotalParticipants] = useState(0); 
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -37,8 +47,8 @@ const GroupChat = () => {
 
     // Modals State
     const [deleteTargetId, setDeleteTargetId] = useState(null);
-    const [infoTargetMessage, setInfoTargetMessage] = useState(null); // Message selected for info
-    const [readByUsersData, setReadByUsersData] = useState([]); // Stores names of who read the msg
+    const [infoTargetMessage, setInfoTargetMessage] = useState(null); 
+    const [readByUsersData, setReadByUsersData] = useState([]); 
     const [isLoadingInfo, setIsLoadingInfo] = useState(false);
 
     // Refs
@@ -79,8 +89,6 @@ const GroupChat = () => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setGroupName(data.groupName);
-                // Assume 'participants' is an array of UIDs in the group document
-                // If specific participant count isn't stored, default to 2 or calculate differently
                 const participants = data.participants || []; 
                 setTotalParticipants(participants.length);
             }
@@ -99,8 +107,6 @@ const GroupChat = () => {
             setMessages(msgs);
 
             // --- Read Receipt Logic (Blue Ticks) ---
-            // If I am reading this message (and I am not the sender), add my ID to 'readBy'
-          // --- Read Receipt Logic (Blue Ticks) ---
             snapshot.docs.forEach(async (docSnap) => {
                 const data = docSnap.data();
                 const readBy = data.readBy || [];
@@ -114,11 +120,11 @@ const GroupChat = () => {
                 // If I haven't marked as read yet and I am NOT the sender
                 if (data.senderId !== user._id && !hasRead) {
                     try {
-                        // UPDATE HERE: Store Name + ID
+                        // FIX: Use currentUserName to avoid "undefined undefined"
                         await updateDoc(docSnap.ref, {
                             readBy: arrayUnion({
                                 uid: user._id,
-                                name: `${user.firstname} ${user.lastname}` // Uses the name from your Auth Context
+                                name: currentUserName 
                             })
                         });
                     } catch (err) {
@@ -129,9 +135,9 @@ const GroupChat = () => {
         });
 
         return () => unsubscribe();
-    }, [chatId, user]);
+    }, [chatId, user, currentUserName]);
 
-    // --- 2. Typing Logic (Group aware) ---
+    // --- 2. Typing Logic ---
     useEffect(() => {
         if (!chatId || !user) return;
 
@@ -141,7 +147,6 @@ const GroupChat = () => {
                 const data = snapshot.data();
                 const typingData = data.typing || {};
                 
-                // Get list of names/emails who are typing (excluding self)
                 const typingList = Object.keys(typingData)
                     .filter(userId => userId !== user._id && typingData[userId]?.isTyping)
                     .map(userId => typingData[userId].name);
@@ -162,7 +167,7 @@ const GroupChat = () => {
             const chatDocRef = doc(db, 'group_chats', chatId);
             await setDoc(chatDocRef, { 
                 typing: { 
-                    [user._id]: { isTyping: true, name: user.firstname } 
+                    [user._id]: { isTyping: true, name: currentUserName } 
                 } 
             }, { merge: true });
         }
@@ -174,13 +179,13 @@ const GroupChat = () => {
             const chatDocRef = doc(db, 'group_chats', chatId);
             await setDoc(chatDocRef, { 
                 typing: { 
-                    [user._id]: { isTyping: false, name: user.firstname } 
+                    [user._id]: { isTyping: false, name: currentUserName } 
                 } 
             }, { merge: true });
         }, 2000);
     };
 
-    // --- 3. Send Message (Encrypted) ---
+    // --- 3. Send Message ---
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!newMessage.trim()) return;
@@ -192,19 +197,18 @@ const GroupChat = () => {
             }, { merge: true });
             setIsTyping(false);
 
-            // Encrypt Text
             const encryptedText = encryptMessage(newMessage);
 
             await addDoc(collection(db, 'group_chats', chatId, 'messages'), {
-                text: encryptedText, // Store Encrypted
+                text: encryptedText, 
                 type: 'text',
-                senderName: `${user.firstname} ${user.lastname}`,
+                senderName: currentUserName, // FIX: Use safe name
                 senderId: user._id,
                 senderEmail: user.email,
                 timestamp: serverTimestamp(),
                 readBy: [{ 
                     uid: user._id, 
-                    name: `${user.firstname} ${user.lastname}` 
+                    name: currentUserName // FIX: Use safe name
                 }]
             });
             setNewMessage('');
@@ -239,11 +243,14 @@ const GroupChat = () => {
                 fileUrl: downloadURL,
                 fileName: file.name,
                 fileSize: file.size,
-                senderName: `${user.firstname} ${user.lastname}`,
+                senderName: currentUserName, // FIX: Use safe name
                 senderId: user._id,
                 senderEmail: user.email,
                 timestamp: serverTimestamp(),
-                readBy: [user._id]
+                readBy: [{ 
+                    uid: user._id, 
+                    name: currentUserName // FIX: Use safe name
+                }]
             });
 
         } catch (error) {
@@ -300,11 +307,14 @@ const GroupChat = () => {
                 type: 'audio',
                 fileUrl: downloadURL,
                 fileName: 'Voice Message',
-                senderName: `${user.firstname} ${user.lastname}`,
+                senderName: currentUserName, // FIX: Use safe name
                 senderId: user._id,
                 senderEmail: user.email,
                 timestamp: serverTimestamp(),
-                readBy: [user._id]
+                readBy: [{ 
+                    uid: user._id, 
+                    name: currentUserName // FIX: Use safe name
+                }]
             });
 
         } catch (error) {
@@ -329,7 +339,6 @@ const GroupChat = () => {
     };
 
     // --- Message Info Logic ---
-  // --- Message Info Logic (Updated to read stored names) ---
     const handleShowInfo = (msg) => {
         setInfoTargetMessage(msg);
         
@@ -344,12 +353,12 @@ const GroupChat = () => {
                 if (typeof item === 'object' && item.name) {
                     return { id: item.uid, name: item.name };
                 }
-                // Fallback for old messages (just ID)
+                // Fallback for old messages
                 return { id: item, name: "Unknown (Old Message)" };
             });
 
         setReadByUsersData(readers);
-        setIsLoadingInfo(false); // No loading needed anymore!
+        setIsLoadingInfo(false);
     };
 
     const closeInfoModal = () => {
@@ -445,9 +454,10 @@ const GroupChat = () => {
                     background-color: rgba(11, 20, 26, 0.95); 
                 }
 
+                /* FIX: Date Separator - Removed Sticky to prevent "intermixing" stack */
                 .date-separator {
                     display: flex; justify-content: center; margin: 15px 0;
-                    position: sticky; top: 5px; z-index: 5;
+                    z-index: 5;
                 }
                 .date-badge {
                     background-color: #1f2c34; color: #8696a0;
@@ -476,7 +486,6 @@ const GroupChat = () => {
                 .bubble-own { background-color: var(--wa-outgoing); border-bottom-right-radius: 0; }
                 .bubble-other { background-color: var(--wa-incoming); border-bottom-left-radius: 0; }
 
-                /* --- ACTION BUTTONS (DELETE & INFO) --- */
                 .action-btns {
                     position: absolute; top: -8px; right: -8px;
                     background: #202c33; 
@@ -499,7 +508,6 @@ const GroupChat = () => {
                 .action-icon.delete:hover { color: #ef5350; }
                 .action-icon.info:hover { color: #34b7f1; }
 
-                /* Group Chat specific: Always show sender name for others */
                 .sender-name { font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; color: #d63384; opacity: 0.9; }
 
                 .msg-image { max-width: 100%; border-radius: 6px; margin-bottom: 4px; cursor: pointer; }
@@ -524,12 +532,10 @@ const GroupChat = () => {
                 .msg-time { font-size: 0.68rem; color: var(--wa-text-secondary); }
                 .bubble-own .msg-time { color: rgba(255,255,255,0.7); }
 
-                /* Ticks CSS */
                 .read-ticks { font-size: 0.9rem; margin-left: 3px; }
                 .read-ticks.blue { color: var(--wa-tick-read); }
                 .read-ticks.grey { color: var(--wa-tick-sent); }
 
-                /* Footer */
                 .chat-footer {
                     padding: 8px 10px; background-color: var(--wa-header); 
                     display: flex; align-items: center; gap: 10px; z-index: 10; flex-shrink: 0;
@@ -567,7 +573,7 @@ const GroupChat = () => {
                 .chat-body::-webkit-scrollbar-track { background: transparent; }
                 .chat-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 
-                /* Modals (Delete & Info) */
+                /* Modals */
                 .modal-overlay {
                     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
                     background: rgba(0,0,0,0.7); z-index: 2000;
@@ -645,9 +651,7 @@ const GroupChat = () => {
                             displayContent = decryptMessage(msg.text);
                         }
 
-                        // --- NEW BLUE TICK LOGIC ---
-                        // Only turn blue if readBy count equals total participants (meaning everyone read it)
-                        // Note: readBy includes the sender, so logic holds.
+                        // --- BLUE TICK LOGIC ---
                         const isReadByAll = msg.readBy && totalParticipants > 0 && msg.readBy.length >= totalParticipants;
 
                         return (
@@ -661,7 +665,7 @@ const GroupChat = () => {
                                 <div className={`message-row ${isOwn ? 'row-own' : 'row-other'}`}>
                                     <div className={`message-bubble ${isOwn ? 'bubble-own' : 'bubble-other'}`}>
                                         
-                                        {/* --- UPDATED ACTION BUTTONS (DELETE & INFO) --- */}
+                                        {/* --- ACTION BUTTONS (DELETE & INFO) --- */}
                                         {isOwn && (
                                             <div className="action-btns">
                                                 <div className="action-icon info" onClick={() => handleShowInfo(msg)} title="Message Info">
@@ -705,7 +709,6 @@ const GroupChat = () => {
 
                                         <div className="msg-meta">
                                             <span className="msg-time">{formatTime(msg.timestamp)}</span>
-                                            {/* BLUE TICKS FOR GROUP (Updated Logic) */}
                                             {isOwn && (
                                                 <span className={`read-ticks ${isReadByAll ? 'blue' : 'grey'}`}>
                                                     <i className="bi bi-check2-all"></i>
