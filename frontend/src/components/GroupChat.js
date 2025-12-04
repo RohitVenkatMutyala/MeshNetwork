@@ -100,15 +100,26 @@ const GroupChat = () => {
 
             // --- Read Receipt Logic (Blue Ticks) ---
             // If I am reading this message (and I am not the sender), add my ID to 'readBy'
+          // --- Read Receipt Logic (Blue Ticks) ---
             snapshot.docs.forEach(async (docSnap) => {
                 const data = docSnap.data();
                 const readBy = data.readBy || [];
                 
+                // Check if I exist in the array (Handle both old string IDs and new Objects)
+                const hasRead = readBy.some(item => 
+                    (typeof item === 'string' && item === user._id) || 
+                    (typeof item === 'object' && item.uid === user._id)
+                );
+
                 // If I haven't marked as read yet and I am NOT the sender
-                if (data.senderId !== user._id && !readBy.includes(user._id)) {
+                if (data.senderId !== user._id && !hasRead) {
                     try {
+                        // UPDATE HERE: Store Name + ID
                         await updateDoc(docSnap.ref, {
-                            readBy: arrayUnion(user._id)
+                            readBy: arrayUnion({
+                                uid: user._id,
+                                name: `${user.firstname} ${user.lastname}` // Uses the name from your Auth Context
+                            })
                         });
                     } catch (err) {
                         console.error("Error updating group read receipt:", err);
@@ -191,7 +202,10 @@ const GroupChat = () => {
                 senderId: user._id,
                 senderEmail: user.email,
                 timestamp: serverTimestamp(),
-                readBy: [user._id] // Initially read by sender
+                readBy: [{ 
+                    uid: user._id, 
+                    name: `${user.firstname} ${user.lastname}` 
+                }]
             });
             setNewMessage('');
         } catch (error) {
@@ -315,35 +329,27 @@ const GroupChat = () => {
     };
 
     // --- Message Info Logic ---
-    const handleShowInfo = async (msg) => {
+  // --- Message Info Logic (Updated to read stored names) ---
+    const handleShowInfo = (msg) => {
         setInfoTargetMessage(msg);
-        setReadByUsersData([]);
-        setIsLoadingInfo(true);
+        
+        const readers = (msg.readBy || [])
+            .filter(item => {
+                // Filter out the sender
+                const itemId = typeof item === 'string' ? item : item.uid;
+                return itemId !== msg.senderId;
+            })
+            .map(item => {
+                // If it's the new format (Object with name), use it!
+                if (typeof item === 'object' && item.name) {
+                    return { id: item.uid, name: item.name };
+                }
+                // Fallback for old messages (just ID)
+                return { id: item, name: "Unknown (Old Message)" };
+            });
 
-        // Filter out sender from read list to show only recipients
-        const readerIds = (msg.readBy || []).filter(id => id !== msg.senderId);
-
-        if (readerIds.length > 0) {
-            try {
-                // Fetch user details for each ID in readerIds
-                // Note: In a large app, you'd use 'in' queries or cache this data.
-                const promises = readerIds.map(uid => getDoc(doc(db, 'users', uid)));
-                const docs = await Promise.all(promises);
-                
-                const readers = docs.map(d => {
-                    if (d.exists()) {
-                        const data = d.data();
-                        return { id: d.id, name: `${data.firstname} ${data.lastname}` };
-                    }
-                    return { id: d.id, name: 'Unknown User' };
-                });
-                setReadByUsersData(readers);
-            } catch (error) {
-                console.error("Error fetching reader info:", error);
-                toast.error("Could not fetch read receipts");
-            }
-        }
-        setIsLoadingInfo(false);
+        setReadByUsersData(readers);
+        setIsLoadingInfo(false); // No loading needed anymore!
     };
 
     const closeInfoModal = () => {
