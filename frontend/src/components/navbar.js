@@ -227,7 +227,7 @@ function Navbar() {
                                 </>
                             ) : (
                                 <li className="nav-item">
-                                    <Link className="nav-link-custom" to="/login">Login</Link>
+                                    
                                 </li>
                             )}
                         </ul>
