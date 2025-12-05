@@ -496,7 +496,14 @@ const GroupChat = () => {
                 .status-text { font-size: 0.8rem; color: var(--wa-text-secondary); margin-top: 2px; min-height: 1.2em; display: flex; align-items: center; gap: 5px; }
                 .status-typing { color: var(--wa-accent); font-weight: 500; }
                 .chat-body { flex: 1; padding: 20px 5%; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; background-color: rgba(11, 20, 26, 0.95); }
-                .date-separator { display: flex; justify-content: center; margin: 15px 0; position: sticky; top: 5px; z-index: 5; }
+               /* --- DATE SEPARATOR (Fixed) --- */
+.date-separator {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0 12px 0; /* Added slightly more space */
+    width: 100%;
+    z-index: 1;
+}
                 .date-badge { background-color: #1f2c34; color: #8696a0; font-size: 0.75rem; padding: 5px 12px; border-radius: 8px; text-transform: uppercase; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
                 .message-row { display: flex; width: 100%; position: relative; }
                 .row-own { justify-content: flex-end; }
