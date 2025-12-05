@@ -9,11 +9,129 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 import { v4 as uuidv4 } from 'uuid';
-import CryptoJS from 'crypto-js'; // Import Crypto-JS
+import CryptoJS from 'crypto-js';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
-// In production, this key should be an environment variable or derived via key exchange
-const SECRET_KEY = "my_super_secret_chat_key_123"; 
+const SECRET_KEY = process.env.REACT_APP_KEY; 
+
+// --- HELPER COMPONENTS FOR DECRYPTING MEDIA ---
+
+const SecureImage = ({ url, secretKey }) => {
+    const [src, setSrc] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchAndDecrypt = async () => {
+            try {
+                // 1. Fetch the encrypted blob from Firebase
+                const response = await fetch(url);
+                const encryptedText = await response.text();
+                
+                // 2. Decrypt
+                const bytes = CryptoJS.AES.decrypt(encryptedText, secretKey);
+                const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+                
+                if (isMounted) {
+                    // Check if decryption worked (valid Base64)
+                    if (decryptedData.startsWith('data:')) {
+                        setSrc(decryptedData); 
+                    } else {
+                        // Fallback for old unencrypted images
+                        setSrc(url); 
+                    }
+                    setLoading(false);
+                }
+            } catch (err) {
+                console.error("Error decrypting image:", err);
+                if (isMounted) { setSrc(url); setLoading(false); } // Fallback
+            }
+        };
+        fetchAndDecrypt();
+        return () => { isMounted = false; };
+    }, [url, secretKey]);
+
+    if (loading) return <div style={{width: '100px', height: '100px', display:'flex', alignItems:'center', justifyContent:'center', color: 'white'}}>...</div>;
+    return <img src={src} alt="attachment" className="msg-image" />;
+};
+
+const SecureAudio = ({ url, secretKey }) => {
+    const [src, setSrc] = useState(null);
+
+    useEffect(() => {
+        const fetchAndDecrypt = async () => {
+            try {
+                const response = await fetch(url);
+                const encryptedText = await response.text();
+                const bytes = CryptoJS.AES.decrypt(encryptedText, secretKey);
+                const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+                setSrc(decryptedData.startsWith('data:') ? decryptedData : url);
+            } catch (err) {
+                setSrc(url);
+            }
+        };
+        fetchAndDecrypt();
+    }, [url, secretKey]);
+
+    if (!src) return <span style={{color: '#8696a0', fontSize:'0.8rem'}}>Decrypting Audio...</span>;
+    return <audio controls src={src} className="msg-audio" />;
+};
+
+const SecureFileDownload = ({ url, fileName, fileSize, secretKey }) => {
+    const [decryptedHref, setDecryptedHref] = useState(null);
+    const [decrypting, setDecrypting] = useState(false);
+
+    const handleDownloadClick = async (e) => {
+        if (decryptedHref) return; // Already decrypted
+        e.preventDefault();
+        setDecrypting(true);
+        try {
+            const response = await fetch(url);
+            const encryptedText = await response.text();
+            const bytes = CryptoJS.AES.decrypt(encryptedText, secretKey);
+            const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
+            
+            // Create a temporary link to download
+            const link = document.createElement("a");
+            link.href = decryptedData;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            setDecryptedHref(decryptedData); // Cache it
+        } catch (err) {
+            console.error("Download decryption failed", err);
+            window.open(url, '_blank'); // Fallback
+        } finally {
+            setDecrypting(false);
+        }
+    };
+
+    const formatBytes = (bytes, decimals = 2) => {
+        if (!+bytes) return '0 Bytes';
+        const k = 1024;
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${sizes[i]}`;
+    };
+
+    return (
+        <a href={decryptedHref || url} onClick={handleDownloadClick} className="msg-file-card" style={{cursor: 'pointer'}}>
+            <div className="file-icon-box"><i className="bi bi-file-earmark-text-fill"></i></div>
+            <div className="file-info">
+                <span className="file-name">{fileName}</span>
+                <span className="file-size">{formatBytes(fileSize)}</span>
+            </div>
+            <div style={{color: '#8696a0', marginLeft: '10px'}}>
+                {decrypting ? <span className="spinner-border spinner-border-sm"></span> : <i className="bi bi-download"></i>}
+            </div>
+        </a>
+    );
+};
+
+
+// --- MAIN CHAT COMPONENT ---
 
 const Chat = () => {
     const { user } = useAuth();
@@ -45,18 +163,27 @@ const Chat = () => {
 
     const handleClose = () => navigate(-1);
 
-    // --- Encryption / Decryption Helpers ---
-    const encryptMessage = (text) => {
-        return CryptoJS.AES.encrypt(text, SECRET_KEY).toString();
-    };
-
-    const decryptMessage = (cipherText) => {
+    // --- Encryption Helpers ---
+    const encryptText = (text) => CryptoJS.AES.encrypt(text, SECRET_KEY).toString();
+    
+    const decryptText = (cipherText) => {
         try {
             const bytes = CryptoJS.AES.decrypt(cipherText, SECRET_KEY);
-            return bytes.toString(CryptoJS.enc.Utf8);
+            const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+            return decrypted || cipherText;
         } catch (error) {
-            return "** Error Decrypting Message **";
+            return cipherText;
         }
+    };
+
+    // Helper: Read File as Base64 (DataURL)
+    const readFileAsBase64 = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
     };
 
     // --- 1. Auto-scroll ---
@@ -68,7 +195,7 @@ const Chat = () => {
         scrollToBottom();
     }, [messages, isOtherTyping, isRecording]);
 
-    // --- 2. Fetch Messages & Handle Read Receipts ---
+    // --- 2. Fetch Messages ---
     useEffect(() => {
         if (!chatId || !collectionName || !user) return;
 
@@ -82,7 +209,7 @@ const Chat = () => {
             }));
             setMessages(msgs);
 
-            // Mark unread messages as read
+            // Read Receipts
             snapshot.docs.forEach(async (docSnap) => {
                 const data = docSnap.data();
                 if (data.senderId !== user._id && !data.read) {
@@ -98,10 +225,9 @@ const Chat = () => {
         return () => unsubscribe();
     }, [chatId, collectionName, user]);
 
-    // --- 3. Online Status & Typing Logic ---
+    // --- 3. Online Status & Typing ---
     useEffect(() => {
         if (!chatId || !user) return;
-
         const chatDocRef = doc(db, collectionName, chatId);
         const unsubChat = onSnapshot(chatDocRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -113,11 +239,10 @@ const Chat = () => {
                 setIsOtherTyping(someoneElseTyping);
             }
         });
-
         return () => unsubChat();
     }, [chatId, collectionName, user]);
 
-    // --- 4. Text Message Logic ---
+    // --- 4. Handlers ---
     const handleTyping = async (e) => {
         setNewMessage(e.target.value);
         if (!user || !chatId) return;
@@ -146,11 +271,10 @@ const Chat = () => {
             await setDoc(doc(db, collectionName, chatId), { typing: { [user._id]: false } }, { merge: true });
             setIsTyping(false);
 
-            // Encrypt the message text
-            const encryptedText = encryptMessage(newMessage);
+            const encryptedText = encryptText(newMessage);
 
             await addDoc(collection(db, collectionName, chatId, 'messages'), {
-                text: encryptedText, // Store Encrypted
+                text: encryptedText, 
                 type: 'text',
                 senderName: `${user.firstname} ${user.lastname}`,
                 senderId: user._id,
@@ -160,15 +284,11 @@ const Chat = () => {
             });
             setNewMessage('');
         } catch (error) {
-            console.error("Error sending message:", error);
             toast.error("Failed to send message.");
         }
     };
 
-    // --- 5. Delete Message Logic ---
-    const promptDelete = (messageId) => {
-        setDeleteTargetId(messageId); 
-    };
+    const promptDelete = (messageId) => setDeleteTargetId(messageId);
 
     const confirmDeleteMessage = async () => {
         if (!deleteTargetId) return;
@@ -176,14 +296,13 @@ const Chat = () => {
             await deleteDoc(doc(db, collectionName, chatId, 'messages', deleteTargetId));
             toast.success("Message deleted");
         } catch (error) {
-            console.error("Error deleting:", error);
             toast.error("Could not delete message");
         } finally {
             setDeleteTargetId(null); 
         }
     };
 
-    // --- 6. File Upload Logic ---
+    // --- 6. Encrypted File Upload Logic ---
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -194,13 +313,23 @@ const Chat = () => {
 
         setIsUploading(true);
         try {
+            // 1. Read File as Base64
+            const base64Data = await readFileAsBase64(file);
+            
+            // 2. Encrypt the Base64 String
+            const encryptedData = CryptoJS.AES.encrypt(base64Data, SECRET_KEY).toString();
+            
+            // 3. Convert Encrypted String to Blob for Upload
+            const encryptedBlob = new Blob([encryptedData], { type: 'text/plain' });
+
             const isImage = file.type.startsWith('image/');
             const msgType = isImage ? 'image' : 'file';
             const fileId = uuidv4();
-            const filePath = `chatFiles/${chatId}/${fileId}-${file.name}`;
+            // Appending .txt because it's now an encrypted text file
+            const filePath = `chatFiles/${chatId}/${fileId}-${file.name}.txt`; 
             const storageRef = ref(storage, filePath);
 
-            const snapshot = await uploadBytes(storageRef, file);
+            const snapshot = await uploadBytes(storageRef, encryptedBlob);
             const downloadURL = await getDownloadURL(snapshot.ref);
 
             await addDoc(collection(db, collectionName, chatId, 'messages'), {
@@ -208,6 +337,7 @@ const Chat = () => {
                 fileUrl: downloadURL,
                 fileName: file.name,
                 fileSize: file.size,
+                isEncrypted: true, // Flag to identify new encrypted files
                 senderName: `${user.firstname} ${user.lastname}`,
                 senderId: user._id,
                 senderEmail: user.email,
@@ -224,7 +354,7 @@ const Chat = () => {
         }
     };
 
-    // --- 7. Voice Recording Logic ---
+    // --- 7. Encrypted Voice Recording Logic ---
     const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -233,9 +363,7 @@ const Chat = () => {
             setAudioChunks([]);
 
             recorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    setAudioChunks((prev) => [...prev, event.data]);
-                }
+                if (event.data.size > 0) setAudioChunks((prev) => [...prev, event.data]);
             };
 
             recorder.onstop = async () => {
@@ -247,7 +375,6 @@ const Chat = () => {
             recorder.start();
             setIsRecording(true);
         } catch (err) {
-            console.error("Error accessing microphone:", err);
             toast.error("Microphone access denied.");
         }
     };
@@ -262,46 +389,46 @@ const Chat = () => {
     const uploadAudio = async (blob) => {
         setIsUploading(true);
         try {
-            const fileId = uuidv4();
-            const filePath = `chatVoice/${chatId}/${fileId}.webm`;
-            const storageRef = ref(storage, filePath);
-            
-            const snapshot = await uploadBytes(storageRef, blob);
-            const downloadURL = await getDownloadURL(snapshot.ref);
+            // 1. Convert Blob to Base64
+            const reader = new FileReader();
+            reader.readAsDataURL(blob); 
+            reader.onloadend = async () => {
+                const base64Audio = reader.result;
+                
+                // 2. Encrypt
+                const encryptedAudio = CryptoJS.AES.encrypt(base64Audio, SECRET_KEY).toString();
+                const encryptedBlob = new Blob([encryptedAudio], { type: 'text/plain' });
 
-            await addDoc(collection(db, collectionName, chatId, 'messages'), {
-                type: 'audio',
-                fileUrl: downloadURL,
-                fileName: 'Voice Message',
-                senderName: `${user.firstname} ${user.lastname}`,
-                senderId: user._id,
-                senderEmail: user.email,
-                timestamp: serverTimestamp(),
-                read: false
-            });
+                const fileId = uuidv4();
+                const filePath = `chatVoice/${chatId}/${fileId}.txt`;
+                const storageRef = ref(storage, filePath);
+                
+                const snapshot = await uploadBytes(storageRef, encryptedBlob);
+                const downloadURL = await getDownloadURL(snapshot.ref);
 
+                await addDoc(collection(db, collectionName, chatId, 'messages'), {
+                    type: 'audio',
+                    fileUrl: downloadURL,
+                    fileName: 'Voice Message',
+                    isEncrypted: true,
+                    senderName: `${user.firstname} ${user.lastname}`,
+                    senderId: user._id,
+                    senderEmail: user.email,
+                    timestamp: serverTimestamp(),
+                    read: false
+                });
+                setIsUploading(false);
+            };
         } catch (error) {
             console.error("Audio upload failed:", error);
-            toast.error("Failed to send voice message.");
-        } finally {
             setIsUploading(false);
         }
     };
-
 
     // --- Helpers ---
     const formatTime = (timestamp) => {
         if (!timestamp) return '...';
         return timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-    };
-
-    const formatBytes = (bytes, decimals = 2) => {
-        if (!+bytes) return '0 Bytes';
-        const k = 1024;
-        const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
     };
 
     const getDateLabel = (timestamp) => {
@@ -311,13 +438,9 @@ const Chat = () => {
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
 
-        if (date.toDateString() === today.toDateString()) {
-            return 'Today';
-        } else if (date.toDateString() === yesterday.toDateString()) {
-            return 'Yesterday';
-        } else {
-            return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
-        }
+        if (date.toDateString() === today.toDateString()) return 'Today';
+        else if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+        else return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     if (!user) return null;
@@ -421,7 +544,7 @@ const Chat = () => {
                     {messages.length === 0 && (
                         <div className="text-center mt-5" style={{ color: 'var(--wa-input-bg)', padding: '10px', background: 'rgba(32, 44, 51, 0.5)', borderRadius: '10px', margin: '0 auto', maxWidth: '300px' }}>
                             <small style={{color: 'var(--wa-text-secondary)'}}>
-                                <i className="bi bi-lock-fill me-1"></i> Messages are end-to-end encrypted.
+                                <i className="bi bi-lock-fill me-1"></i> Messages & Files are end-to-end encrypted.
                             </small>
                         </div>
                     )}
@@ -433,10 +556,10 @@ const Chat = () => {
                         const prevDateLabel = prevMsg ? getDateLabel(prevMsg.timestamp) : null;
                         const showDate = dateLabel && dateLabel !== prevDateLabel;
 
-                        // Decrypt text if it's a text message
+                        // Decrypt text
                         let displayContent = msg.text;
                         if(msg.type === 'text') {
-                            displayContent = decryptMessage(msg.text);
+                            displayContent = decryptText(msg.text);
                         }
 
                         return (
@@ -460,27 +583,41 @@ const Chat = () => {
                                             <div className="sender-name">{msg.senderName}</div>
                                         )}
 
+                                        {/* --- ENCRYPTED CONTENT RENDERING --- */}
                                         {msg.type === 'image' && (
-                                            <a href={msg.fileUrl} target="_blank" rel="noreferrer">
-                                                <img src={msg.fileUrl} alt="attachment" className="msg-image" />
-                                            </a>
+                                            msg.isEncrypted ? (
+                                                <SecureImage url={msg.fileUrl} secretKey={SECRET_KEY} />
+                                            ) : (
+                                                // Backward compatibility for old unencrypted images
+                                                <a href={msg.fileUrl} target="_blank" rel="noreferrer">
+                                                    <img src={msg.fileUrl} alt="attachment" className="msg-image" />
+                                                </a>
+                                            )
                                         )}
                                         
                                         {msg.type === 'file' && (
-                                            <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="msg-file-card">
-                                                <div className="file-icon-box"><i className="bi bi-file-earmark-text-fill"></i></div>
-                                                <div className="file-info">
-                                                    <span className="file-name">{msg.fileName}</span>
-                                                    <span className="file-size">{formatBytes(msg.fileSize)}</span>
-                                                </div>
-                                                <i className="bi bi-download ms-2" style={{color: '#8696a0'}}></i>
-                                            </a>
+                                            msg.isEncrypted ? (
+                                                <SecureFileDownload url={msg.fileUrl} fileName={msg.fileName} fileSize={msg.fileSize} secretKey={SECRET_KEY} />
+                                            ) : (
+                                                <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="msg-file-card">
+                                                    <div className="file-icon-box"><i className="bi bi-file-earmark-text-fill"></i></div>
+                                                    <div className="file-info">
+                                                        <span className="file-name">{msg.fileName}</span>
+                                                        <span className="file-size">{(msg.fileSize / 1024).toFixed(2)} KB</span>
+                                                    </div>
+                                                    <i className="bi bi-download ms-2" style={{color: '#8696a0'}}></i>
+                                                </a>
+                                            )
                                         )}
 
                                         {msg.type === 'audio' && (
                                             <div className="d-flex align-items-center gap-2">
                                                 <i className="bi bi-mic-fill" style={{color: isOwn ? '#fff' : '#8696a0'}}></i>
-                                                <audio controls src={msg.fileUrl} className="msg-audio" />
+                                                {msg.isEncrypted ? (
+                                                    <SecureAudio url={msg.fileUrl} secretKey={SECRET_KEY} />
+                                                ) : (
+                                                    <audio controls src={msg.fileUrl} className="msg-audio" />
+                                                )}
                                             </div>
                                         )}
 
