@@ -11,98 +11,98 @@ import Footer from './Footer';
 
 
 function RegisterForm() {
-  const API_URL = process.env.REACT_APP_SERVER_API;
-  const [form, setForm] = useState({
-    firstname: '',
-    lastname: '',
-    email: '',
-    password: '',
-    role: '',
-  });
+    const API_URL = process.env.REACT_APP_SERVER_API;
+    const [form, setForm] = useState({
+        firstname: '',
+        lastname: '',
+        email: '',
+        password: '',
+        role: '',
+    });
 
-  const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const { setUser, user } = useAuth();
-  const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const { theme } = useTheme();
+    const [error, setError] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const { setUser, user } = useAuth();
+    const navigate = useNavigate();
+    const [loading, setLoading] = useState(false);
+    const { theme } = useTheme();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
 
-    try {
-      const registrationForm = { ...form, role: 'user' };
-      
-      const res = await axios.post(`${API_URL}/register`, registrationForm, {
-        withCredentials: true,
-      });
+        try {
+            const registrationForm = { ...form, role: 'user' };
 
-      setUser(res.data.user);
-      navigate('/new-call');
-    } catch (err) {
-      if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Registration failed. Please try again.');
-      }
-      setLoading(false);
+            const res = await axios.post(`${API_URL}/register`, registrationForm, {
+                withCredentials: true,
+            });
+
+            setUser(res.data.user);
+            navigate('/new-call');
+        } catch (err) {
+            if (err.response?.data?.message) {
+                setError(err.response.data.message);
+            } else {
+                setError('Registration failed. Please try again.');
+            }
+            setLoading(false);
+        }
+    };
+
+    if (user) {
+        navigate("/new-call");
+        return null;
     }
-  };
 
-  if (user) {
-    navigate("/new-call");
-    return null;
-  }
+    // Feature Data for the Grid
+    const features = [
+        {
+            icon: <ShieldCheck size={32} />,
+            title: "End-to-End Encryption",
+            desc: "All chats are protected with AES-256 symmetric encryption. Messages stay encrypted even for network providers — only the sender and receiver can read them.",
+            color: "text-blue",
+        },
 
-  // Feature Data for the Grid
- const features = [
-  {
-    icon: <ShieldCheck size={32} />,
-    title: "End-to-End Encryption",
-    desc: "All chats are protected with AES-256 symmetric encryption. Messages stay encrypted even for network providers — only the sender and receiver can read them.",
-    color: "text-blue",
-  },
+        {
+            icon: <Shield size={32} />,
+            title: "End-to-End Secure",
+            desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.",
+            color: "text-purple"
+        },
 
-  { 
-    icon: <Shield size={32} />, 
-    title: "End-to-End Secure", 
-    desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.", 
-    color: "text-purple" 
-  },
+        {
+            icon: <MessageSquare size={32} />,
+            title: "Real-Time Chat",
+            desc: "Instant peer-to-peer messaging protected with AES-256 end-to-end encryption. Only the sender and receiver can access the messages.",
+            color: "text-teal",
+        },
 
-  {
-    icon: <MessageSquare size={32} />,
-    title: "Real-Time Chat",
-    desc: "Instant peer-to-peer messaging protected with AES-256 end-to-end encryption. Only the sender and receiver can access the messages.",
-    color: "text-teal",
-  },
+        {
+            icon: <MessagesSquare size={32} />,
+            title: "Group Chat",
+            desc: "Secure messaging inside group meetings with AES-256 end-to-end encryption. Only authorized participants can view messages.",
+            color: "text-teal",
+        },
 
-  {
-    icon: <MessagesSquare size={32} />,
-    title: "Group Chat",
-    desc: "Secure messaging inside group meetings with AES-256 end-to-end encryption. Only authorized participants can view messages.",
-    color: "text-teal",
-  },
+        { icon: <Users size={32} />, title: "Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
 
-  { icon: <Users size={32} />, title: "Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
+        { icon: <Users size={32} />, title: "Group Calls", desc: "Host meetings with up to 10 participants with ease and stability.", color: "text-teal" },
 
-  { icon: <Users size={32} />, title: "Group Calls", desc: "Host meetings with up to 10 participants with ease and stability.", color: "text-teal" },
+        { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming.", color: "text-teal" },
 
-  { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming.", color: "text-teal" },
+        { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
 
-  { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
-
-  { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
-];
+        { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
+    ];
 
 
-  return (
-    <>
-      <Navbar />
-      
-      <style>{`
+    return (
+        <>
+            <Navbar />
+
+            <style>{`
         :root {
             --bg-page: #111b21; 
             --text-primary: #e9edef;
@@ -248,148 +248,160 @@ function RegisterForm() {
         }
       `}</style>
 
-      {/* --- 1. HERO SECTION --- */ }
-      <div className="hero-section">
-        <div className="container">
-          <h1 className="hero-title">Join The Network</h1>
-          <p className="hero-subtitle">
-            Experience the future of communication. Create your account to start secure, 
-            high-fidelity audio and video calls today. It's free, fast, and secure.
-          </p>
-          <a href="#register-area" className="btn btn-glass-primary" style={{ maxWidth: '200px' }}>
-             Create Account <i className="bi bi-arrow-down-short"></i>
-          </a>
-        </div>
-      </div>
-
-      {/* --- 2. FEATURES GRID --- */}
-      <div className="features-container">
-        <div className="feature-grid">
-            {features.map((feature, index) => (
-                <div key={index} className="feature-card">
-                    <div className={`mb-3 ${feature.color}`}>{feature.icon}</div>
-                    <h4 className="fw-bold mb-2">{feature.title}</h4>
-                    <p className="text-secondary mb-0 small">{feature.desc}</p>
+            {/* --- 1. HERO SECTION --- */}
+            <div className="hero-section">
+                <div className="container">
+                    <h1 className="hero-title">Join The Network</h1>
+                    <p className="hero-subtitle">
+                        Experience the future of communication. Create your account to start secure,
+                        high-fidelity audio and video calls today. It's free, fast, and secure.
+                    </p>
+                    <a href="#register-area" className="btn btn-glass-primary" style={{ maxWidth: '200px' }}>
+                        Create Account <i className="bi bi-arrow-down-short"></i>
+                    </a>
                 </div>
-            ))}
-        </div>
-      </div>
-
-      {/* --- 3. REGISTER SECTION (BOTTOM) --- */}
-      <div id="register-area" className="register-section">
-        <div className="register-bg-glow"></div>
-        <div className="container">
-            <div className="text-center mb-5" style={{ position: 'relative', zIndex: 1 }}>
-                <h2 className="fw-bold display-6">Get Started Now</h2>
-                <p className="text-secondary">Join thousands of users connecting securely every day.</p>
             </div>
 
-            <div className="register-card-glass">
-                <form onSubmit={handleSubmit}>
-                    <div className="text-center mb-4">
-                        <div className="d-inline-flex p-3 rounded-circle mb-3" style={{ background: 'rgba(0, 168, 132, 0.1)', border: '1px solid rgba(0, 168, 132, 0.2)' }}>
-                            <i className="bi bi-person-plus-fill" style={{ fontSize: '2rem', color: '#00a884' }}></i>
+            {/* --- 2. FEATURES GRID --- */}
+            <div className="features-container">
+                <div className="feature-grid">
+                    {features.map((feature, index) => (
+                        <div key={index} className="feature-card">
+                            <div className={`mb-3 ${feature.color}`}>{feature.icon}</div>
+                            <h4 className="fw-bold mb-2">{feature.title}</h4>
+                            <p className="text-secondary mb-0 small">{feature.desc}</p>
                         </div>
-                        <h4 className="fw-bold">Create Account</h4>
+                    ))}
+                </div>
+            </div>
+
+            {/* --- 3. REGISTER SECTION (BOTTOM) --- */}
+            <div id="register-area" className="register-section">
+                <div className="register-bg-glow"></div>
+                <div className="container">
+                    <div className="text-center mb-5" style={{ position: 'relative', zIndex: 1 }}>
+                        <h2 className="fw-bold display-6">Get Started Now</h2>
+                        <p className="text-secondary">Join thousands of users connecting securely every day.</p>
                     </div>
 
-                    {error && (
-                        <div className="alert alert-danger d-flex align-items-center p-2 mb-4" style={{fontSize: '0.9rem', background: 'rgba(220, 53, 69, 0.1)', border: '1px solid rgba(220, 53, 69, 0.2)', color: '#ef5350'}}>
-                            <i className="bi bi-exclamation-circle-fill me-2"></i> {error}
-                        </div>
-                    )}
+                    <div className="register-card-glass">
+                        <form onSubmit={handleSubmit}>
+                            <div className="text-center mb-4">
+                                <div
+                                    className="d-inline-flex justify-content-center align-items-center rounded-circle mb-3"
+                                    style={{
+                                        width: "80px",
+                                        height: "80px",
+                                        background: "rgba(0, 168, 132, 0.1)",
+                                        border: "1px solid rgba(0, 168, 132, 0.2)",
+                                    }}
+                                >
+                                    <i
+                                        className="bi bi-person-plus-fill"
+                                        style={{ fontSize: "2rem", color: "#00a884" }}
+                                    ></i>
+                                </div>
 
-                    <div className="row mb-3">
-                        <div className="col-6">
-                            <label className="form-label text-uppercase">First Name</label>
-                            <input
-                                type="text"
-                                className="form-control"
-                                placeholder="John"
-                                value={form.firstname}
-                                onChange={(e) => setForm({ ...form, firstname: e.target.value })}
-                                required
-                            />
-                        </div>
-                        <div className="col-6">
-                            <label className="form-label text-uppercase">Last Name</label>
-                            <input
-                                type="text"
-                                className="form-control"
-                                placeholder="Doe"
-                                value={form.lastname}
-                                onChange={(e) => setForm({ ...form, lastname: e.target.value })}
-                                required
-                            />
-                        </div>
-                    </div>
+                                <h4 className="fw-bold">Create Account</h4>
+                            </div>
 
-                    <div className="mb-4">
-                        <label className="form-label text-uppercase">Email Address</label>
-                        <div className="input-group">
-                            <span className="input-group-text"><i className="bi bi-envelope"></i></span>
-                            <input
-                                type="email"
-                                className="form-control"
-                                placeholder="name@company.com"
-                                value={form.email}
-                                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                                required
-                            />
-                        </div>
-                    </div>
+                            {error && (
+                                <div className="alert alert-danger d-flex align-items-center p-2 mb-4" style={{ fontSize: '0.9rem', background: 'rgba(220, 53, 69, 0.1)', border: '1px solid rgba(220, 53, 69, 0.2)', color: '#ef5350' }}>
+                                    <i className="bi bi-exclamation-circle-fill me-2"></i> {error}
+                                </div>
+                            )}
 
-                    <div className="mb-4">
-                        <label className="form-label text-uppercase">Password</label>
-                        <div className="input-group">
-                            <span className="input-group-text"><i className="bi bi-key"></i></span>
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                className="form-control"
-                                placeholder="Create a password"
-                                value={form.password}
-                                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                                required
-                            />
-                            <button
-                                type="button"
-                                className="btn btn-outline-secondary btn-eye"
-                                onClick={() => setShowPassword(!showPassword)}
-                                tabIndex={-1}
-                            >
-                                {showPassword ? <EyeOff size={18} color="#8696a0" /> : <Eye size={18} color="#8696a0" />}
+                            <div className="row mb-3">
+                                <div className="col-6">
+                                    <label className="form-label text-uppercase">First Name</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="John"
+                                        value={form.firstname}
+                                        onChange={(e) => setForm({ ...form, firstname: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="col-6">
+                                    <label className="form-label text-uppercase">Last Name</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="Doe"
+                                        value={form.lastname}
+                                        onChange={(e) => setForm({ ...form, lastname: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="form-label text-uppercase">Email Address</label>
+                                <div className="input-group">
+                                    <span className="input-group-text"><i className="bi bi-envelope"></i></span>
+                                    <input
+                                        type="email"
+                                        className="form-control"
+                                        placeholder="name@company.com"
+                                        value={form.email}
+                                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="form-label text-uppercase">Password</label>
+                                <div className="input-group">
+                                    <span className="input-group-text"><i className="bi bi-key"></i></span>
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        className="form-control"
+                                        placeholder="Create a password"
+                                        value={form.password}
+                                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-secondary btn-eye"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <EyeOff size={18} color="#8696a0" /> : <Eye size={18} color="#8696a0" />}
+                                    </button>
+                                </div>
+                                <small className="text-secondary mt-1 d-block" style={{ fontSize: '0.75rem' }}>Must be at least 8 characters.</small>
+                            </div>
+
+                            <input type="hidden" value={form.role} onChange={(e) => setForm({ ...form, role: 'user' })} />
+
+                            <button type="submit" className="btn btn-glass-primary mt-2 mb-4" disabled={loading}>
+                                {loading ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        Creating Account...
+                                    </>
+                                ) : (
+                                    'Sign Up'
+                                )}
                             </button>
-                        </div>
-                        <small className="text-secondary mt-1 d-block" style={{fontSize: '0.75rem'}}>Must be at least 8 characters.</small>
+
+                            <div className="text-center">
+                                <p className="text-secondary mb-3 small">Already have an account?</p>
+                                <Link to="/login" className="btn btn-glass-outline">
+                                    Sign In Instead
+                                </Link>
+                            </div>
+                        </form>
                     </div>
-
-                    <input type="hidden" value={form.role} onChange={(e) => setForm({ ...form, role: 'user' })} />
-
-                    <button type="submit" className="btn btn-glass-primary mt-2 mb-4" disabled={loading}>
-                        {loading ? (
-                            <>
-                                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                Creating Account...
-                            </>
-                        ) : (
-                            'Sign Up'
-                        )}
-                    </button>
-
-                    <div className="text-center">
-                        <p className="text-secondary mb-3 small">Already have an account?</p>
-                        <Link to="/login" className="btn btn-glass-outline">
-                            Sign In Instead
-                        </Link>
-                    </div>
-                </form>
+                </div>
             </div>
-        </div>
-      </div>
 
-      <Footer />
-    </>
-  );
+            <Footer />
+        </>
+    );
 }
 
 export default RegisterForm;

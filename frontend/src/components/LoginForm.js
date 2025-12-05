@@ -12,84 +12,84 @@ import Footer from './Footer';
 
 
 function LoginForm() {
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const navigate = useNavigate();
-  const { setUser, user } = useAuth();
-  const { theme } = useTheme();
+    const [form, setForm] = useState({ email: '', password: '' });
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const navigate = useNavigate();
+    const { setUser, user } = useAuth();
+    const { theme } = useTheme();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    const API_URL = process.env.REACT_APP_SERVER_API;
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        const API_URL = process.env.REACT_APP_SERVER_API;
 
-    try {
-      const res = await axios.post(`${API_URL}/login`, form, {
-        withCredentials: true,
-      });
+        try {
+            const res = await axios.post(`${API_URL}/login`, form, {
+                withCredentials: true,
+            });
 
-      setUser(res.data.user);
-      navigate('/new-call');
-    } catch (err) {
-      setError('Login failed. Please check your credentials.');
-      setLoading(false);
+            setUser(res.data.user);
+            navigate('/new-call');
+        } catch (err) {
+            setError('Login failed. Please check your credentials.');
+            setLoading(false);
+        }
+    };
+
+    if (user) {
+        navigate("/new-call");
+        return null;
     }
-  };
 
-  if (user) {
-    navigate("/new-call");
-    return null;
-  }
+    // Feature Data for the Grid
+    const features = [
+        {
+            icon: <ShieldCheck size={32} />,
+            title: "End-to-End Encryption",
+            desc: "All chats are protected with AES-256 symmetric encryption. Messages stay encrypted even for network providers — only the sender and receiver can read them.",
+            color: "text-blue",
+        },
 
-  // Feature Data for the Grid
- const features = [
-  {
-    icon: <ShieldCheck size={32} />,
-    title: "End-to-End Encryption",
-    desc: "All chats are protected with AES-256 symmetric encryption. Messages stay encrypted even for network providers — only the sender and receiver can read them.",
-    color: "text-blue",
-  },
+        {
+            icon: <Shield size={32} />,
+            title: "End-to-End Secure",
+            desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.",
+            color: "text-purple"
+        },
 
-  { 
-    icon: <Shield size={32} />, 
-    title: "End-to-End Secure", 
-    desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.", 
-    color: "text-purple" 
-  },
+        {
+            icon: <MessageSquare size={32} />,
+            title: "Real-Time Chat",
+            desc: "Instant peer-to-peer messaging protected with AES-256 end-to-end encryption. Only the sender and receiver can access the messages.",
+            color: "text-teal",
+        },
 
-  {
-    icon: <MessageSquare size={32} />,
-    title: "Real-Time Chat",
-    desc: "Instant peer-to-peer messaging protected with AES-256 end-to-end encryption. Only the sender and receiver can access the messages.",
-    color: "text-teal",
-  },
+        {
+            icon: <MessagesSquare size={32} />,
+            title: "Group Chat",
+            desc: "Secure messaging inside group meetings with AES-256 end-to-end encryption. Only authorized participants can view messages.",
+            color: "text-teal",
+        },
 
-  {
-    icon: <MessagesSquare size={32} />,
-    title: "Group Chat",
-    desc: "Secure messaging inside group meetings with AES-256 end-to-end encryption. Only authorized participants can view messages.",
-    color: "text-teal",
-  },
+        { icon: <Users size={32} />, title: "Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
 
-  { icon: <Users size={32} />, title: "Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
+        { icon: <Users size={32} />, title: "Group Calls", desc: "Host meetings with up to 10 participants with ease and stability.", color: "text-teal" },
 
-  { icon: <Users size={32} />, title: "Group Calls", desc: "Host meetings with up to 10 participants with ease and stability.", color: "text-teal" },
+        { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming.", color: "text-teal" },
 
-  { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming.", color: "text-teal" },
+        { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
 
-  { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
+        { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
+    ];
 
-  { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
-];
+    return (
+        <>
+            <Navbar />
 
-  return (
-    <>
-      <Navbar />
-      
-      <style>{`
+            <style>{`
         :root {
             --bg-page: #111b21; 
             --text-primary: #e9edef;
@@ -251,121 +251,133 @@ function LoginForm() {
         }
       `}</style>
 
-      {/* --- 1. HERO SECTION --- */ }
-      <div className="hero-section">
-        <div className="container">
-          <h1 className="hero-title">NETWORK</h1>
-          <p className="hero-subtitle">
-            The next generation of secure, decentralized communication. 
-            Connect with your team, friends, and family with high-fidelity video and crystal-clear audio. 
-            No installations, just instant connection.
-          </p>
-          <a href="#login-area" className="btn btn-glass-primary" style={{ maxWidth: '200px' }}>
-             Get Started <i className="bi bi-arrow-down-short"></i>
-          </a>
-        </div>
-      </div>
-
-      {/* --- 2. FEATURES GRID --- */}
-      <div className="features-container">
-        <div className="feature-grid">
-            {features.map((feature, index) => (
-                <div key={index} className="feature-card">
-                    <div className={`mb-3 ${feature.color}`}>{feature.icon}</div>
-                    <h4 className="fw-bold mb-2">{feature.title}</h4>
-                    <p className="text-secondary mb-0 small">{feature.desc}</p>
+            {/* --- 1. HERO SECTION --- */}
+            <div className="hero-section">
+                <div className="container">
+                    <h1 className="hero-title">NETWORK</h1>
+                    <p className="hero-subtitle">
+                        The next generation of secure, decentralized communication.
+                        Connect with your team, friends, and family with high-fidelity video and crystal-clear audio.
+                        No installations, just instant connection.
+                    </p>
+                    <a href="#login-area" className="btn btn-glass-primary" style={{ maxWidth: '200px' }}>
+                        Get Started <i className="bi bi-arrow-down-short"></i>
+                    </a>
                 </div>
-            ))}
-        </div>
-      </div>
-
-      {/* --- 3. LOGIN SECTION (BOTTOM) --- */}
-      <div id="login-area" className="login-section">
-        <div className="login-bg-glow"></div>
-        <div className="container">
-            <div className="text-center mb-5" style={{ position: 'relative', zIndex: 1 }}>
-                <h2 className="fw-bold display-6">Ready to Connect?</h2>
-                <p className="text-secondary">Login to your dashboard to start or join a meeting.</p>
             </div>
 
-            <div className="login-card-glass">
-                <form onSubmit={handleSubmit}>
-                    <div className="text-center mb-4">
-                        <div className="d-inline-flex p-3 rounded-circle mb-3" style={{ background: 'rgba(0, 168, 132, 0.1)', border: '1px solid rgba(0, 168, 132, 0.2)' }}>
-                            <i className="bi bi-person-fill" style={{ fontSize: '2rem', color: '#00a884' }}></i>
+            {/* --- 2. FEATURES GRID --- */}
+            <div className="features-container">
+                <div className="feature-grid">
+                    {features.map((feature, index) => (
+                        <div key={index} className="feature-card">
+                            <div className={`mb-3 ${feature.color}`}>{feature.icon}</div>
+                            <h4 className="fw-bold mb-2">{feature.title}</h4>
+                            <p className="text-secondary mb-0 small">{feature.desc}</p>
                         </div>
-                        <h4 className="fw-bold">Member Login</h4>
+                    ))}
+                </div>
+            </div>
+
+            {/* --- 3. LOGIN SECTION (BOTTOM) --- */}
+            <div id="login-area" className="login-section">
+                <div className="login-bg-glow"></div>
+                <div className="container">
+                    <div className="text-center mb-5" style={{ position: 'relative', zIndex: 1 }}>
+                        <h2 className="fw-bold display-6">Ready to Connect?</h2>
+                        <p className="text-secondary">Login to your dashboard to start or join a meeting.</p>
                     </div>
 
-                    {error && (
-                        <div className="alert alert-danger d-flex align-items-center p-2 mb-4" style={{fontSize: '0.9rem', background: 'rgba(220, 53, 69, 0.1)', border: '1px solid rgba(220, 53, 69, 0.2)', color: '#ef5350'}}>
-                            <i className="bi bi-exclamation-circle-fill me-2"></i> {error}
-                        </div>
-                    )}
+                    <div className="login-card-glass">
+                        <form onSubmit={handleSubmit}>
+                            <div className="text-center mb-4">
+                                <div
+                                    className="d-inline-flex justify-content-center align-items-center rounded-circle mb-3"
+                                    style={{
+                                        width: "80px",
+                                        height: "80px",
+                                        background: "rgba(0, 168, 132, 0.1)",
+                                        border: "1px solid rgba(0, 168, 132, 0.2)",
+                                    }}
+                                >
+                                    <i
+                                        className="bi bi-person-fill"
+                                        style={{ fontSize: "2rem", color: "#00a884" }}
+                                    ></i>
+                                </div>
 
-                    <div className="mb-4">
-                        <label className="form-label text-uppercase">Email Address</label>
-                        <div className="input-group">
-                            <span className="input-group-text"><i className="bi bi-envelope"></i></span>
-                            <input
-                                type="email"
-                                className="form-control"
-                                placeholder="name@company.com"
-                                value={form.email}
-                                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                                required
-                            />
-                        </div>
-                    </div>
+                                <h4 className="fw-bold">Member Login</h4>
+                            </div>
 
-                    <div className="mb-4">
-                        <label className="form-label text-uppercase">Password</label>
-                        <div className="input-group">
-                            <span className="input-group-text"><i className="bi bi-key"></i></span>
-                            <input
-                                type={showPassword ? 'text' : 'password'}
-                                className="form-control"
-                                placeholder="Enter your password"
-                                value={form.password}
-                                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                                required
-                            />
-                            <button
-                                type="button"
-                                className="btn btn-outline-secondary btn-eye"
-                                onClick={() => setShowPassword(!showPassword)}
-                                tabIndex={-1}
-                            >
-                                {showPassword ? <EyeOff size={18} color="#8696a0" /> : <Eye size={18} color="#8696a0" />}
+                            {error && (
+                                <div className="alert alert-danger d-flex align-items-center p-2 mb-4" style={{ fontSize: '0.9rem', background: 'rgba(220, 53, 69, 0.1)', border: '1px solid rgba(220, 53, 69, 0.2)', color: '#ef5350' }}>
+                                    <i className="bi bi-exclamation-circle-fill me-2"></i> {error}
+                                </div>
+                            )}
+
+                            <div className="mb-4">
+                                <label className="form-label text-uppercase">Email Address</label>
+                                <div className="input-group">
+                                    <span className="input-group-text"><i className="bi bi-envelope"></i></span>
+                                    <input
+                                        type="email"
+                                        className="form-control"
+                                        placeholder="name@company.com"
+                                        value={form.email}
+                                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="form-label text-uppercase">Password</label>
+                                <div className="input-group">
+                                    <span className="input-group-text"><i className="bi bi-key"></i></span>
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        className="form-control"
+                                        placeholder="Enter your password"
+                                        value={form.password}
+                                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-secondary btn-eye"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <EyeOff size={18} color="#8696a0" /> : <Eye size={18} color="#8696a0" />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button type="submit" className="btn btn-glass-primary mt-2 mb-4" disabled={loading}>
+                                {loading ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        Authenticating...
+                                    </>
+                                ) : (
+                                    'Sign In'
+                                )}
                             </button>
-                        </div>
-                    </div>
 
-                    <button type="submit" className="btn btn-glass-primary mt-2 mb-4" disabled={loading}>
-                        {loading ? (
-                            <>
-                                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                Authenticating...
-                            </>
-                        ) : (
-                            'Sign In'
-                        )}
-                    </button>
-
-                    <div className="text-center">
-                        <p className="text-secondary mb-3 small">Don't have an ID?</p>
-                        <Link to="/register" className="btn btn-glass-outline">
-                            Create Account
-                        </Link>
+                            <div className="text-center">
+                                <p className="text-secondary mb-3 small">Don't have an ID?</p>
+                                <Link to="/register" className="btn btn-glass-outline">
+                                    Create Account
+                                </Link>
+                            </div>
+                        </form>
                     </div>
-                </form>
+                </div>
             </div>
-        </div>
-      </div>
 
-      <Footer />
-    </>
-  );
+            <Footer />
+        </>
+    );
 }
 
 export default LoginForm;
