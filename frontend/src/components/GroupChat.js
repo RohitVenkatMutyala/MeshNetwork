@@ -575,7 +575,7 @@ const GroupChat = () => {
                             <div className="status-text">
                                 {typingUsers.length > 0 ? (
                                     <span className="status-typing">{typingUsers.join(', ')} typing...</span>
-                                ) : <span>Tap for info</span>}
+                                ) : <span></span>}
                             </div>
                         </div>
                     </div>
