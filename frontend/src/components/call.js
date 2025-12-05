@@ -248,7 +248,7 @@ function Call() {
     const [isPipDragging, setIsPipDragging] = useState(false);
     const pipOffsetRef = useRef({ x: 0, y: 0 });
     const pipWrapperRef = useRef(null);
-
+    const [elapsedTime, setElapsedTime] = useState('00:00:00');
     // --- FIX: Moved participantsRef and its useEffect to the top level ---
     const participantsRef = React.useRef(participants);
     useEffect(() => {
@@ -290,8 +290,8 @@ function Call() {
             setCallState('denied'); // No call ID to load
             return;
         }
-            // --- End Auth Check ---
-           
+        // --- End Auth Check ---
+
 
         const callDocRef = doc(db, 'calls', callId);
 
@@ -387,8 +387,31 @@ function Call() {
             unsubscribeCall();
             unsubscribeMessages();
         };
-    },[callId, user, navigate, loading]); // --- MODIFIED ---
+    }, [callId, user, navigate, loading]); // --- MODIFIED ---
+    useEffect(() => {
+        // Only run if call is active and we have data
+        if (callState !== 'active' || !callData) return;
 
+        // Use serverTimestamp if available, otherwise fallback to local time
+        // ideally, your 'createCall' logic should save a 'startedAt' timestamp.
+        // If not, we use the time the component mounted or the user joined.
+        const startTime = callData.startedAt?.toDate() // If you saved this in DB
+            || callData.createdAt?.toDate() // Fallback to creation time
+            || new Date();
+
+        const intervalId = setInterval(() => {
+            const now = new Date();
+            const diff = Math.floor((now - startTime) / 1000);
+
+            const hours = Math.floor(diff / 3600).toString().padStart(2, '0');
+            const minutes = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+            const seconds = (diff % 60).toString().padStart(2, '0');
+
+            setElapsedTime(hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`);
+        }, 1000);
+
+        return () => clearInterval(intervalId);
+    }, [callState, callData]);
 
     // --- NEW: Stable participant ID string ---
     const participantIDs = JSON.stringify(participants.map(p => p.id).sort());
@@ -825,42 +848,68 @@ function Call() {
     };
 
     const handleToggleScreenShare = async () => {
+        // 1. If already sharing, stop it.
         if (isScreenSharing) {
             handleStopScreenShare();
             return;
         }
 
+        // 2. Safety Check
         if (!stream) {
             toast.error("You must be in the call to share your screen.");
             return;
         }
 
+        // 3. Browser Support Check (Crucial for Mobile)
+        // Note: Most standard mobile browsers (Chrome Android / Safari iOS) DO NOT support getDisplayMedia.
+        // This check prevents the app from crashing on those devices.
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            toast.warning("Screen sharing is not supported by this browser/device.");
+            return;
+        }
+
         try {
+            // 4. Request the Screen Stream
             const screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: true,
-                audio: true // Request system audio
+                video: { cursor: "always" },
+                audio: true // Request system audio if available
             });
 
             screenStreamRef.current = screenStream;
             const screenVideoTrack = screenStream.getVideoTracks()[0];
-            const screenAudioTrack = screenStream.getAudioTracks()[0]; // Might be null
+            const screenAudioTrack = screenStream.getAudioTracks()[0];
 
-            // Store original tracks
+            // 5. Save the current camera tracks so we can switch back later
             cameraTrackRef.current = stream.getVideoTracks()[0];
             micTrackRef.current = stream.getAudioTracks()[0];
 
-            // Replace tracks on all peers
-            for (const peerId in peersRef.current) {
-                const peer = peersRef.current[peerId];
-                if (peer) {
-                    peer.replaceTrack(cameraTrackRef.current, screenVideoTrack, stream);
-                    if (screenAudioTrack) {
-                        peer.replaceTrack(micTrackRef.current, screenAudioTrack, stream);
-                    }
-                }
+            // 6. Replace tracks for ALL connected peers
+            // This loop works for both Owner and Participants
+            const peers = Object.values(peersRef.current);
+
+            if (peers.length === 0) {
+                // Edge case: User is alone in the call
+                console.log("No peers to share screen with yet.");
             }
 
-            // Listen for the browser's "Stop sharing" button
+            peers.forEach((peer) => {
+                if (peer && !peer.destroyed) {
+                    // Replace Video Track
+                    // Note: We use the *current* stream's video track as the 'old' track to replace
+                    const currentVideoTrack = stream.getVideoTracks()[0];
+                    if (currentVideoTrack) {
+                        peer.replaceTrack(currentVideoTrack, screenVideoTrack, stream);
+                    }
+
+                    // Replace Audio Track (if screen audio was captured)
+                    const currentAudioTrack = stream.getAudioTracks()[0];
+                    if (screenAudioTrack && currentAudioTrack) {
+                        peer.replaceTrack(currentAudioTrack, screenAudioTrack, stream);
+                    }
+                }
+            });
+
+            // 7. Handle "Stop Sharing" from the browser's native UI bar
             screenVideoTrack.onended = () => {
                 handleStopScreenShare();
             };
@@ -869,8 +918,14 @@ function Call() {
 
         } catch (err) {
             console.error("Screen share error:", err);
-            toast.error("Could not start screen share.");
-            // Ensure state is reset if it fails
+            // Handle user cancelling the prompt
+            if (err.name === 'NotAllowedError') {
+                // User clicked "Cancel", do nothing specific
+            } else {
+                toast.error("Failed to start screen share.");
+            }
+
+            // Cleanup if we partially started
             if (screenStreamRef.current) {
                 screenStreamRef.current.getTracks().forEach(track => track.stop());
                 screenStreamRef.current = null;
@@ -1240,6 +1295,36 @@ function Call() {
                         0% { -webkit-mask-position: 150%; }
                         100% { -webkit-mask-position: -50%; }
                     }
+                        /* --- Meeting Timer (Zoom Style) --- */
+.meeting-timer-overlay {
+    position: absolute;
+    top: 1rem; /* Adjust top spacing */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 0.25rem 0.75rem;
+    border-radius: 8px;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    font-weight: 500;
+    z-index: 100; /* Ensure it stays on top */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    pointer-events: none; /* Let clicks pass through */
+}
+.recording-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #dc3545; /* Red dot */
+    border-radius: 50%;
+    animation: pulse-red 2s infinite;
+}
+@keyframes pulse-red {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
                 `}</style>
                 <div className="d-flex flex-column justify-content-around align-items-center joining-screen" style={{ minHeight: 'calc(100dvh - 56px)' }}>
 
@@ -1876,6 +1961,11 @@ function Call() {
                             onMouseLeave={handlePipDragEnd}
                             onTouchEnd={handlePipDragEnd}
                         >
+                            {/* --- NEW: TIMER ELEMENT --- */}
+                            <div className="meeting-timer-overlay">
+                                <div className="recording-dot"></div>
+                                <span>{elapsedTime}</span>
+                            </div>
                             {/* --- MODIFIED: Video Grid (Remote Only) --- */}
                             <div className={`video-grid-container grid-${remoteStreams.length}`}>
                                 {/* Remote Video Tiles */}
