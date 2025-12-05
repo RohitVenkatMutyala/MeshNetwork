@@ -62,6 +62,13 @@ function RegisterForm() {
     { icon: <Shield size={32} />, title: "End-to-End Secure", desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.", color: "text-purple" },
     { icon: <Users size={32} />, title: "Group Calls", desc: "Host meetings with up to 10 participants with ease and stability.", color: "text-teal" },
    // { icon: <Mic size={32} />, title: "Noise Cancellation", desc: "Advanced audio processing to filter out background noise.", color: "text-purple" },
+   {
+  icon: <ShieldCheck size={32} />,
+  title: "End-to-End Encryption",
+  desc: "All chats are protected with AES-256 symmetric encryption. Messages stay encrypted even for network providers — only the sender and receiver can read them.",
+  color: "text-blue",
+},
+
     { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
     { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
   ];
