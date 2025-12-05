@@ -3,12 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Eye, EyeOff, Video, Shield, Users, Mic, Monitor, Globe } from 'lucide-react';
+import { Eye, EyeOff, Video, Shield, Users, Mic, Monitor, Globe, ShieldCheck, MessageSquare, MessagesSquare } from "lucide-react";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import Navbar from './navbar';
 import Footer from './Footer';
-import { ShieldCheck } from "lucide-react";
+
 
 
 function LoginForm() {
@@ -46,21 +46,44 @@ function LoginForm() {
 
   // Feature Data for the Grid
  const features = [
-      { icon: <Users size={32} />, title: " Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
-     { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming.", color: "text-teal" },
-     { icon: <Shield size={32} />, title: "End-to-End Secure", desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.", color: "text-purple" },
-     { icon: <Users size={32} />, title: "Group Calls", desc: "Host meetings with up to 10 participants with ease and stability.", color: "text-teal" },
-    // { icon: <Mic size={32} />, title: "Noise Cancellation", desc: "Advanced audio processing to filter out background noise.", color: "text-purple" },
-    {
-  icon: <ShieldCheck size={32} />,
-  title: "End-to-End Encryption",
-  desc: "All chats are protected with AES-256 symmetric encryption. Messages stay encrypted even for network providers — only the sender and receiver can read them.",
-  color: "text-blue",
-},
+  {
+    icon: <ShieldCheck size={32} />,
+    title: "End-to-End Encryption",
+    desc: "All chats are protected with AES-256 symmetric encryption. Messages stay encrypted even for network providers — only the sender and receiver can read them.",
+    color: "text-blue",
+  },
 
-     { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
-     { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
-   ];
+  { 
+    icon: <Shield size={32} />, 
+    title: "End-to-End Secure", 
+    desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.", 
+    color: "text-purple" 
+  },
+
+  {
+    icon: <MessageSquare size={32} />,
+    title: "Real-Time Chat",
+    desc: "Instant peer-to-peer messaging protected with AES-256 end-to-end encryption. Only the sender and receiver can access the messages.",
+    color: "text-teal",
+  },
+
+  {
+    icon: <MessagesSquare size={32} />,
+    title: "Group Chat",
+    desc: "Secure messaging inside group meetings with AES-256 end-to-end encryption. Only authorized participants can view messages.",
+    color: "text-teal",
+  },
+
+  { icon: <Users size={32} />, title: "Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
+
+  { icon: <Users size={32} />, title: "Group Calls", desc: "Host meetings with up to 10 participants with ease and stability.", color: "text-teal" },
+
+  { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming.", color: "text-teal" },
+
+  { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
+
+  { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
+];
 
   return (
     <>
