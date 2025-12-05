@@ -622,7 +622,7 @@ const GroupChat = () => {
                                         {typingUsers.join(', ')} typing...
                                     </span>
                                 ) : (
-                                    <span>Tap for info</span>
+                                    <span> </span>
                                 )}
                             </div>
                         </div>
