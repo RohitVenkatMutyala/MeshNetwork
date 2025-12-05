@@ -4,7 +4,7 @@ import { db } from '../firebaseConfig';
 import {
     collection, query, where, orderBy, limit, onSnapshot,
     doc, setDoc, serverTimestamp, runTransaction, deleteDoc,
-    writeBatch, getDocs, addDoc
+    writeBatch, getDocs, updateDoc
 } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
@@ -153,6 +153,9 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
     const displaySubtitle = isGroup ? `${call.allowedEmails.length} Participants` : (isOwner ? call.recipientEmail : call.ownerEmail);
     const canDelete = isGroup ? isOwner : true;
 
+    // Logic for latest session ID (for 1-on-1 meetings)
+    const latestSessionId = call.latestSessionId || call.id;
+
     const actionBtnClass = isGroup ? 'icon-btn-purple' : 'icon-btn-green';
 
     if (!displayTitle) return null;
@@ -161,11 +164,17 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
         e.stopPropagation(); 
         e.preventDefault();
         
-        if (isGroup && !isOwner) {
-            navigate(`/call/${call.id}`);
-        } else {
+        // Allow ONLY if it's NOT a group (1-on-1) OR if I am the Owner of the group
+        if (!isGroup || isOwner) {
             handleReCall(call);
         }
+    };
+
+    const handleReEnter = (e) => {
+        e.stopPropagation();
+        // For groups, use the static ID. For 1-on-1, use the latest session ID.
+        const targetId = isGroup ? call.id : latestSessionId;
+        navigate(`/call/${targetId}`);
     };
 
     return (
@@ -190,26 +199,32 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
             </div>
 
             <div className="card-actions">
-                <button 
-                    className={`action-btn ${actionBtnClass}`}
-                    title={isGroup && !isOwner ? "Join Meeting" : "Start Video Call"} 
-                    disabled={isCalling === call.id} 
-                    onPointerDown={(e) => e.stopPropagation()} 
-                    onClick={handleVideoAction}
-                >
-                    {isCalling === call.id ? <span className="spinner-border spinner-border-sm" style={{width: '1rem', height: '1rem'}}></span> : <i className="bi bi-camera-video-fill"></i>}
-                </button>
-
-                {isOwner && (
+                {/* LOGIC UPDATE:
+                   Video Icon is visible if:
+                   1. It is NOT a group (1-on-1 meeting)
+                   2. OR It IS a group AND I am the Owner
+                */}
+                {(!isGroup || isOwner) && (
                     <button 
                         className={`action-btn ${actionBtnClass}`}
-                        title="Re-Enter Room" 
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => { e.stopPropagation(); navigate(`/call/${call.id}`); }}
+                        title={isGroup ? "Start Group Call" : "Start New Video Call"} 
+                        disabled={isCalling === call.id} 
+                        onPointerDown={(e) => e.stopPropagation()} 
+                        onClick={handleVideoAction}
                     >
-                        <i className="bi bi-box-arrow-in-right"></i>
+                        {isCalling === call.id ? <span className="spinner-border spinner-border-sm" style={{width: '1rem', height: '1rem'}}></span> : <i className="bi bi-camera-video-fill"></i>}
                     </button>
                 )}
+
+                {/* Re-Enter / Join Button (Visible to everyone) */}
+                <button 
+                    className={`action-btn ${actionBtnClass}`}
+                    title={isGroup ? "Join Meeting" : "Re-Enter Latest Session"} 
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={handleReEnter}
+                >
+                    <i className="bi bi-box-arrow-in-right"></i>
+                </button>
 
                 <button 
                     className={`action-btn ${actionBtnClass}`}
@@ -346,6 +361,7 @@ function RecentCalls() {
                 allowedEmails: [user.email, recipientEmail],
                 access: 'private',
                 muteStatus: { [user._id]: false },
+                latestSessionId: null // Initialize null
             };
 
         } else {
@@ -412,6 +428,32 @@ function RecentCalls() {
                 transaction.set(limitDocRef, { count: currentCount + 1, lastCallDate: today });
             });
 
+            // UPDATED LOGIC FOR NEW SESSION
+            let finalCallId = callData.id;
+
+            if (callData.type === 'individual') {
+                // Generate a NEW session ID for 1-on-1 calls
+                const newSessionId = Math.random().toString(36).substring(2, 12);
+                finalCallId = newSessionId;
+
+                // 1. Create the temporary session document
+                await setDoc(doc(db, 'calls', newSessionId), {
+                    ...callData,
+                    id: newSessionId,
+                    isTemporarySession: true,
+                    parentCallId: callData.id,
+                    createdAt: serverTimestamp(),
+                    participants: [user._id]
+                });
+
+                // 2. Update the MAIN card with the latest session ID
+                await updateDoc(doc(db, 'calls', callData.id), {
+                    latestSessionId: newSessionId,
+                    updatedAt: serverTimestamp()
+                });
+            }
+
+            // Notifications
             const recipients = callData.allowedEmails.filter(e => e !== user.email);
             const batch = writeBatch(db);
             recipients.forEach(email => {
@@ -420,8 +462,8 @@ function RecentCalls() {
                     recipientEmail: email,
                     callerName: `${user.firstname} ${user.lastname}`,
                     callerEmail: user.email,
-                    callId: callData.id,
-                    callType: callData.type, // Added callType
+                    callId: finalCallId, 
+                    callType: callData.type,
                     createdAt: serverTimestamp(),
                     status: 'pending',
                     type: 'call'
@@ -429,10 +471,11 @@ function RecentCalls() {
             });
             await batch.commit();
 
-            await sendInvitationEmails(callData.id, callData.description, recipients);
+            await sendInvitationEmails(finalCallId, callData.description, recipients);
             toast.success(`Starting call...`);
-            navigate(`/call/${callData.id}`);
+            navigate(`/call/${finalCallId}`);
         } catch (error) {
+            console.error(error);
             toast.error(error.message);
         } finally {
             setIsCalling(null);
@@ -497,10 +540,12 @@ function RecentCalls() {
         const unsub = onSnapshot(q, (snap) => {
             const rawCalls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // Deduplication Logic
             const uniqueCalls = [];
             const seenKeys = new Set();
             for (const call of rawCalls) {
+                // FILTER: Don't show temporary session calls in the main list
+                if (call.isTemporarySession) continue;
+
                 let uniqueKey = call.type === 'group' ? 'group_' + call.id : (call.ownerId === user._id ? 'user_' + call.recipientEmail : 'user_' + call.ownerEmail);
                 if (!seenKeys.has(uniqueKey)) {
                     seenKeys.add(uniqueKey);
