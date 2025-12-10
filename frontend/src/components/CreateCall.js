@@ -119,7 +119,7 @@ function CreateCall() {
     return (
         <>
             <Navbar />
-         
+            <div className="container mt-5">
                 <style jsx>{`
                     .calls-page-card { 
                         backdrop-filter: blur(15px); 
@@ -146,7 +146,7 @@ function CreateCall() {
                 <div className="card calls-page-card">
                     {renderStep()}
                 </div>
-        
+            </div>
         </>
     );
 }
