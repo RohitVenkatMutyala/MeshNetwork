@@ -1172,7 +1172,7 @@ function Call() {
                     <div className="spinner-border text-primary mb-3" style={{ width: '3rem', height: '3rem' }} role="status">
                         <span className="visually-hidden">Loading...</span>
                     </div>
-                    <h4 className="text-white">Waiting for the host to let you in...</h4>
+                    <h4 className="text-white">⭐ Waiting for admission…</h4>
                     <p className="text-secondary">Call: {callData?.description || callId}</p>
                 </div>
             </div>
