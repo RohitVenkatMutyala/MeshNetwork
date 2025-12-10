@@ -689,7 +689,7 @@ function RecentCalls() {
                 }
 
                 @media (max-width: 480px) {
-                    .recent-calls-grid { grid-template-columns: 1fr; padding: 15px; } 
+                    .recent-calls-grid { grid-template-columns: 1fr; padding: 15px; padding-bottom: 100px !important;} 
                     .header-actions { flex-direction: row !important; align-items: center; gap: 10px; }
                     .search-wrapper { width: auto; flex: 1; }
                     .search-input-group { height: 40px; }
