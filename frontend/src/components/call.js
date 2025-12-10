@@ -1365,7 +1365,7 @@ function Call() {
     return (
         <>
             {/* --- MODIFIED: Navbar is **REMOVED** from active call --- */}
- <Navbar />
+
             <div className="chat-page-container">
                 {/* --- MODIFIED: Adjusted CSS for no-navbar --- */}
                 <style jsx>{`
