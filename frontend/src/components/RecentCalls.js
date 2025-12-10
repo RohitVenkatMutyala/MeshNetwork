@@ -618,7 +618,7 @@ function RecentCalls() {
             <style jsx>{`
                 /* --- BASE LAYOUT --- */
                 .recent-calls-container { 
-                    background-color: #111b21; 
+                   
                     height: calc(100vh - 60px); 
                     width: 100%; 
                     margin: 0;
