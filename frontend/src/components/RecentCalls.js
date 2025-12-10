@@ -798,7 +798,7 @@ function RecentCalls() {
                 </div>
             </div>
 
-           
+            <div className="recent-calls-grid">
                 {!filteredCalls.length ? (
                     <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#8696a0', padding: '40px' }}>
                         {searchTerm ? 'No contacts match.' : 'No recent calls.'}
@@ -822,7 +822,7 @@ function RecentCalls() {
                         </SortableContext>
                     </DndContext>
                 )}
-           
+            </div>
 
             {/* Modals remain the same */}
             {showAddContactModal && (
