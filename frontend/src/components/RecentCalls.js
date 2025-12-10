@@ -7,6 +7,7 @@ import {
     writeBatch, getDocs, updateDoc
 } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext'; // <--- Ensure this is imported
 import { toast } from 'react-toastify';
 import emailjs from '@emailjs/browser';
 
@@ -253,6 +254,7 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
 
 function RecentCalls() {
     const { user } = useAuth();
+    const { theme } = useTheme(); // <--- Theme Hook Added
     const navigate = useNavigate();
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -616,29 +618,67 @@ function RecentCalls() {
     return (
         <div className="recent-calls-container">
             <style jsx>{`
+                /* 2. DYNAMIC THEME VARIABLES */
+                :root {
+                    --bg-main: ${theme === 'dark' ? '#111b21' : '#ffffff'};
+                    --bg-header: ${theme === 'dark' ? '#111b21' : '#f0f2f5'};
+                    --bg-input: ${theme === 'dark' ? '#202c33' : '#ffffff'};
+                    --input-bg-form: ${theme === 'dark' ? '#2a3942' : '#f0f2f5'};
+                    
+                    --text-primary: ${theme === 'dark' ? '#e9edef' : '#111b21'};
+                    --text-secondary: ${theme === 'dark' ? '#8696a0' : '#54656f'};
+                    --border-color: ${theme === 'dark' ? 'rgba(134, 150, 160, 0.15)' : 'rgba(0,0,0,0.1)'};
+                    
+                    /* Cards */
+                    --card-bg: ${theme === 'dark' ? 'rgba(31, 41, 55, 0.7)' : '#ffffff'};
+                    --card-border: ${theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.1)'};
+                    --card-shadow: ${theme === 'dark' ? 'rgba(0, 0, 0, 0.1)' : 'rgba(0, 0, 0, 0.05)'};
+                    
+                    /* Action Buttons */
+                    --btn-bg: ${theme === 'dark' ? '#202c33' : '#f0f2f5'};
+                    
+                    /* Modal */
+                    --modal-bg: ${theme === 'dark' ? '#1f2937' : '#ffffff'};
+                    --modal-border: ${theme === 'dark' ? '#374051' : '#e0e0e0'};
+                }
+
                 /* --- BASE LAYOUT --- */
                 .recent-calls-container { 
-                    background-color: #111b21; 
+                    background-color: var(--bg-main); 
                     height: calc(100vh - 60px); 
                     width: 100%; 
                     margin: 0;
-                    display: flex; flex-direction: column; color: #e9edef; font-family: sans-serif;
+                    display: flex; flex-direction: column; 
+                    color: var(--text-primary); 
+                    font-family: sans-serif;
                     box-sizing: border-box; overflow-x: hidden;
                     touch-action: pan-y;
+                    transition: background-color 0.3s ease, color 0.3s ease;
                 }
                 .sticky-header { 
-                    position: sticky; top: 0; z-index: 100; background-color: #111b21; padding: 20px 20px 10px; border-bottom: 1px solid rgba(134, 150, 160, 0.15);
+                    position: sticky; top: 0; z-index: 100; 
+                    background-color: var(--bg-main);
+                    padding: 20px 20px 10px; 
+                    border-bottom: 1px solid var(--border-color);
                     box-sizing: border-box; width: 100%;
+                    transition: background-color 0.3s ease;
                 }
                 .header-actions { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
                 .search-wrapper { flex-grow: 1; min-width: 200px; }
                 .search-input-group { 
-                    background-color: #202c33; border-radius: 24px; display: flex; align-items: center; 
-                    padding: 0 20px; height: 46px; border: 1px solid transparent; transition: 0.2s;
+                    background-color: var(--bg-input); 
+                    border-radius: 24px; display: flex; align-items: center; 
+                    padding: 0 20px; height: 46px; 
+                    border: 1px solid var(--border-color); 
+                    transition: 0.2s;
                     width: 100%; box-sizing: border-box;
                 }
-                .search-input-group:focus-within { background-color: #2a3942; border-color: rgba(255,255,255,0.1); }
-                .search-input { background: transparent; border: none; color: #e9edef; width: 100%; margin-left: 10px; outline: none; font-size: 1rem; }
+                .search-input-group:focus-within { border-color: #00a884; }
+                .search-input { 
+                    background: transparent; border: none; 
+                    color: var(--text-primary); 
+                    width: 100%; margin-left: 10px; outline: none; font-size: 1rem; 
+                }
                 
                 .recent-calls-grid { 
                     flex: 1; overflow-y: auto; padding: 20px; display: grid; 
@@ -655,7 +695,7 @@ function RecentCalls() {
                     .search-input-group { height: 40px; }
                 }
 
-                /* --- HEADER BUTTONS (Still Glassy) --- */
+                /* --- HEADER BUTTONS (Keep Glassy look) --- */
                 .glass-btn-green, .glass-btn-purple {
                     border: none; border-radius: 24px; padding: 10px 20px;
                     font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.3s;
@@ -669,34 +709,36 @@ function RecentCalls() {
 
                 /* --- CARDS --- */
                 .call-card { 
-                    background: rgba(31, 41, 55, 0.7); 
+                    background: var(--card-bg); 
                     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+                    border: 1px solid var(--card-border);
+                    box-shadow: 0 4px 30px var(--card-shadow);
                     border-radius: 16px; padding: 20px; 
                     display: flex; flex-direction: column; min-height: 220px; 
                     transition: 0.3s all ease; position: relative; overflow: hidden;
                 }
                 .call-card.joint-meet { 
-                    background: linear-gradient(145deg, rgba(55, 65, 81, 0.7) 0%, rgba(17, 24, 39, 0.85) 100%);
-                    border: 1px solid rgba(255, 255, 255, 0.15);
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+                    background: ${theme === 'dark' 
+                        ? 'linear-gradient(145deg, rgba(55, 65, 81, 0.7) 0%, rgba(17, 24, 39, 0.85) 100%)' 
+                        : 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)'};
+                    border: 1px solid var(--card-border);
+                    box-shadow: 0 8px 32px var(--card-shadow);
                 }
-                .call-card:hover { transform: translateY(-5px); border-color: rgba(255, 255, 255, 0.2); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
+                .call-card:hover { transform: translateY(-5px); border-color: rgba(0, 168, 132, 0.5); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15); }
                 .call-card::before {
                     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 100%;
-                    background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%); pointer-events: none;
+                    background: ${theme === 'dark' ? 'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%)' : 'none'}; 
+                    pointer-events: none;
                 }
 
-                /* --- CARD ACTION BUTTONS (UPDATED: Flat/Normal Style) --- */
-                .card-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); z-index: 10; position: relative; }
+                /* --- CARD ACTION BUTTONS --- */
+                .card-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); z-index: 10; position: relative; }
                 .action-btn { 
                     width: 38px; height: 38px; border-radius: 50%; 
                     display: flex; align-items: center; justify-content: center;
-                    border: 1px solid rgba(134, 150, 160, 0.15); /* Subtle generic border */
+                    border: 1px solid var(--border-color); 
                     cursor: pointer; transition: 0.2s; font-size: 1.1rem; z-index: 20; 
-                    /* No blur, solid dark background to match image */
-                    background-color: #202c33; 
+                    background-color: var(--btn-bg); 
                 }
                 
                 .icon-btn-green { color: #00a884; }
@@ -709,30 +751,30 @@ function RecentCalls() {
                 .icon-btn-red:hover { background-color: rgba(239, 83, 80, 0.1); border-color: #ef5350; }
 
                 .card-header-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: bold; color: white; margin-bottom: 12px; z-index: 2; }
-                .card-title { font-size: 1.1rem; font-weight: 600; color: #e9edef; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
-                .card-subtitle { font-size: 0.85rem; color: #8696a0; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
-                .card-date { font-size: 0.75rem; color: #556066; margin-bottom: 12px; z-index: 2; }
+                .card-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
+                .card-subtitle { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 2; }
+                .card-date { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 12px; z-index: 2; }
                 
                 .badge { position: absolute; top: 15px; right: 15px; font-size: 0.65rem; padding: 4px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; z-index: 2; }
-                .badge-meeting { background: rgba(0, 168, 132, 0.2); color: #00a884; }
-                .badge-joint { background: rgba(111, 66, 193, 0.2); color: #b185f7; }
+                .badge-meeting { background: rgba(0, 168, 132, 0.15); color: #00a884; }
+                .badge-joint { background: rgba(111, 66, 193, 0.15); color: #b185f7; }
 
                 /* Modal */
                 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-                .modal-card { background: #1f2937; color: #e9edef; width: 90%; max-width: 420px; padding: 24px; border-radius: 16px; border: 1px solid #374051; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+                .modal-card { background: var(--modal-bg); color: var(--text-primary); width: 90%; max-width: 420px; padding: 24px; border-radius: 16px; border: 1px solid var(--modal-border); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
                 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
                 .modal-title { margin: 0; font-size: 1.25rem; font-weight: 600; }
-                .close-btn { background: none; border: none; color: #8696a0; font-size: 1.2rem; cursor: pointer; }
+                .close-btn { background: none; border: none; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer; }
                 .form-group { margin-bottom: 15px; }
-                .form-label { display: block; color: #8696a0; font-size: 0.85rem; margin-bottom: 6px; }
-                .form-control { width: 100%; background: #2a3942; border: 1px solid #374051; color: white; padding: 10px 14px; border-radius: 8px; outline: none; transition: 0.2s; }
+                .form-label { display: block; color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 6px; }
+                .form-control { width: 100%; background: var(--input-bg-form); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 14px; border-radius: 8px; outline: none; transition: 0.2s; }
                 .form-control:focus { border-color: #00a884; }
                 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
                 .btn-modal { padding: 10px 20px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; }
                 .btn-primary { background: #00a884; color: white; }
                 .btn-primary:hover { background: #008f6f; }
-                .btn-secondary { background: transparent; border: 1px solid #374051; color: #8696a0; }
-                .btn-secondary:hover { border-color: #8696a0; color: white; }
+                .btn-secondary { background: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); }
+                .btn-secondary:hover { border-color: var(--text-secondary); color: var(--text-primary); }
                 .btn-danger { background: #ef5350; color: white; }
 
                 .mobile-fab-container { display: none; }
@@ -745,7 +787,7 @@ function RecentCalls() {
                     
                     .mobile-fab-container { display: flex; align-items: center; position: relative; z-index: 200; }
                     .fab-trigger { width: 40px; height: 40px; border-radius: 50%; background-color: #00a884; color: white; border: none; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.3s ease, background 0.3s; cursor: pointer; z-index: 202; }
-                    .fab-options { position: absolute; left: 10px; top: 0; height: 40px; display: flex; align-items: center; gap: 8px; opacity: 0; visibility: hidden; transform: translateX(-10px) scale(0.9); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 201; pointer-events: none; background: rgba(31, 41, 55, 0.9); padding: 5px 10px 5px 35px; border-radius: 24px; margin-left: -5px; }
+                    .fab-options { position: absolute; left: 10px; top: 0; height: 40px; display: flex; align-items: center; gap: 8px; opacity: 0; visibility: hidden; transform: translateX(-10px) scale(0.9); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 201; pointer-events: none; background: var(--bg-input); padding: 5px 10px 5px 35px; border-radius: 24px; margin-left: -5px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
                     .mobile-fab-container:hover .fab-options, .mobile-fab-container:active .fab-options { opacity: 1; visibility: visible; transform: translateX(10px) scale(1); pointer-events: auto; left: 100%; margin-left: -35px; }
                     .mobile-fab-container:hover .fab-trigger { transform: rotate(45deg); background-color: #202c33; }
                     .fab-mini-btn { border: none; border-radius: 20px; padding: 6px 12px; font-size: 0.75rem; font-weight: 600; color: white; display: flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
@@ -779,16 +821,16 @@ function RecentCalls() {
 
                     <div className="search-wrapper">
                         <div className="search-input-group">
-                            <i className="bi bi-search" style={{ color: '#8696a0', marginRight: '10px' }}></i>
+                            <i className="bi bi-search" style={{ color: 'var(--text-secondary)', marginRight: '10px' }}></i>
                             <input type="text" className="search-input" placeholder="Search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8696a0', fontSize: '0.85rem', padding: '0 5px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '0.85rem', padding: '0 5px' }}>
                     <span>Conducted Meetings: {dailyCallCount}/{dailyCallLimit}</span>
                     <div style={{ cursor: 'pointer', position: 'relative' }} onClick={openNotificationModal}>
-                        <i className="bi bi-bell-fill" style={{ fontSize: '1.2rem', color: unreadCount ? '#e9edef' : '#8696a0' }}></i>
+                        <i className="bi bi-bell-fill" style={{ fontSize: '1.2rem', color: unreadCount ? 'var(--text-primary)' : 'var(--text-secondary)' }}></i>
                         {unreadCount > 0 && (
                             <span style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#00a884', color: 'white', fontSize: '0.6rem', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 {unreadCount}
@@ -800,7 +842,7 @@ function RecentCalls() {
 
             <div className="recent-calls-grid">
                 {!filteredCalls.length ? (
-                    <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#8696a0', padding: '40px' }}>
+                    <div style={{ gridColumn: '1/-1', textAlign: 'center', color: 'var(--text-secondary)', padding: '40px' }}>
                         {searchTerm ? 'No contacts match.' : 'No recent calls.'}
                     </div>
                 ) : (
@@ -857,7 +899,7 @@ function RecentCalls() {
                                     <div className="form-group">
                                         <label className="form-label">Participant Emails (Comma Separated)</label>
                                         <textarea className="form-control" rows="3" placeholder="alice@test.com, bob@test.com" value={groupEmails} onChange={e => setGroupEmails(e.target.value)} />
-                                        <small style={{ color: '#8696a0', fontSize: '0.75rem' }}>Separate emails with commas.</small>
+                                        <small style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Separate emails with commas.</small>
                                     </div>
                                 </>
                             )}
@@ -879,7 +921,7 @@ function RecentCalls() {
                             <h5 className="modal-title">Delete {deleteTarget.type === 'group' ? 'Group' : 'Contact'}</h5>
                             <button className="close-btn" onClick={() => setDeleteTarget(null)}><i className="bi bi-x-lg"></i></button>
                         </div>
-                        <p style={{ color: '#8696a0', marginBottom: '20px' }}>Are you sure you want to delete <strong>{deleteTarget.name}</strong>?</p>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Are you sure you want to delete <strong>{deleteTarget.name}</strong>?</p>
                         <div className="modal-footer">
                             <button className="btn-modal btn-secondary" onClick={() => setDeleteTarget(null)}>Cancel</button>
                             <button className="btn-modal btn-danger" onClick={confirmDelete}>Delete</button>
@@ -897,13 +939,13 @@ function RecentCalls() {
                         </div>
                         <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                             {allNotifications.length === 0 ? (
-                                <p style={{ textAlign: 'center', color: '#8696a0', padding: '20px' }}>No notifications</p>
+                                <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>No notifications</p>
                             ) : (
                                 allNotifications.map(n => (
-                                    <div key={n.id} style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div key={n.id} style={{ padding: '12px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                         <div>
                                             <div style={{ fontWeight: '600' }}>{n.callerName}</div>
-                                            <div style={{ fontSize: '0.75rem', color: '#8696a0' }}>{formatTimeAgo(n.createdAt)}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{formatTimeAgo(n.createdAt)}</div>
                                         </div>
                                         {n.type === 'call' && (
                                             <button 
