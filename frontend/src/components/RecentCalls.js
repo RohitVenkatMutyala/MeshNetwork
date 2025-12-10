@@ -11,21 +11,21 @@ import { toast } from 'react-toastify';
 import emailjs from '@emailjs/browser';
 
 // --- DRAG & DROP IMPORTS ---
-import {
-    DndContext,
-    closestCenter,
-    KeyboardSensor,
-    PointerSensor,
-    useSensor,
-    useSensors,
-    TouchSensor
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors, 
+  TouchSensor 
 } from '@dnd-kit/core';
-import {
-    arrayMove,
-    SortableContext,
-    sortableKeyboardCoordinates,
-    rectSortingStrategy,
-    useSortable
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  rectSortingStrategy, 
+  useSortable 
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -142,7 +142,7 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.5 : 1,
-        touchAction: 'pan-y',
+        touchAction: 'pan-y', 
         position: 'relative',
         zIndex: isDragging ? 999 : 'auto'
     };
@@ -161,9 +161,9 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
     if (!displayTitle) return null;
 
     const handleVideoAction = (e) => {
-        e.stopPropagation();
+        e.stopPropagation(); 
         e.preventDefault();
-
+        
         // Allow ONLY if it's NOT a group (1-on-1) OR if I am the Owner of the group
         if (!isGroup || isOwner) {
             handleReCall(call);
@@ -178,11 +178,11 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
     };
 
     return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            {...attributes}
-            {...listeners}
+        <div 
+            ref={setNodeRef} 
+            style={style} 
+            {...attributes} 
+            {...listeners} 
             className={`call-card ${isGroup ? 'joint-meet' : ''}`}
         >
             <span className={`badge ${isGroup ? 'badge-joint' : 'badge-meeting'}`}>
@@ -205,41 +205,41 @@ const SortableCallCard = ({ call, user, isCalling, handleReCall, handleOpenChat,
                    2. OR It IS a group AND I am the Owner
                 */}
                 {(!isGroup || isOwner) && (
-                    <button
+                    <button 
                         className={`action-btn ${actionBtnClass}`}
-                        title={isGroup ? "Start Group Call" : "Start New Video Call"}
-                        disabled={isCalling === call.id}
-                        onPointerDown={(e) => e.stopPropagation()}
+                        title={isGroup ? "Start Group Call" : "Start New Video Call"} 
+                        disabled={isCalling === call.id} 
+                        onPointerDown={(e) => e.stopPropagation()} 
                         onClick={handleVideoAction}
                     >
-                        {isCalling === call.id ? <span className="spinner-border spinner-border-sm" style={{ width: '1rem', height: '1rem' }}></span> : <i className="bi bi-camera-video-fill"></i>}
+                        {isCalling === call.id ? <span className="spinner-border spinner-border-sm" style={{width: '1rem', height: '1rem'}}></span> : <i className="bi bi-camera-video-fill"></i>}
                     </button>
                 )}
 
                 {/* Re-Enter / Join Button (Visible to everyone) */}
-                <button
+                <button 
                     className={`action-btn ${actionBtnClass}`}
-                    title={isGroup ? "Join Meeting" : "Re-Enter Latest Session"}
+                    title={isGroup ? "Join Meeting" : "Re-Enter Latest Session"} 
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={handleReEnter}
                 >
                     <i className="bi bi-box-arrow-in-right"></i>
                 </button>
 
-                <button
+                <button 
                     className={`action-btn ${actionBtnClass}`}
-                    title="Chat"
+                    title="Chat" 
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); handleOpenChat(call); }}
                 >
                     <i className="bi bi-chat-left-text-fill"></i>
                 </button>
-
+                
                 {canDelete && (
-                    <button
-                        className="action-btn icon-btn-red"
-                        title="Delete"
-                        style={{ marginLeft: 'auto' }}
+                    <button 
+                        className="action-btn icon-btn-red" 
+                        title="Delete" 
+                        style={{ marginLeft: 'auto' }} 
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: call.id, name: displayTitle, type: call.type }); }}
                     >
@@ -264,7 +264,7 @@ function RecentCalls() {
 
     const [isCalling, setIsCalling] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
-
+    
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [showAddContactModal, setShowAddContactModal] = useState(false);
     const [modalType, setModalType] = useState('individual');
@@ -312,7 +312,7 @@ function RecentCalls() {
 
     const sendInvitationEmails = async (callId, callDescription, invitedEmailsArray) => {
         if (!invitedEmailsArray || invitedEmailsArray.length === 0) return;
-        const emailjsPublicKey = 'Cd-NUUSJ5dW3GJMo0';
+        const emailjsPublicKey = 'Cd-NUUSJ5dW3GJMo0'; 
         const serviceID = 'service_y8qops6';
         const templateID = 'template_apzjekq';
         const callLink = `${window.location.origin}/call/${callId}`;
@@ -348,7 +348,7 @@ function RecentCalls() {
             }
             const recipientEmail = newContactEmail.trim();
             recipients = [recipientEmail];
-
+            
             callData = {
                 type: 'individual',
                 description: newContactDesc,
@@ -419,7 +419,7 @@ function RecentCalls() {
 
         const today = new Date().toISOString().split('T')[0];
         const limitDocRef = doc(db, 'userCallLimits', user._id);
-
+        
         try {
             await runTransaction(db, async (transaction) => {
                 const limitDoc = await transaction.get(limitDocRef);
@@ -462,7 +462,7 @@ function RecentCalls() {
                     recipientEmail: email,
                     callerName: `${user.firstname} ${user.lastname}`,
                     callerEmail: user.email,
-                    callId: finalCallId,
+                    callId: finalCallId, 
                     callType: callData.type,
                     createdAt: serverTimestamp(),
                     status: 'pending',
@@ -536,10 +536,10 @@ function RecentCalls() {
     useEffect(() => {
         if (!user) return setLoading(false);
         const q = query(collection(db, 'calls'), where('allowedEmails', 'array-contains', user.email), orderBy('createdAt', 'desc'), limit(100));
-
+        
         const unsub = onSnapshot(q, (snap) => {
             const rawCalls = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
+            
             const uniqueCalls = [];
             const seenKeys = new Set();
             for (const call of rawCalls) {
@@ -668,37 +668,20 @@ function RecentCalls() {
                 .glass-btn-purple:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(111, 66, 193, 0.4); }
 
                 /* --- CARDS --- */
-              /* --- DARK THEME --- */
-.dark .call-card {
-    background: rgba(31, 41, 55, 0.7);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: #e9edef;
-}
-
-.dark .call-card.joint-meet {
-    background: linear-gradient(145deg, rgba(55,65,81,0.7), rgba(17,24,39,0.85));
-}
-
-/* --- LIGHT THEME --- */
-.light .call-card {
-    background: #ffffff;
-    border: 1px solid #d0d7de;
-    color: #1c1c1c;
-}
-
-.light .call-card.joint-meet {
-    background: linear-gradient(145deg, #f1f1f6, #ffffff);
-}
-
-/* Common */
-.call-card {
-    backdrop-filter: blur(12px);
-    border-radius: 16px;
-    padding: 20px;
-    transition: 0.3s;
-    position: relative;
-}
-
+                .call-card { 
+                    background: rgba(31, 41, 55, 0.7); 
+                    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+                    border-radius: 16px; padding: 20px; 
+                    display: flex; flex-direction: column; min-height: 220px; 
+                    transition: 0.3s all ease; position: relative; overflow: hidden;
+                }
+                .call-card.joint-meet { 
+                    background: linear-gradient(145deg, rgba(55, 65, 81, 0.7) 0%, rgba(17, 24, 39, 0.85) 100%);
+                    border: 1px solid rgba(255, 255, 255, 0.15);
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+                }
                 .call-card:hover { transform: translateY(-5px); border-color: rgba(255, 255, 255, 0.2); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
                 .call-card::before {
                     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 100%;
@@ -923,9 +906,9 @@ function RecentCalls() {
                                             <div style={{ fontSize: '0.75rem', color: '#8696a0' }}>{formatTimeAgo(n.createdAt)}</div>
                                         </div>
                                         {n.type === 'call' && (
-                                            <button
-                                                className={`btn-modal ${n.callType === 'group' ? 'glass-btn-purple' : 'glass-btn-green'}`}
-                                                style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                                            <button 
+                                                className={`btn-modal ${n.callType === 'group' ? 'glass-btn-purple' : 'glass-btn-green'}`} 
+                                                style={{ padding: '6px 12px', fontSize: '0.85rem' }} 
                                                 onClick={() => { navigate(`/call/${n.callId}`); setShowNotificationModal(false); }}
                                             >
                                                 Join
