@@ -6,7 +6,6 @@ import React, {
     useCallback
 } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext'; // <--- ADD THIS
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
 import {
@@ -194,7 +193,7 @@ function Call() {
     const { user, loading } = useAuth();
     const { callId } = useParams();
     const navigate = useNavigate();
-   const { theme } = useTheme();
+
     // --- State Variables ---
     const heartbeatIntervalRef = useRef(null);
     const [messages, setMessages] = useState([]);
@@ -1144,13 +1143,12 @@ function Call() {
 
     if (callState === 'loading') {
         return (
-           <div className="d-flex justify-content-center align-items-center" 
-             style={{ height: '100dvh', backgroundColor: theme === 'dark' ? '#12121c' : '#f0f2f5' }}>
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '100dvh', backgroundColor: '#12121c' }}>
                 <div className="text-center">
                     <div className="spinner-border text-primary mb-3" style={{ width: '3rem', height: '3rem' }} role="status">
                         <span className="visually-hidden">Loading...</span>
                     </div>
-                   <h4 className={theme === 'dark' ? "text-white" : "text-dark"}>Loading Call...</h4>
+                    <h4 className="text-white">Loading Call...</h4>
                 </div>
             </div>
         );
@@ -1169,13 +1167,12 @@ function Call() {
     // --- NEW: Waiting Room Screen ---
     if (callState === 'waiting') {
         return (
-           <div className="d-flex justify-content-center align-items-center" 
-             style={{ height: '100dvh', backgroundColor: theme === 'dark' ? '#12121c' : '#f0f2f5' }}>
+            <div className="d-flex justify-content-center align-items-center" style={{ height: '100dvh', backgroundColor: '#12121c' }}>
                 <div className="text-center">
                     <div className="spinner-border text-primary mb-3" style={{ width: '3rem', height: '3rem' }} role="status">
                         <span className="visually-hidden">Loading...</span>
                     </div>
-                  <h4 className={theme === 'dark' ? "text-white" : "text-dark"}>⭐ Waiting for admission…</h4>
+                    <h4 className="text-white">⭐ Waiting for admission…</h4>
                     <p className="text-secondary">Call: {callData?.description || callId}</p>
                 </div>
             </div>
@@ -1190,8 +1187,8 @@ function Call() {
                 {/* --- MODIFIED: Added vibration animation --- */}
                 <style jsx>{`
                     .joining-screen {
-                       background-color: ${theme === 'dark' ? '#2b2b2b' : '#ffffff'};
-    color: ${theme === 'dark' ? 'white' : '#111b21'};
+                        background-color: #2b2b2b;
+                        color: white;
                     }
                     .caller-info {
                         text-align: center;
@@ -1202,10 +1199,10 @@ function Call() {
                         font-weight: 500;
                         margin-bottom: 0.25rem;
                     }
-                   .caller-id {
-    font-size: 1.5rem;
-    color: ${theme === 'dark' ? '#aaa' : '#54656f'}; /* Dynamic gray */
-}
+                    .caller-id {
+                        font-size: 1.5rem;
+                        color: #aaa;
+                    }
                     .call-actions-container {
                         display: flex;
                         flex-direction: column;
@@ -1221,15 +1218,14 @@ function Call() {
                         position: relative;
                         width: 100%;
                         height: 60px;
-                       background-color: ${theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.05)'};
-    border: 1px solid ${theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)'};
+                        background-color: rgba(255, 255, 255, 0.15);
                         border-radius: 30px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         overflow: hidden;
                         user-select: none;
-                       
+                        border: 1px solid rgba(255, 255, 255, 0.2);
                     }
                     .slider-text-overlay {
                         position: absolute;
@@ -1250,7 +1246,6 @@ function Call() {
                         -webkit-mask-image: linear-gradient(-75deg, rgba(0,0,0,.6) 30%, #000 50%, rgba(0,0,0,.6) 70%);
                         -webkit-mask-size: 200%;
                         animation: slide-shine 2s infinite;
-                        color: ${theme === 'dark' ? 'white' : '#111b21'};
                     }
                     .slider-thumb {
                         position: absolute;
@@ -1370,22 +1365,14 @@ function Call() {
                 {/* --- MODIFIED: Adjusted CSS for no-navbar --- */}
                 <style jsx>{`
                     /* --- 1. General Page & Layout Styles --- */
-                 :root {
-    /* DYNAMIC VARIABLES START */
-    --dark-bg-primary: ${theme === 'dark' ? '#12121c' : '#f0f2f5'};
-    --dark-bg-secondary: ${theme === 'dark' ? '#1e1e2f' : '#ffffff'};
-    --border-color: ${theme === 'dark' ? '#3a3a5a' : '#d1d7db'};
-    --text-primary: ${theme === 'dark' ? '#e0e0e0' : '#111b21'};
-    --text-secondary: ${theme === 'dark' ? '#a9a9b3' : '#54656f'};
-    --accent-blue: #4a69bd;
-    
-    /* New variable for received message bubbles */
-    --msg-bubble-other: ${theme === 'dark' ? '#313147' : '#e9edef'};
-    
-    /* New variable for transparent overlays (like mobile headers) */
-    --overlay-bg: ${theme === 'dark' ? 'rgba(30, 30, 47, 0.95)' : 'rgba(255, 255, 255, 0.95)'};
-    /* DYNAMIC VARIABLES END */
-}
+                    :root {
+                        --dark-bg-primary: #12121c;
+                        --dark-bg-secondary: #1e1e2f;
+                        --border-color: #3a3a5a;
+                        --text-primary: #e0e0e0;
+                        --text-secondary: #a9a9b3;
+                        --accent-blue: #4a69bd;
+                    }
                     .chat-page-container {
                         background-color: var(--dark-bg-primary);
                         color: var(--text-primary);
@@ -1565,7 +1552,6 @@ function Call() {
                         flex-direction: column;
                         gap: 0.25rem;
                         width: 150px;
-                        background-color: var(--overlay-bg);
                     }
                     .quality-menu-button {
                         background-color: transparent;
@@ -1607,7 +1593,6 @@ function Call() {
                         grid-template-columns: repeat(3, 1fr);
                         gap: 0.5rem;
                         width: 240px;
-                        background-color: var(--overlay-bg);
                     }
                     .filter-thumbnail {
                         width: 100%;
@@ -1667,7 +1652,6 @@ function Call() {
                         flex-shrink: 0;
                         /* --- NEW: Add safe-area padding for notch/island --- */
                         padding-top: calc(1rem + env(safe-area-inset-top));
-                        background-color: var(--dark-bg-secondary);
                     }
                     .mobile-panel-header h5 { margin: 0; }
                     .mobile-panel-body {
@@ -1699,7 +1683,6 @@ function Call() {
                         flex-shrink: 0;
                         /* --- NEW: Add safe-area padding for home bar --- */
                         padding-bottom: calc(1rem + env(safe-area-inset-bottom));
-                        background-color: var(--dark-bg-secondary);
                     }
 
                     /* --- NEW: Participant Card Styles --- */
@@ -1940,11 +1923,7 @@ function Call() {
                     .own-message .message-bubble { background-color: var(--accent-blue); color: #ffffff; border-top-right-radius: 4px; }
                     .own-message .message-header { justify-content: flex-end; }
                     .other-message { align-items: flex-start; }
-                  .other-message .message-bubble { 
-    background-color: var(--msg-bubble-other); /* Use variable */
-    color: var(--text-primary); 
-    border-top-left-radius: 4px; 
-}
+                    .other-message .message-bubble { background-color: #313147; color: var(--text-primary); border-top-left-radius: 4px; }
                     .form-control {
                         background-color: var(--dark-bg-primary) !important;
                         border: 1px solid var(--border-color) !important;
