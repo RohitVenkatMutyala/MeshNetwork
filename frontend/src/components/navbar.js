@@ -57,27 +57,41 @@ function Navbar() {
             <style>
                 {`
                 :root {
-                    /* WhatsApp Web Dark Palette */
-                    --nav-bg: #202c33;
-                    --nav-border: rgba(134, 150, 160, 0.15);
-                    --nav-text: #e9edef;
-                    --nav-text-secondary: #8696a0;
+                    /* Dynamic Theme Variables */
+                    
+                    /* Background: Dark = #202c33, Light = #ffffff */
+                    --nav-bg: ${theme === 'dark' ? '#202c33' : '#ffffff'};
+                    
+                    /* Border: Dark = transparent white, Light = transparent black */
+                    --nav-border: ${theme === 'dark' ? 'rgba(134, 150, 160, 0.15)' : 'rgba(0, 0, 0, 0.1)'};
+                    
+                    /* Main Text: Dark = White-ish, Light = Dark Grey */
+                    --nav-text: ${theme === 'dark' ? '#e9edef' : '#111b21'};
+                    
+                    /* Secondary Text: Dark = Grey, Light = Light Grey */
+                    --nav-text-secondary: ${theme === 'dark' ? '#8696a0' : '#54656f'};
+                    
+                    /* Accent (Green): Keeps consistent or slightly darker for light mode */
                     --nav-accent: #00a884;
-                    --nav-hover: #2a3942;
-                    --nav-dropdown-bg: #233138;
+                    
+                    /* Hover BG: Dark = #2a3942, Light = #f0f2f5 */
+                    --nav-hover: ${theme === 'dark' ? '#2a3942' : '#f0f2f5'};
+                    
+                    /* Dropdown BG: Dark = #233138, Light = #ffffff */
+                    --nav-dropdown-bg: ${theme === 'dark' ? '#233138' : '#ffffff'};
                 }
 
                 /* Navbar Container */
-               .navbar-custom {
-             background-color: var(--nav-bg);
-              border-bottom: 1px solid var(--nav-border);
-               transition: background-color 0.3s ease;
-                min-height: 64px;     /* Allows it to expand */
-                 height: auto;         /* Prevents overflow */
-                 padding-top: 6px;  
-                 padding-bottom: 6px;
-                        z-index: 1050;
-                            }
+                .navbar-custom {
+                    background-color: var(--nav-bg);
+                    border-bottom: 1px solid var(--nav-border);
+                    transition: background-color 0.3s ease, border-color 0.3s ease; /* Added transition */
+                    min-height: 64px;
+                    height: auto;
+                    padding-top: 6px;
+                    padding-bottom: 6px;
+                    z-index: 1050;
+                }
 
 
                 /* Brand Style */
