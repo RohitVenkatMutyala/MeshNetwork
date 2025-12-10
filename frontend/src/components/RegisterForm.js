@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-// import { useTheme } from '../context/ThemeContext'; // Theme context not needed for forced mode
+import { useTheme } from '../context/ThemeContext';
 import { Eye, EyeOff, Video, Shield, Users, Mic, Monitor, Globe, ShieldCheck, MessageSquare, MessagesSquare } from "lucide-react";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -25,7 +25,7 @@ function RegisterForm() {
     const { setUser, user } = useAuth();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-    // const { theme } = useTheme(); // Unused
+    const { theme } = useTheme();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -64,39 +64,46 @@ function RegisterForm() {
             desc: "All chats are protected with AES-256 symmetric encryption. Messages stay encrypted even for network providers — only the sender and receiver can read them.",
             color: "text-blue",
         },
+
         {
             icon: <Shield size={32} />,
             title: "End-to-End Secure",
             desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.",
             color: "text-purple"
         },
+
         {
             icon: <MessageSquare size={32} />,
             title: "Real-Time Chat",
             desc: "Instant peer-to-peer messaging protected with AES-256 end-to-end encryption. Only the sender and receiver can access the messages.",
             color: "text-teal",
         },
+
         {
             icon: <MessagesSquare size={32} />,
             title: "Group Chat",
             desc: "Secure messaging inside group meetings with AES-256 end-to-end encryption. Only authorized participants can view messages.",
             color: "text-teal",
         },
+
         { icon: <Users size={32} />, title: "Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
+
         { icon: <Users size={32} />, title: "Group Calls", desc: "Host meetings with up to 10 participants with ease and stability.", color: "text-teal" },
+
         { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming.", color: "text-teal" },
+
         { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
+
         { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
     ];
 
 
     return (
-        <div className="force-dark-mode"> {/* Wrapper applied here */}
+        <>
             <Navbar />
 
             <style>{`
-        /* Scoped styles for Forced Dark Mode */
-        .force-dark-mode {
+        :root {
             --bg-page: #111b21; 
             --text-primary: #e9edef;
             --text-secondary: #8696a0;
@@ -104,13 +111,9 @@ function RegisterForm() {
             --border-color: rgba(255, 255, 255, 0.1);
             --brand-teal: #00a884;
             --brand-purple: #6f42c1;
-
-            background-color: var(--bg-page);
-            color: var(--text-primary);
-            min-height: 100vh;
         }
 
-        .force-dark-mode body { 
+        body { 
             background-color: var(--bg-page); 
             color: var(--text-primary); 
             font-family: sans-serif; 
@@ -119,10 +122,10 @@ function RegisterForm() {
         }
 
         /* --- CUSTOM SCROLLBAR --- */
-        .force-dark-mode ::-webkit-scrollbar { width: 10px; }
-        .force-dark-mode ::-webkit-scrollbar-track { background: #111b21; }
-        .force-dark-mode ::-webkit-scrollbar-thumb { background: #374051; border-radius: 5px; border: 2px solid #111b21; }
-        .force-dark-mode ::-webkit-scrollbar-thumb:hover { background: #00a884; }
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: #111b21; }
+        ::-webkit-scrollbar-thumb { background: #374051; border-radius: 5px; border: 2px solid #111b21; }
+        ::-webkit-scrollbar-thumb:hover { background: #00a884; }
 
         /* --- HERO SECTION --- */
         .hero-section {
@@ -397,7 +400,7 @@ function RegisterForm() {
             </div>
 
             <Footer />
-        </div>
+        </>
     );
 }
 
