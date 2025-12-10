@@ -68,13 +68,17 @@ function Navbar() {
                 }
 
                 /* Navbar Container */
-                .navbar-custom {
-                    background-color: var(--nav-bg);
-                    border-bottom: 1px solid var(--nav-border);
-                    transition: background-color 0.3s ease;
-                    height: 64px; /* Fixed height like WA header */
-                    z-index: 1050; /* Higher than content sticky headers */
-                }
+               .navbar-custom {
+             background-color: var(--nav-bg);
+              border-bottom: 1px solid var(--nav-border);
+               transition: background-color 0.3s ease;
+                min-height: 64px;     /* Allows it to expand */
+                 height: auto;         /* Prevents overflow */
+                 padding-top: 6px;  
+                 padding-bottom: 6px;
+                        z-index: 1050;
+                            }
+
 
                 /* Brand Style */
               .navbar-brand-custom {
@@ -152,6 +156,17 @@ function Navbar() {
                 .navbar-toggler:focus {
                     box-shadow: none;
                 }
+                    @media (max-width: 576px) {
+    .navbar-brand-custom {
+        font-size: 1rem;
+    }
+
+    .navbar-custom .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+}
+
                 `}
             </style>
 
