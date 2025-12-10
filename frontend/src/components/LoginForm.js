@@ -2,14 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
+// import { useTheme } from '../context/ThemeContext'; // Theme context is not needed if we force dark mode
 import { Eye, EyeOff, Video, Shield, Users, Mic, Monitor, Globe, ShieldCheck, MessageSquare, MessagesSquare } from "lucide-react";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import Navbar from './navbar';
 import Footer from './Footer';
-
-
 
 function LoginForm() {
     const [form, setForm] = useState({ email: '', password: '' });
@@ -18,7 +16,7 @@ function LoginForm() {
     const [showPassword, setShowPassword] = useState(false);
     const navigate = useNavigate();
     const { setUser, user } = useAuth();
-    const { theme } = useTheme();
+    // const { theme } = useTheme(); // Unused since we are forcing dark mode
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -52,45 +50,40 @@ function LoginForm() {
             desc: "All chats are protected with AES-256 symmetric encryption. Messages stay encrypted even for network providers — only the sender and receiver can read them.",
             color: "text-blue",
         },
-
         {
             icon: <Shield size={32} />,
             title: "End-to-End Secure",
             desc: "Your conversations are encrypted via WebRTC peer-to-peer protocols.",
             color: "text-purple"
         },
-
         {
             icon: <MessageSquare size={32} />,
             title: "Real-Time Chat",
             desc: "Instant peer-to-peer messaging protected with AES-256 end-to-end encryption. Only the sender and receiver can access the messages.",
             color: "text-teal",
         },
-
         {
             icon: <MessagesSquare size={32} />,
             title: "Group Chat",
             desc: "Secure messaging inside group meetings with AES-256 end-to-end encryption. Only authorized participants can view messages.",
             color: "text-teal",
         },
-
         { icon: <Users size={32} />, title: "Meetings", desc: "Create group rooms instantly. Invite multiple participants with a single link.", color: "text-teal" },
-
         { icon: <Users size={32} />, title: "Group Calls", desc: "Host meetings with up to 10 participants with ease and stability.", color: "text-teal" },
-
         { icon: <Video size={32} />, title: "HD Video Calling", desc: "Crystal clear 1080p video with adaptive bitrate streaming.", color: "text-teal" },
-
         { icon: <Monitor size={32} />, title: "Screen Sharing", desc: "Share your entire screen, a specific window, or a browser tab seamlessly.", color: "text-teal" },
-
         { icon: <Globe size={32} />, title: "Browser Based", desc: "No downloads required. Works on Chrome, Firefox, Safari, and Edge instantly.", color: "text-purple" },
     ];
 
     return (
-        <>
+        <div className="force-dark-mode"> {/* Wrapper to apply forced styles */}
             <Navbar />
 
             <style>{`
-        :root {
+        /* We use .force-dark-mode to scope these variables. 
+           Even if the global theme changes, elements inside this class will look to these variable definitions.
+        */
+        .force-dark-mode {
             --bg-page: #111b21; 
             --text-primary: #e9edef;
             --text-secondary: #8696a0;
@@ -98,34 +91,37 @@ function LoginForm() {
             --border-color: rgba(255, 255, 255, 0.1);
             --brand-teal: #00a884;
             --brand-purple: #6f42c1;
+            
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            min-height: 100vh; /* Ensure full height background */
         }
 
-        body { 
+        .force-dark-mode body { 
             background-color: var(--bg-page); 
             color: var(--text-primary); 
             font-family: sans-serif; 
             overflow-x: hidden; 
-            /* Ensure vertical scrolling is enabled */
             overflow-y: auto; 
         }
 
         /* --- CUSTOM SCROLLBAR (PREMIUM LOOK) --- */
         /* Width */
-        ::-webkit-scrollbar {
+        .force-dark-mode ::-webkit-scrollbar {
             width: 10px;
         }
         /* Track */
-        ::-webkit-scrollbar-track {
+        .force-dark-mode ::-webkit-scrollbar-track {
             background: #111b21; 
         }
         /* Handle */
-        ::-webkit-scrollbar-thumb {
+        .force-dark-mode ::-webkit-scrollbar-thumb {
             background: #374051; 
             border-radius: 5px;
             border: 2px solid #111b21; /* Creates padding effect */
         }
         /* Handle on hover */
-        ::-webkit-scrollbar-thumb:hover {
+        .force-dark-mode ::-webkit-scrollbar-thumb:hover {
             background: #00a884; /* Accents green on hover */
         }
 
@@ -376,7 +372,7 @@ function LoginForm() {
             </div>
 
             <Footer />
-        </>
+        </div>
     );
 }
 
