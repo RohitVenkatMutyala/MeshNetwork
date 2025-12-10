@@ -62,7 +62,6 @@ const VIDEO_FILTERS = [
 
 // --- NEW: RemoteVideo Component ---
 // This component handles rendering the remote streams in the grid
-// --- NEW: RemoteVideo Component (Updated with Inline Styles) ---
 const RemoteVideo = ({ peer, name, videoFit, videoFilter, onDoubleClick }) => {
     const videoRef = useRef(null);
     const [isMuted, setIsMuted] = useState(false);
@@ -71,9 +70,12 @@ const RemoteVideo = ({ peer, name, videoFit, videoFilter, onDoubleClick }) => {
         if (peer && peer.stream && videoRef.current) {
             videoRef.current.srcObject = peer.stream;
 
+            // Check for audio tracks to determine mute state
             const audioTracks = peer.stream.getAudioTracks();
             if (audioTracks.length > 0) {
                 setIsMuted(!audioTracks[0].enabled);
+
+                // Listen for mute/unmute events on the track
                 const track = audioTracks[0];
                 const handleMute = () => setIsMuted(true);
                 const handleUnmute = () => setIsMuted(false);
@@ -88,36 +90,13 @@ const RemoteVideo = ({ peer, name, videoFit, videoFilter, onDoubleClick }) => {
     }, [peer, peer.stream]);
 
     return (
-        <div 
-            className="video-tile" 
-            onDoubleClick={onDoubleClick}
-            // 1. Critical Fix: Added inline styles here to ensure dimensions apply
-            style={{
-                position: 'relative',
-                background: '#000',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                width: '100%', 
-                height: '100%' 
-            }}
-        >
+        <div className="video-tile" onDoubleClick={onDoubleClick}>
             <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 className="remote-video-element"
-                // 2. Critical Fix: Ensure video fills the tile
-                style={{ 
-                    width: '100%',
-                    height: '100%',
-                    objectFit: videoFit, 
-                    filter: videoFilter,
-                    transition: 'object-fit 0.3s ease'
-                }}
+                style={{ objectFit: videoFit, filter: videoFilter }}
             />
             <div className="video-label">
                 {isMuted && <i className="bi bi-mic-mute-fill me-2 text-danger"></i>}
@@ -1386,7 +1365,7 @@ function Call() {
     return (
         <>
             {/* --- MODIFIED: Navbar is **REMOVED** from active call --- */}
- 
+ <Navbar />
             <div className="chat-page-container">
                 {/* --- MODIFIED: Adjusted CSS for no-navbar --- */}
                 <style jsx>{`
