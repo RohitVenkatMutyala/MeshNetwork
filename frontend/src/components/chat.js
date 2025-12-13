@@ -444,37 +444,57 @@ const Chat = () => {
     };
 // Add this function inside the Chat component (before the return statement)
 
-const renderFormattedText = (text) => {
-    if (!text) return null;
-    
-    // 1. Split text by URLs (Regex matches http:// or https://)
-    const parts = text.split(/(https?:\/\/[^\s]+)/g);
-    
-    // 2. Wrap the text in a class that preserves spacing and allows breaking.
-    return (
-        <span className="msg-text-content">
-            {parts.map((part, index) => {
-                // Check if this part is a URL
-                if (part.match(/https?:\/\/[^\s]+/)) {
+// --- UPDATED HELPER FUNCTION ---
+    const renderFormattedText = (text) => {
+        if (!text) return null;
+
+        // Regex for URLs
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        // Regex for Bold text (*...*)
+        const boldRegex = /(\*[^*]+\*)/g;
+
+        // 1. Split text by URLs first
+        const parts = text.split(urlRegex);
+
+        return (
+            <span className="msg-text-content">
+                {parts.map((part, index) => {
+                    // CASE A: It is a URL -> Render clickable link
+                    if (part.match(urlRegex)) {
+                        return (
+                            <a 
+                                key={index} 
+                                href={part} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="msg-link"
+                            >
+                                {part}
+                            </a>
+                        );
+                    }
+
+                    // CASE B: Regular text -> Check for *bold* formatting inside it
+                    const subParts = part.split(boldRegex);
+                    
                     return (
-                        <a 
-                            key={index} 
-                            href={part} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="msg-link"
-                        >
-                            {part}
-                        </a>
+                        <span key={index}>
+                            {subParts.map((subPart, subIndex) => {
+                                // Check if this piece matches *...*
+                                if (subPart.match(boldRegex)) {
+                                    // Remove the asterisks (*) and wrap in <strong>
+                                    const content = subPart.substring(1, subPart.length - 1);
+                                    return <strong key={subIndex}>{content}</strong>;
+                                }
+                                // Just plain text
+                                return subPart;
+                            })}
+                        </span>
                     );
-                }
-                // Return regular text. white-space: pre-wrap handles the newlines and spaces.
-                return part;
-            })}
-        </span>
-    );
-};
-    
+                })}
+            </span>
+        );
+    };
     if (!user) return null;
 
     return (
@@ -568,8 +588,7 @@ const renderFormattedText = (text) => {
                 @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
                 /* Preserves lines/lists and wraps text properly */
 .msg-text-content {
-    white-space: pre-wrap; 
-    white-space: pre-wrap;
+   white-space: pre-wrap;
 }
 /* Styles for the links */
 .msg-link {
