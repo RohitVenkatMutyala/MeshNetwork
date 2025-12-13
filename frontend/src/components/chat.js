@@ -442,7 +442,35 @@ const Chat = () => {
         else if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
         else return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
     };
-
+const renderFormattedText = (text) => {
+        if (!text) return null;
+        
+        // 1. Split text by URLs (Regex matches http:// or https://)
+        const parts = text.split(/(https?:\/\/[^\s]+)/g);
+        
+        return (
+            <span className="msg-text-content">
+                {parts.map((part, index) => {
+                    // Check if this part is a URL
+                    if (part.match(/https?:\/\/[^\s]+/)) {
+                        return (
+                            <a 
+                                key={index} 
+                                href={part} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="msg-link"
+                            >
+                                {part}
+                            </a>
+                        );
+                    }
+                    // Return regular text
+                    return part;
+                })}
+            </span>
+        );
+    };
     if (!user) return null;
 
     return (
@@ -474,7 +502,22 @@ const Chat = () => {
                 .message-row { display: flex; width: 100%; position: relative; }
                 .row-own { justify-content: flex-end; }
                 .row-other { justify-content: flex-start; }
-                .message-bubble { max-width: 85%; padding: 6px 7px 8px 9px; border-radius: 12px; font-size: 0.95rem; line-height: 1.35; position: relative; color: var(--wa-text-primary); box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); display: flex; flex-direction: column; }
+                .message-bubble { 
+    max-width: 85%; 
+    padding: 6px 7px 8px 9px; 
+    border-radius: 12px; 
+    font-size: 0.95rem; 
+    line-height: 1.35; 
+    position: relative; 
+    color: var(--wa-text-primary); 
+    box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); 
+    display: flex; 
+    flex-direction: column;
+    /* ADD THESE LINES FOR MOBILE LAYOUT: */
+    word-wrap: break-word; 
+    overflow-wrap: break-word; 
+    word-break: break-word;
+}
                 @media(min-width: 768px) { .message-bubble { max-width: 60%; } }
                 .bubble-own { background-color: var(--wa-outgoing); border-bottom-right-radius: 0; }
                 .bubble-other { background-color: var(--wa-incoming); border-bottom-left-radius: 0; }
@@ -516,6 +559,16 @@ const Chat = () => {
                 .btn-modal-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-accent); }
                 .btn-modal-confirm { background: #ef5350; color: white; }
                 @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+                /* Preserves lines/lists and wraps text properly */
+.msg-text-content {
+    white-space: pre-wrap; 
+}
+/* Styles for the links */
+.msg-link {
+    color: #53bdeb;
+    text-decoration: underline;
+    word-break: break-all;
+}
             `}</style>
 
             <div className="chat-window">
@@ -628,7 +681,7 @@ const Chat = () => {
                                             </div>
                                         )}
 
-                                        {msg.type === 'text' && <span>{displayContent}</span>}
+                                       {msg.type === 'text' && renderFormattedText(displayContent)}
 
                                         <div className="msg-meta">
                                             <span className="msg-time">{formatTime(msg.timestamp)}</span>
