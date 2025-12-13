@@ -477,6 +477,51 @@ const GroupChat = () => {
         else if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
         else return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
     };
+    // --- TEXT FORMATTING HELPER (Links + Bold + Newlines) ---
+    const renderFormattedText = (text) => {
+        if (!text) return null;
+
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const boldRegex = /(\*[^*]+\*)/g;
+
+        // 1. Split by URLs first
+        const parts = text.split(urlRegex);
+
+        return (
+            <span className="msg-text-content">
+                {parts.map((part, index) => {
+                    // Check if it's a URL
+                    if (part.match(urlRegex)) {
+                        return (
+                            <a 
+                                key={index} 
+                                href={part} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="msg-link"
+                            >
+                                {part}
+                            </a>
+                        );
+                    }
+
+                    // Check for Bold formatting inside regular text
+                    const subParts = part.split(boldRegex);
+                    return (
+                        <span key={index}>
+                            {subParts.map((subPart, subIndex) => {
+                                if (subPart.match(boldRegex)) {
+                                    // Remove asterisks and wrap in <strong>
+                                    return <strong key={subIndex}>{subPart.slice(1, -1)}</strong>;
+                                }
+                                return subPart;
+                            })}
+                        </span>
+                    );
+                })}
+            </span>
+        );
+    };
 
     if (!user) return null;
 
@@ -508,7 +553,32 @@ const GroupChat = () => {
                 .message-row { display: flex; width: 100%; position: relative; }
                 .row-own { justify-content: flex-end; }
                 .row-other { justify-content: flex-start; }
-                .message-bubble { max-width: 85%; padding: 6px 7px 8px 9px; border-radius: 12px; font-size: 0.95rem; line-height: 1.35; position: relative; color: var(--wa-text-primary); box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); display: flex; flex-direction: column; }
+               .message-bubble { 
+    max-width: 85%; 
+    padding: 6px 7px 8px 9px; 
+    border-radius: 12px; 
+    font-size: 0.95rem; 
+    line-height: 1.35; 
+    position: relative; 
+    color: var(--wa-text-primary); 
+    box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); 
+    display: flex; 
+    flex-direction: column;
+    /* ADD THESE 3 LINES FOR MOBILE WRAPPING */
+    word-wrap: break-word; 
+    overflow-wrap: break-word; 
+    word-break: break-word;
+}
+
+/* ADD THESE NEW CLASSES */
+.msg-text-content {
+    white-space: pre-wrap; /* Preserves newlines/enter keys */
+}
+.msg-link {
+    color: #53bdeb;
+    text-decoration: underline;
+    word-break: break-all; /* Ensures long links don't break layout */
+}
                 @media(min-width: 768px) { .message-bubble { max-width: 60%; } }
                 .bubble-own { background-color: var(--wa-outgoing); border-bottom-right-radius: 0; }
                 .bubble-other { background-color: var(--wa-incoming); border-bottom-left-radius: 0; }
@@ -642,8 +712,7 @@ const GroupChat = () => {
                                             </div>
                                         )}
 
-                                        {msg.type === 'text' && <span>{displayContent}</span>}
-
+                                       {msg.type === 'text' && renderFormattedText(displayContent)}
                                         <div className="msg-meta">
                                             <span className="msg-time">{formatTime(msg.timestamp)}</span>
                                             {isOwn && (
