@@ -442,35 +442,39 @@ const Chat = () => {
         else if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
         else return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
     };
+// Add this function inside the Chat component (before the return statement)
+
 const renderFormattedText = (text) => {
-        if (!text) return null;
-        
-        // 1. Split text by URLs (Regex matches http:// or https://)
-        const parts = text.split(/(https?:\/\/[^\s]+)/g);
-        
-        return (
-            <span className="msg-text-content">
-                {parts.map((part, index) => {
-                    // Check if this part is a URL
-                    if (part.match(/https?:\/\/[^\s]+/)) {
-                        return (
-                            <a 
-                                key={index} 
-                                href={part} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="msg-link"
-                            >
-                                {part}
-                            </a>
-                        );
-                    }
-                    // Return regular text
-                    return part;
-                })}
-            </span>
-        );
-    };
+    if (!text) return null;
+    
+    // 1. Split text by URLs (Regex matches http:// or https://)
+    const parts = text.split(/(https?:\/\/[^\s]+)/g);
+    
+    // 2. Wrap the text in a class that preserves spacing and allows breaking.
+    return (
+        <span className="msg-text-content">
+            {parts.map((part, index) => {
+                // Check if this part is a URL
+                if (part.match(/https?:\/\/[^\s]+/)) {
+                    return (
+                        <a 
+                            key={index} 
+                            href={part} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="msg-link"
+                        >
+                            {part}
+                        </a>
+                    );
+                }
+                // Return regular text. white-space: pre-wrap handles the newlines and spaces.
+                return part;
+            })}
+        </span>
+    );
+};
+    
     if (!user) return null;
 
     return (
@@ -514,6 +518,9 @@ const renderFormattedText = (text) => {
     display: flex; 
     flex-direction: column;
     /* ADD THESE LINES FOR MOBILE LAYOUT: */
+    word-wrap: break-word; 
+    overflow-wrap: break-word; 
+    word-break: break-word;
     word-wrap: break-word; 
     overflow-wrap: break-word; 
     word-break: break-word;
@@ -562,6 +569,7 @@ const renderFormattedText = (text) => {
                 /* Preserves lines/lists and wraps text properly */
 .msg-text-content {
     white-space: pre-wrap; 
+    white-space: pre-wrap;
 }
 /* Styles for the links */
 .msg-link {
