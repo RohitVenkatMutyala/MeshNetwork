@@ -565,16 +565,22 @@ const GroupChat = () => {
                 }
 
                 .chat-page-container { width: 100%; height: 100vh; background-color: var(--wa-bg); display: flex; flex-direction: column; transition: background-color 0.3s ease; }
-                
-                .chat-window { 
-                    width: 100%; height: 100%; 
-                    background-color: var(--wa-bg); 
-                    /* Dynamic Pattern */
-                    background-image: radial-gradient(var(--wa-bg-pattern) 1.5px, transparent 1.5px); 
-                    background-size: 24px 24px; 
-                    display: flex; flex-direction: column; 
-                    overflow: hidden; position: relative; 
-                }
+               .chat-window { 
+    width: 100%; height: 100%; 
+    background-color: var(--wa-bg); 
+    
+    /* --- UPDATED PATTERN LOGIC --- */
+    /* Dark Mode: No pattern (Solid Color) */
+    /* Light Mode: Radial Dots */
+    background-image: ${theme === 'dark' 
+        ? 'none' 
+        : `radial-gradient(var(--wa-bg-pattern) 1.5px, transparent 1.5px)`
+    }; 
+    
+    background-size: 24px 24px; 
+    display: flex; flex-direction: column; 
+    overflow: hidden; position: relative; 
+}
 
                 .chat-header { padding: 10px 16px; background-color: var(--wa-header); display: flex; align-items: center; justify-content: space-between; color: var(--wa-text-primary); z-index: 10; box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 60px; flex-shrink: 0; }
                 .recipient-info { display: flex; align-items: center; gap: 12px; cursor: pointer; }
