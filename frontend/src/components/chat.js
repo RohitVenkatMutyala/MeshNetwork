@@ -503,29 +503,39 @@ const Chat = () => {
         <div className="chat-page-container">
             <style jsx>{`
                :root {
-                    /* --- DYNAMIC THEME VARIABLES --- */
-                    
-                    /* Backgrounds */
-                    --wa-bg: ${theme === 'dark' ? '#0b141a' : '#efe7dd'}; /* Dark: Deep Blue | Light: Chat Beige */
-                    --wa-header: ${theme === 'dark' ? '#202c33' : '#f0f2f5'}; /* Dark: Gray-Blue | Light: Light Gray */
-                    --wa-input-bg: ${theme === 'dark' ? '#2a3942' : '#ffffff'}; /* Dark: Lighter Gray | Light: White */
-                    
-                    /* Message Bubbles */
-                    --wa-outgoing: ${theme === 'dark' ? '#005c4b' : '#d9fdd3'}; /* Dark: Greenish | Light: Light Green */
-                    --wa-incoming: ${theme === 'dark' ? '#202c33' : '#ffffff'}; /* Dark: Gray-Blue | Light: White */
-                    
-                    /* Text Colors */
-                    --wa-text-primary: ${theme === 'dark' ? '#e9edef' : '#111b21'}; /* Dark: White | Light: Black */
-                    --wa-text-secondary: ${theme === 'dark' ? '#8696a0' : '#54656f'}; /* Dark: Gray | Light: Dark Gray */
-                    
-                    /* Accents */
-                    --wa-accent: ${theme === 'dark' ? '#34b7f1' : '#00a884'}; /* Dark: Blue | Light: WhatsApp Green */
-                    --wa-tick-read: #53bdeb;
-                    --wa-tick-sent: ${theme === 'dark' ? '#8696a0' : '#667781'};
-                    
-                    /* Background Pattern Dots */
-                    --wa-bg-pattern: ${theme === 'dark' ? '#2a3942' : 'rgba(0,0,0,0.08)'};
-                }
+    /* --- DYNAMIC THEME VARIABLES --- */
+    
+    /* Backgrounds */
+    /* Dark: #0b141a (Your Original) | Light: White */
+    --wa-bg: ${theme === 'dark' ? '#0b141a' : '#ffffff'};
+    
+    /* Header/Footer */
+    /* Dark: #202c33 (Your Original) | Light: Light Gray */
+    --wa-header: ${theme === 'dark' ? '#202c33' : '#f0f2f5'};
+    
+    /* Input Field */
+    /* Dark: #2a3942 (Your Original) | Light: White */
+    --wa-input-bg: ${theme === 'dark' ? '#2a3942' : '#ffffff'};
+    
+    /* Message Bubbles */
+    /* Dark: #0c3e59 (Your Original Blue) | Light: Very Light Blue (Not Green) */
+    --wa-outgoing: ${theme === 'dark' ? '#0c3e59' : '#e1f5fe'};
+    
+    /* Dark: #202c33 (Your Original) | Light: White */
+    --wa-incoming: ${theme === 'dark' ? '#202c33' : '#ffffff'};
+    
+    /* Text Colors */
+    --wa-text-primary: ${theme === 'dark' ? '#e9edef' : '#111b21'};
+    --wa-text-secondary: ${theme === 'dark' ? '#8696a0' : '#54656f'};
+    
+    /* Accents */
+    --wa-accent: ${theme === 'dark' ? '#34b7f1' : '#0088cc'};
+    --wa-tick-read: #53bdeb;
+    --wa-tick-sent: ${theme === 'dark' ? '#8696a0' : '#667781'};
+    
+    /* Pattern */
+    --wa-bg-pattern: ${theme === 'dark' ? '#2a3942' : 'rgba(0,0,0,0.05)'};
+}
                 .chat-page-container { width: 100%; height: 100vh; background-color: var(--wa-bg); display: flex; flex-direction: column; }
                 .chat-window { width: 100%; height: 100%; background-color: var(--wa-bg); background-image: radial-gradient(var(--wa-bg-pattern) 1.5px, transparent 1.5px);; background-size: 24px 24px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
                 .chat-header { padding: 10px 16px; background-color: var(--wa-header); display: flex; align-items: center; justify-content: space-between; color: var(--wa-text-primary); z-index: 10; box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 60px; flex-shrink: 0; }
@@ -567,11 +577,11 @@ const Chat = () => {
     word-break: break-word;
 }
                 @media(min-width: 768px) { .message-bubble { max-width: 60%; } }
-               .bubble-own { 
-                    background-color: var(--wa-outgoing); 
-                    border-bottom-right-radius: 0;
-                    color: var(--wa-text-primary); /* Ensure text is readable */
-                }
+              .bubble-own { 
+    background-color: var(--wa-outgoing); 
+    border-bottom-right-radius: 0; 
+    color: var(--wa-text-primary);
+}
                 .bubble-other { background-color: var(--wa-incoming); border-bottom-left-radius: 0; }
                 .delete-btn { position: absolute; top: -8px; right: -8px; background: #202c33; color: #ef5350; border-radius: 50%; width: 20px; height: 20px; display: none; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; border: 1px solid #333; z-index: 2; }
                 .message-row:hover .delete-btn { display: flex; }
@@ -589,9 +599,9 @@ const Chat = () => {
                 .read-ticks { font-size: 0.9rem; }
                 .read-ticks.blue { color: var(--wa-tick-read); }
                 .read-ticks.grey { color: var(--wa-tick-sent); }
-               .bubble-own .msg-time { 
-                    color: ${theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.45)'}; 
-                }
+              .bubble-own .msg-time { 
+    color: ${theme === 'dark' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.45)'}; 
+}
                 .chat-footer { padding: 8px 10px; background-color: var(--wa-header); display: flex; align-items: center; gap: 10px; z-index: 10; flex-shrink: 0; }
                 .chat-input-bar { flex: 1; background-color: var(--wa-input-bg); border-radius: 20px; padding: 10px 16px; border: none; color: var(--wa-text-primary); font-size: 1rem; outline: none; }
                 .chat-input-bar::placeholder { color: var(--wa-text-secondary); }
