@@ -519,7 +519,7 @@ const Chat = () => {
     
     /* Message Bubbles */
     /* Dark: #0c3e59 (Your Original Blue) | Light: Very Light Blue (Not Green) */
-    --wa-outgoing: ${theme === 'dark' ? '#0c3e59' : '#66bde5ff'};
+    --wa-outgoing: ${theme === 'dark' ? '#0c3e59' : '#e1f5fe'};
     
     /* Dark: #202c33 (Your Original) | Light: White */
     --wa-incoming: ${theme === 'dark' ? '#202c33' : '#ffffff'};
