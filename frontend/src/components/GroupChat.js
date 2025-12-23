@@ -121,6 +121,7 @@ const SecureFileDownload = ({ url, fileName, fileSize, secretKey }) => {
 
 const GroupChat = () => {
     const { user } = useAuth();
+    const { theme } = useTheme();
     const { chatId } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
