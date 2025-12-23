@@ -501,7 +501,7 @@ const Chat = () => {
 
     return (
         <div className="chat-page-container">
-          <style jsx>{`
+<style jsx>{`
     :root {
         /* --- DYNAMIC THEME VARIABLES --- */
         
@@ -542,7 +542,9 @@ const Chat = () => {
         width: 100%; height: 100%; 
         background-color: var(--wa-bg); 
         
-        /* --- FIX: Dynamic Background Image --- */
+        /* --- FIX 1: DYNAMIC BACKGROUND PATTERN --- */
+        /* Dark Mode: 'none' (Solid Color) */
+        /* Light Mode: 'radial-gradient' (Dots) */
         background-image: ${theme === 'dark' ? 'none' : 'radial-gradient(var(--wa-bg-pattern) 1.5px, transparent 1.5px)'};
         
         background-size: 24px 24px; 
@@ -588,7 +590,6 @@ const Chat = () => {
         word-break: break-word;
     }
     
-    /* LINKS AND FORMATTING */
     .msg-text-content { white-space: pre-wrap; }
     .msg-link { color: var(--wa-accent); text-decoration: underline; word-break: break-all; }
 
@@ -617,7 +618,7 @@ const Chat = () => {
     .msg-meta { display: flex; justify-content: flex-end; align-items: center; margin-top: 2px; gap: 4px; }
     .msg-time { font-size: 0.68rem; color: var(--wa-text-secondary); }
     
-    /* Fix timestamp color visibility for Light mode in Own bubbles */
+    /* Fix timestamp visibility */
     .bubble-own .msg-time { 
         color: ${theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.45)'}; 
     }
@@ -642,15 +643,35 @@ const Chat = () => {
     .chat-body::-webkit-scrollbar-track { background: transparent; }
     .chat-body::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.3); border-radius: 3px; }
     
-    /* MODALS CSS */
-    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 2000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
-    .delete-modal { background: var(--wa-header); color: var(--wa-text-primary); padding: 20px; border-radius: 12px; width: 300px; max-width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; animation: fadeIn 0.2s ease-out; }
+    /* --- FIX 2: MODAL CENTERING --- */
+    .delete-modal-overlay { 
+        position: fixed; 
+        top: 0; left: 0; right: 0; bottom: 0; 
+        background: rgba(0,0,0,0.7); 
+        z-index: 2000; 
+        display: flex; 
+        align-items: center; /* Centers vertically */
+        justify-content: center; /* Centers horizontally */
+        backdrop-filter: blur(2px); 
+    }
+    .delete-modal { 
+        background: var(--wa-header); 
+        color: var(--wa-text-primary); 
+        padding: 20px; 
+        border-radius: 12px; 
+        width: 300px; 
+        max-width: 90%; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+        text-align: center; 
+        animation: fadeIn 0.2s ease-out; 
+    }
     .delete-modal h5 { margin-bottom: 10px; font-size: 1.1rem; }
     .delete-modal p { color: var(--wa-text-secondary); font-size: 0.9rem; margin-bottom: 20px; }
     .delete-actions { display: flex; justify-content: center; gap: 10px; }
     .btn-modal { padding: 8px 16px; border: none; border-radius: 20px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
     .btn-modal-cancel { background: transparent; color: var(--wa-accent); border: 1px solid var(--wa-accent); }
     .btn-modal-confirm { background: #ef5350; color: white; }
+    
     @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 `}</style>
 
