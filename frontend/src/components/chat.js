@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { toast } from 'react-toastify';
 import { v4 as uuidv4 } from 'uuid';
 import CryptoJS from 'crypto-js';
@@ -500,13 +501,32 @@ const Chat = () => {
     return (
         <div className="chat-page-container">
             <style jsx>{`
-                :root {
-                    --wa-bg: #0b141a; --wa-header: #202c33; --wa-outgoing: #0c3e59; --wa-incoming: #202c33;
-                    --wa-input-bg: #2a3942; --wa-text-primary: #e9edef; --wa-text-secondary: #8696a0;
-                    --wa-accent: #34b7f1; --wa-tick-read: #53bdeb; --wa-tick-sent: #8696a0; 
+               :root {
+                    /* --- DYNAMIC THEME VARIABLES --- */
+                    
+                    /* Backgrounds */
+                    --wa-bg: ${theme === 'dark' ? '#0b141a' : '#efe7dd'}; /* Dark: Deep Blue | Light: Chat Beige */
+                    --wa-header: ${theme === 'dark' ? '#202c33' : '#f0f2f5'}; /* Dark: Gray-Blue | Light: Light Gray */
+                    --wa-input-bg: ${theme === 'dark' ? '#2a3942' : '#ffffff'}; /* Dark: Lighter Gray | Light: White */
+                    
+                    /* Message Bubbles */
+                    --wa-outgoing: ${theme === 'dark' ? '#005c4b' : '#d9fdd3'}; /* Dark: Greenish | Light: Light Green */
+                    --wa-incoming: ${theme === 'dark' ? '#202c33' : '#ffffff'}; /* Dark: Gray-Blue | Light: White */
+                    
+                    /* Text Colors */
+                    --wa-text-primary: ${theme === 'dark' ? '#e9edef' : '#111b21'}; /* Dark: White | Light: Black */
+                    --wa-text-secondary: ${theme === 'dark' ? '#8696a0' : '#54656f'}; /* Dark: Gray | Light: Dark Gray */
+                    
+                    /* Accents */
+                    --wa-accent: ${theme === 'dark' ? '#34b7f1' : '#00a884'}; /* Dark: Blue | Light: WhatsApp Green */
+                    --wa-tick-read: #53bdeb;
+                    --wa-tick-sent: ${theme === 'dark' ? '#8696a0' : '#667781'};
+                    
+                    /* Background Pattern Dots */
+                    --wa-bg-pattern: ${theme === 'dark' ? '#2a3942' : 'rgba(0,0,0,0.08)'};
                 }
                 .chat-page-container { width: 100%; height: 100vh; background-color: var(--wa-bg); display: flex; flex-direction: column; }
-                .chat-window { width: 100%; height: 100%; background-color: var(--wa-bg); background-image: radial-gradient(#2a3942 1.5px, transparent 1.5px); background-size: 24px 24px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+                .chat-window { width: 100%; height: 100%; background-color: var(--wa-bg); background-image: radial-gradient(var(--wa-bg-pattern) 1.5px, transparent 1.5px);; background-size: 24px 24px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
                 .chat-header { padding: 10px 16px; background-color: var(--wa-header); display: flex; align-items: center; justify-content: space-between; color: var(--wa-text-primary); z-index: 10; box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 60px; flex-shrink: 0; }
                 .recipient-info { display: flex; align-items: center; gap: 12px; cursor: pointer; }
                 .avatar-circle { width: 40px; height: 40px; background: #6a7f8a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 1.1rem; }
@@ -546,7 +566,11 @@ const Chat = () => {
     word-break: break-word;
 }
                 @media(min-width: 768px) { .message-bubble { max-width: 60%; } }
-                .bubble-own { background-color: var(--wa-outgoing); border-bottom-right-radius: 0; }
+               .bubble-own { 
+                    background-color: var(--wa-outgoing); 
+                    border-bottom-right-radius: 0;
+                    color: var(--wa-text-primary); /* Ensure text is readable */
+                }
                 .bubble-other { background-color: var(--wa-incoming); border-bottom-left-radius: 0; }
                 .delete-btn { position: absolute; top: -8px; right: -8px; background: #202c33; color: #ef5350; border-radius: 50%; width: 20px; height: 20px; display: none; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; border: 1px solid #333; z-index: 2; }
                 .message-row:hover .delete-btn { display: flex; }
@@ -564,7 +588,9 @@ const Chat = () => {
                 .read-ticks { font-size: 0.9rem; }
                 .read-ticks.blue { color: var(--wa-tick-read); }
                 .read-ticks.grey { color: var(--wa-tick-sent); }
-                .bubble-own .msg-time { color: rgba(255,255,255,0.7); }
+               .bubble-own .msg-time { 
+                    color: ${theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.45)'}; 
+                }
                 .chat-footer { padding: 8px 10px; background-color: var(--wa-header); display: flex; align-items: center; gap: 10px; z-index: 10; flex-shrink: 0; }
                 .chat-input-bar { flex: 1; background-color: var(--wa-input-bg); border-radius: 20px; padding: 10px 16px; border: none; color: var(--wa-text-primary); font-size: 1rem; outline: none; }
                 .chat-input-bar::placeholder { color: var(--wa-text-secondary); }
