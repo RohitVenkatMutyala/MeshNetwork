@@ -657,9 +657,9 @@ const Chat = () => {
             <div className="chat-window">
                 <div className="chat-header">
                     <div className="recipient-info">
-                        <button className="icon-btn me-2" onClick={handleClose}>
+                       {/* <button className="icon-btn me-2" onClick={handleClose}>
                              <i className="bi bi-arrow-left"></i>
-                        </button>
+                        </button> */}
                         
                         <div className="avatar-circle">
                             {recipientName ? recipientName.charAt(0).toUpperCase() : '?'}

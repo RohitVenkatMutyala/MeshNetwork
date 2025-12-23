@@ -695,9 +695,9 @@ const GroupChat = () => {
             <div className="chat-window">
                 <div className="chat-header">
                     <div className="recipient-info">
-                        <button className="icon-btn me-2" onClick={handleClose}>
+                          {/* <button className="icon-btn me-2" onClick={handleClose}>
                              <i className="bi bi-arrow-left"></i>
-                        </button>
+                        </button> */}
                         <div className="avatar-circle"> <i className="bi bi-people-fill"></i> </div>
                         <div style={{display: 'flex', flexDirection: 'column'}}>
                             <span style={{fontWeight: 500, fontSize: '1rem'}}>{groupName}</span>
