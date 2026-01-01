@@ -1,79 +1,158 @@
 <svg width="600" height="600" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Main gradient -->
-    <linearGradient id="customGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#f12711;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#f5af19;stop-opacity:1" />
+    <!-- Outer circle gradient - dark gray to black -->
+    <linearGradient id="circleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3a3a3a;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2a2a2a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a1a;stop-opacity:1" />
     </linearGradient>
     
-    <!-- 3D shadow gradient -->
+    <!-- 3D shadow gradient for circle -->
     <radialGradient id="shadowGradient" cx="30%" cy="30%" r="70%">
-      <stop offset="0%" style="stop-color:#f5af19;stop-opacity:0.8" />
-      <stop offset="100%" style="stop-color:#d10000;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#4a4a4a;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#000000;stop-opacity:0.9" />
     </radialGradient>
     
-    <!-- Triangle gradient for 3D effect -->
+    <!-- Triangle gradient - cyan -->
     <linearGradient id="triangleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#00FFFF;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#00E6E6;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#00CCCC;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#5FFBF1;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#3DE8DE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00CCC4;stop-opacity:1" />
     </linearGradient>
     
-    <!-- Triangle shadow -->
+    <!-- Triangle 3D shadow -->
     <linearGradient id="triangleShadow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#008B8B;stop-opacity:0.8" />
-      <stop offset="100%" style="stop-color:#006666;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#008B85;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#006660;stop-opacity:1" />
     </linearGradient>
     
-    <!-- Highlight gradient -->
-    <radialGradient id="highlightGradient" cx="35%" cy="35%" r="60%">
-      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.4" />
+    <!-- Triangle inner glow -->
+    <radialGradient id="triangleGlow" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" style="stop-color:#B8FFF9;stop-opacity:0.8" />
+      <stop offset="50%" style="stop-color:#5FFBF1;stop-opacity:0.4" />
+      <stop offset="100%" style="stop-color:#3DE8DE;stop-opacity:0" />
+    </radialGradient>
+    
+    <!-- Outer glow effect -->
+    <radialGradient id="outerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="70%" style="stop-color:#2a2a2a;stop-opacity:0" />
+      <stop offset="100%" style="stop-color:#1a1a1a;stop-opacity:0.8" />
+    </radialGradient>
+    
+    <!-- Metallic highlight for 3D -->
+    <linearGradient id="metallicHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.5" />
+      <stop offset="50%" style="stop-color:#ffffff;stop-opacity:0.1" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.3" />
+    </linearGradient>
+    
+    <!-- Glass effect for depth -->
+    <radialGradient id="glassEffect" cx="30%" cy="25%" r="70%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.3" />
+      <stop offset="50%" style="stop-color:#ffffff;stop-opacity:0.05" />
       <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
     </radialGradient>
     
-    <!-- Inner glow -->
-    <radialGradient id="innerGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.3" />
-      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
-    </radialGradient>
+    <!-- Text gradient -->
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#5FFBF1;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#3DE8DE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00CCC4;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Bevel effect for 3D depth -->
+    <filter id="bevel">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>
+      <feSpecularLighting in="blur" surfaceScale="5" specularConstant="0.75" specularExponent="20" lighting-color="#ffffff" result="spec">
+        <fePointLight x="-5000" y="-10000" z="20000"/>
+      </feSpecularLighting>
+      <feComposite in="spec" in2="SourceAlpha" operator="in" result="specOut"/>
+      <feComposite in="SourceGraphic" in2="specOut" operator="arithmetic" k1="0" k2="1" k3="1" k4="0"/>
+    </filter>
   </defs>
   
-  <!-- 3D Shadow base -->
-  <circle cx="208" cy="208" r="160" fill="url(#shadowGradient)" opacity="0.6"/>
+  <!-- Deep outer glow -->
+  <circle cx="200" cy="200" r="180" fill="url(#outerGlow)" opacity="0.9"/>
   
-  <!-- Main circle with gradient -->
-  <circle cx="200" cy="200" r="160" fill="url(#customGradient)"/>
+  <!-- 3D Shadow base - offset for depth -->
+  <circle cx="208" cy="208" r="160" fill="url(#shadowGradient)" opacity="0.7"/>
   
-  <!-- Inner shadow for depth -->
-  <circle cx="200" cy="200" r="160" fill="radial-gradient(circle at 30% 30%, transparent 60%, rgba(0,0,0,0.2) 100%)"/>
+  <!-- Main circle with dark gradient -->
+  <circle cx="200" cy="200" r="160" fill="url(#circleGradient)"/>
   
-  <!-- Triangle shadow (for 3D depth) -->
-  <polygon points="200,80 280,220 120,220" fill="url(#triangleShadow)" transform="translate(4, 4)"/>
+  <!-- Inner shadow ring for 3D depth -->
+  <circle cx="200" cy="200" r="160" fill="radial-gradient(circle at 30% 30%, transparent 50%, rgba(0,0,0,0.5) 100%)"/>
   
-  <!-- Main triangle -->
-  <polygon points="200,80 280,220 120,220" fill="url(#triangleGradient)"/>
+  <!-- Highlight ring for 3D effect -->
+  <circle cx="200" cy="200" r="160" fill="radial-gradient(circle at 25% 25%, rgba(255,255,255,0.15) 0%, transparent 40%)"/>
   
-  <!-- Triangle highlight for 3D effect -->
-  <polygon points="200,80 240,150 160,150" fill="url(#innerGlow)"/>
+  <!-- Inner depth ring -->
+  <circle cx="200" cy="200" r="150" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  <circle cx="200" cy="200" r="145" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="1"/>
   
-  <!-- Left edge highlight -->
-  <polygon points="200,80 160,150 120,220 125,215 165,145 200,85" fill="rgba(255,255,255,0.3)"/>
+  <!-- Triangle 3D shadow layer -->
+  <polygon points="200,85 280,220 120,220" fill="url(#triangleShadow)" transform="translate(5, 5)" opacity="0.6"/>
+  <polygon points="200,85 280,220 120,220" fill="rgba(0,0,0,0.3)" transform="translate(3, 3)"/>
   
-  <!-- Top edge highlight -->
-  <polygon points="200,80 200,85 275,215 280,220 200,80" fill="rgba(255,255,255,0.2)"/>
+  <!-- Main triangle with cyan gradient -->
+  <polygon points="200,85 280,220 120,220" fill="url(#triangleGradient)" filter="url(#bevel)"/>
   
-  <!-- Center dot -->
-  <circle cx="200" cy="180" r="8" fill="#004D4D"/>
-  <circle cx="200" cy="180" r="6" fill="#00FFFF"/>
-  <circle cx="198" cy="178" r="2" fill="rgba(255,255,255,0.8)"/>
+  <!-- Triangle inner glow for depth -->
+  <polygon points="200,85 280,220 120,220" fill="url(#triangleGlow)"/>
   
-  <!-- Outer circle 3D highlight -->
-  <circle cx="200" cy="200" r="160" fill="url(#highlightGradient)"/>
+  <!-- Triangle 3D edge highlights -->
+  <polygon points="200,85 203,88 277,217 280,220" fill="rgba(255,255,255,0.35)"/>
+  <polygon points="200,85 203,88 123,217 120,220" fill="rgba(255,255,255,0.25)"/>
+  <polygon points="200,85 280,220 275,220 200,90" fill="rgba(255,255,255,0.15)"/>
   
-  <!-- Outer rim for 3D effect -->
-  <circle cx="200" cy="200" r="160" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="4"/>
-  <circle cx="197" cy="197" r="157" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+  <!-- Triangle bottom edge shadow -->
+  <polygon points="120,220 125,215 275,215 280,220" fill="rgba(0,0,0,0.4)"/>
   
-  <!-- Additional inner rim -->
-  <circle cx="200" cy="200" r="145" fill="none" stroke="rgba(0,0,0,0.1)" stroke-width="1"/>
+  <!-- Metallic shine on triangle top -->
+  <polygon points="200,85 245,145 155,145" fill="url(#metallicHighlight)"/>
+  
+  <!-- Center dot with 3D effect -->
+  <circle cx="200" cy="175" r="12" fill="rgba(0,0,0,0.5)"/>
+  <circle cx="200" cy="175" r="10" fill="#004D4D"/>
+  <circle cx="200" cy="175" r="8" fill="url(#triangleGradient)"/>
+  <circle cx="198" cy="173" r="3" fill="rgba(255,255,255,0.9)"/>
+  <circle cx="197" cy="172" r="1.5" fill="rgba(255,255,255,1)"/>
+  
+  <!-- 2026 Text with 3D effect -->
+  <text x="202" y="292" font-family="Arial, sans-serif" font-size="44" font-weight="bold" text-anchor="middle" fill="rgba(0,0,0,0.6)">2026</text>
+  <text x="200" y="290" font-family="Arial, sans-serif" font-size="44" font-weight="bold" text-anchor="middle" fill="url(#textGradient)" stroke="rgba(0,0,0,0.5)" stroke-width="2">2026</text>
+  <text x="200" y="290" font-family="Arial, sans-serif" font-size="44" font-weight="bold" text-anchor="middle" fill="url(#textGradient)">2026</text>
+  
+  <!-- Glow effect on text -->
+  <text x="200" y="290" font-family="Arial, sans-serif" font-size="44" font-weight="bold" text-anchor="middle" fill="none" stroke="#5FFBF1" stroke-width="0.5" opacity="0.7">2026</text>
+  
+  <!-- Decorative elements -->
+  <circle cx="95" cy="120" r="3" fill="#5FFBF1" opacity="0.9">
+    <animate attributeName="opacity" values="0.9;0.4;0.9" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="305" cy="120" r="3" fill="#3DE8DE" opacity="0.9">
+    <animate attributeName="opacity" values="0.4;0.9;0.4" dur="2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="90" cy="280" r="2.5" fill="#00CCC4" opacity="0.8">
+    <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="310" cy="280" r="2.5" fill="#5FFBF1" opacity="0.8">
+    <animate attributeName="opacity" values="0.3;0.8;0.3" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- Accent lines -->
+  <line x1="70" y1="200" x2="85" y2="200" stroke="url(#textGradient)" stroke-width="2" opacity="0.6"/>
+  <line x1="315" y1="200" x2="330" y2="200" stroke="url(#textGradient)" stroke-width="2" opacity="0.6"/>
+  
+  <!-- Outer rim with enhanced 3D -->
+  <circle cx="200" cy="200" r="161" fill="none" stroke="rgba(0,0,0,0.5)" stroke-width="6" opacity="0.8"/>
+  <circle cx="200" cy="200" r="160" fill="none" stroke="rgba(0,0,0,0.4)" stroke-width="4"/>
+  <circle cx="197" cy="197" r="157" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2.5"/>
+  <circle cx="196" cy="196" r="156" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  
+  <!-- Additional inner accent rim -->
+  <circle cx="200" cy="200" r="143" fill="none" stroke="rgba(95,251,241,0.25)" stroke-width="1.5"/>
+  
+  <!-- Glass overlay effect on entire circle -->
+  <circle cx="200" cy="200" r="160" fill="url(#glassEffect)" opacity="0.9"/>
 </svg>
